@@ -1,0 +1,188 @@
+/* App chrome: home page, viewer HUD, toasts, panels. */
+:root {
+  --app-bg: #0b0e17;
+  --app-panel: #141927;
+  --app-line: #262d40;
+  --app-text: #e8ebf5;
+  --app-muted: #8b93ab;
+  --app-accent: #5eead4;
+  --app-warn: #fbbf24;
+  --app-err: #f87171;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not(.sk-theme-aurora):not(.sk-theme-paper) {
+    --app-bg: #f6f7fb;
+    --app-panel: #ffffff;
+    --app-line: #dfe3ee;
+    --app-text: #151a2a;
+    --app-muted: #5d667f;
+    --app-accent: #0d9488;
+    color-scheme: light;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--app-bg);
+  color: var(--app-text);
+  font: 16px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+button { font: inherit; }
+
+/* ---- home ---- */
+.home { max-width: 960px; margin: 0 auto; padding: 64px 16px 96px; display: grid; gap: 48px; }
+.home-head h1 { margin: 0; font-size: 44px; letter-spacing: -0.03em; }
+.home-head p { margin: 6px 0 0; color: var(--app-muted); font-size: 18px; }
+.home h2 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--app-muted); margin: 0 0 14px; }
+.deck-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.deck-card {
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  background: var(--app-panel);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.deck-card:hover { border-color: var(--app-accent); transform: translateY(-2px); }
+.deck-card.theme-aurora { border-left: 4px solid #5eead4; }
+.deck-card.theme-paper { border-left: 4px solid #c2410c; }
+.deck-title { font-weight: 600; font-size: 17px; }
+.deck-meta { color: var(--app-muted); font-size: 13px; }
+.empty { color: var(--app-muted); }
+.home-connect p { margin: 0 0 10px; }
+.home-connect .hint { color: var(--app-muted); margin-top: 12px; }
+.cmd { position: relative; }
+.cmd pre {
+  margin: 0;
+  padding: 16px 18px;
+  padding-right: 84px;
+  background: var(--app-panel);
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  overflow-x: auto;
+  font: 13px/1.6 "JetBrains Mono", ui-monospace, monospace;
+}
+.copy {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--app-line);
+  background: var(--app-bg);
+  color: var(--app-text);
+  cursor: pointer;
+}
+.app-missing { padding: 64px 16px; text-align: center; color: var(--app-muted); }
+
+/* ---- viewer HUD ---- */
+.sk-viewer-page { overflow: hidden; }
+.hud {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translate(-50%, 0);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
+  padding: 6px 8px 6px 16px;
+  border-radius: 999px;
+  background: rgba(12, 15, 25, 0.82);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e8ebf5;
+  font-size: 13px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+}
+.hud-active .hud, .hud:hover, .hud:focus-within { opacity: 1; pointer-events: auto; }
+.hud-hidden .hud { display: none; }
+.hud-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.hud-pos { color: #9aa3bd; font-variant-numeric: tabular-nums; padding: 0 6px; }
+.hud-live { display: inline-flex; align-items: center; gap: 6px; color: #9aa3bd; padding: 0 6px; }
+.hud-live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+.hud-live[data-state="on"]::before { background: #34d399; box-shadow: 0 0 10px #34d399; }
+.hud-live[data-state="off"]::before { background: #f87171; }
+.hud-btn, .hud-lint {
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 13px;
+}
+.hud-btn:hover, .hud-lint:hover { background: rgba(255, 255, 255, 0.16); }
+.hud-btn[aria-pressed="true"] { color: #5eead4; }
+.hud-lint[data-state="ok"] { color: #34d399; }
+.hud-lint[data-state="warning"] { color: #fbbf24; }
+.hud-lint[data-state="error"] { color: #f87171; }
+.hud-progress { position: fixed; left: 0; right: 0; bottom: 0; height: 3px; z-index: 9; }
+.hud-progress div { height: 100%; width: 0; background: var(--sk-accent, #5eead4); transition: width 0.4s ease; }
+.hud-hidden .hud-progress { display: none; }
+
+.toast {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 11;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(12, 15, 25, 0.88);
+  color: #e8ebf5;
+  border: 1px solid rgba(94, 234, 212, 0.4);
+  font-size: 13px;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: none; }
+
+.lint-panel, .help {
+  position: fixed;
+  right: 18px;
+  bottom: 74px;
+  z-index: 12;
+  width: min(420px, calc(100vw - 32px));
+  max-height: 60vh;
+  overflow: auto;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(12, 15, 25, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e8ebf5;
+  font-size: 13px;
+}
+.lint-panel h2, .help h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #9aa3bd; }
+.lint-row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  border: 0;
+  border-left: 3px solid #6b7280;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+}
+.lint-row small { color: #9aa3bd; }
+.lint-error { border-left-color: #f87171; }
+.lint-warning { border-left-color: #fbbf24; }
+.lint-info { border-left-color: #60a5fa; }
+.help { left: 50%; right: auto; top: 50%; bottom: auto; transform: translate(-50%, -50%); }
+.help dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; }
+.help dt { font-family: ui-monospace, monospace; color: #5eead4; }
+.help dd { margin: 0; }
