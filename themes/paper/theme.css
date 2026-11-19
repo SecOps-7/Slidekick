@@ -1,0 +1,23 @@
+/* Paper: editorial rules and a quiet grain. */
+.sk-theme-paper .sk-slide {
+  background-image: radial-gradient(color-mix(in oklab, var(--sk-text) 5%, transparent) 1px, transparent 1px);
+  background-size: 6px 6px;
+}
+.sk-theme-paper .sk-slide[data-bg-image] { background-size: cover; }
+.sk-theme-paper .sk-layout-title-body .sk-region-title,
+.sk-theme-paper .sk-layout-two-column .sk-region-title,
+.sk-theme-paper .sk-layout-grid-3 .sk-region-title {
+  border-bottom: 3px solid var(--sk-text);
+  padding-bottom: 18px;
+}
+.sk-theme-paper .sk-el-heading { font-variation-settings: "opsz" 144; letter-spacing: -0.01em; }
+.sk-theme-paper .sk-el-quote blockquote::before {
+  content: "\201C";
+  display: block;
+  font-family: var(--sk-font-heading);
+  font-size: 220px;
+  line-height: 0.6;
+  color: var(--sk-accent);
+}
+.sk-theme-paper .sk-el-bullets li::marker { color: var(--sk-accent); }
+.sk-theme-paper .sk-layout-grid-3 .sk-card { border-top: 6px solid var(--sk-accent); background: var(--sk-surface); box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 12px 30px -18px rgba(0,0,0,.25); }

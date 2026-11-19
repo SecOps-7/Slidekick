@@ -1,0 +1,9 @@
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+data/
+*.db
+*.db-*
+.env
+/slidekick
+.temp/

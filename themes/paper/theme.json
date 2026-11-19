@@ -1,0 +1,25 @@
+{
+  "name": "paper",
+  "label": "Paper",
+  "description": "Light, editorial. Warm off-white, serif headlines, a single vermilion accent. Good for strategy, research and reports.",
+  "dark": false,
+  "tokens": {
+    "color": {
+      "bg": "#f6f1e7",
+      "surface": "#fffdf8",
+      "text": "#1d1b17",
+      "muted": "#6b6458",
+      "accent": "#c2410c",
+      "accent2": "#1e3a8a"
+    },
+    "font": {
+      "heading": "\"Fraunces\", Georgia, serif",
+      "body": "\"Source Sans 3\", system-ui, sans-serif",
+      "mono": "\"IBM Plex Mono\", ui-monospace, monospace"
+    },
+    "fontImport": "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono&family=Source+Sans+3:wght@400;600&display=swap",
+    "size": { "xs": 22, "sm": 28, "md": 34, "lg": 50, "xl": 72, "xxl": 112 },
+    "radius": 4,
+    "motion": { "fast": 200, "base": 420, "slow": 700, "easing": "cubic-bezier(0.4, 0, 0.2, 1)" }
+  }
+}

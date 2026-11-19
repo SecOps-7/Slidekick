@@ -1,0 +1,317 @@
+{
+  "schemaVersion": 1,
+  "id": "d_launch",
+  "title": "Introducing Slidekick",
+  "theme": "aurora",
+  "aspect": "16:9",
+  "slides": [
+    {
+      "id": "s_open",
+      "layout": "title",
+      "transition": {
+        "type": "fade",
+        "duration": "slow"
+      },
+      "regions": {
+        "title": [
+          {
+            "id": "brand",
+            "type": "heading",
+            "props": {
+              "text": "Slidekick",
+              "level": 1
+            },
+            "style": {
+              "size": "xxl"
+            }
+          }
+        ],
+        "subtitle": [
+          {
+            "id": "tagline",
+            "type": "text",
+            "props": {
+              "text": "Agents write the deck. You watch it move."
+            },
+            "style": {
+              "color": "muted",
+              "size": "lg"
+            },
+            "build": {
+              "step": 1,
+              "preset": "fade-up"
+            }
+          }
+        ]
+      },
+      "notes": "Open on the promise: an agent builds the deck live while the audience watches."
+    },
+    {
+      "id": "s_problem",
+      "layout": "title-body",
+      "transition": {
+        "type": "push"
+      },
+      "regions": {
+        "title": [
+          {
+            "id": "h_main",
+            "type": "heading",
+            "props": {
+              "text": "AI slide tools stop at **static**",
+              "level": 2
+            }
+          }
+        ],
+        "body": [
+          {
+            "id": "b_problem",
+            "type": "bullets",
+            "props": {
+              "items": [
+                "Markdown wrappers give flat slides",
+                "Deck generators export PPTX and walk away",
+                "Nobody lets you watch, then take the wheel"
+              ],
+              "buildEach": true
+            },
+            "build": {
+              "step": 1,
+              "preset": "fade-up"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "s_schema",
+      "layout": "two-column",
+      "transition": {
+        "type": "morph"
+      },
+      "regions": {
+        "title": [
+          {
+            "id": "h_main",
+            "type": "heading",
+            "props": {
+              "text": "Slides are data, not HTML",
+              "level": 2
+            }
+          }
+        ],
+        "left": [
+          {
+            "id": "t_schema",
+            "type": "text",
+            "props": {
+              "text": "Agents compose **elements** inside **layouts**. The theme decides the look, so output is valid and good-looking every time."
+            }
+          }
+        ],
+        "right": [
+          {
+            "id": "c_schema",
+            "type": "code",
+            "props": {
+              "language": "json",
+              "code": "{\n  \"type\": \"stat\",\n  \"props\": { \"value\": 42, \"suffix\": \"%\" },\n  \"build\": { \"step\": 1 }\n}"
+            },
+            "build": {
+              "step": 1,
+              "preset": "wipe"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "s_number",
+      "layout": "big-number",
+      "transition": {
+        "type": "zoom"
+      },
+      "regions": {
+        "number": [
+          {
+            "id": "n_binary",
+            "type": "stat",
+            "props": {
+              "value": 1,
+              "label": "Go binary. Editor, MCP server and live sync included."
+            },
+            "build": {
+              "step": 1,
+              "preset": "scale-in"
+            }
+          }
+        ],
+        "caption": [
+          {
+            "id": "t_binary",
+            "type": "text",
+            "props": {
+              "text": "No Node, no Playwright, no SaaS."
+            },
+            "style": {
+              "color": "muted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "s_pillars",
+      "layout": "grid-3",
+      "transition": {
+        "type": "fade"
+      },
+      "regions": {
+        "title": [
+          {
+            "id": "h_pillars",
+            "type": "heading",
+            "props": {
+              "text": "Three things nobody else combines",
+              "level": 2
+            }
+          }
+        ],
+        "a": [
+          {
+            "id": "a_head",
+            "type": "heading",
+            "props": {
+              "text": "Structured",
+              "level": 3
+            },
+            "style": {
+              "color": "accent"
+            },
+            "build": {
+              "step": 1
+            }
+          },
+          {
+            "id": "a_text",
+            "type": "text",
+            "props": {
+              "text": "A JSON schema agents can't get wrong."
+            },
+            "build": {
+              "step": 1
+            }
+          }
+        ],
+        "b": [
+          {
+            "id": "b_head",
+            "type": "heading",
+            "props": {
+              "text": "In motion",
+              "level": 3
+            },
+            "style": {
+              "color": "accent"
+            },
+            "build": {
+              "step": 2
+            }
+          },
+          {
+            "id": "b_text",
+            "type": "text",
+            "props": {
+              "text": "Builds, morphs and count-ups as data."
+            },
+            "build": {
+              "step": 2
+            }
+          }
+        ],
+        "c": [
+          {
+            "id": "c_head",
+            "type": "heading",
+            "props": {
+              "text": "Live",
+              "level": 3
+            },
+            "style": {
+              "color": "accent"
+            },
+            "build": {
+              "step": 3
+            }
+          },
+          {
+            "id": "c_text",
+            "type": "text",
+            "props": {
+              "text": "Edits stream into your browser as they happen."
+            },
+            "build": {
+              "step": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "s_quote",
+      "layout": "quote",
+      "transition": {
+        "type": "fade"
+      },
+      "regions": {
+        "quote": [
+          {
+            "id": "q_main",
+            "type": "quote",
+            "props": {
+              "text": "The best slide is the one the speaker can talk over.",
+              "attribution": "Slidekick design guide"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "s_close",
+      "layout": "title",
+      "transition": {
+        "type": "zoom",
+        "duration": "slow"
+      },
+      "regions": {
+        "title": [
+          {
+            "id": "brand",
+            "type": "heading",
+            "props": {
+              "text": "Slidekick",
+              "level": 1
+            },
+            "style": {
+              "size": "xl"
+            }
+          }
+        ],
+        "subtitle": [
+          {
+            "id": "t_try",
+            "type": "text",
+            "props": {
+              "text": "Point your agent at `/mcp` and ask for a deck."
+            },
+            "build": {
+              "step": 1,
+              "preset": "typewriter"
+            }
+          }
+        ]
+      },
+      "notes": "Close on the brand again; the heading reuses slide 1's id, so it morphs if you jump straight from the opener."
+    }
+  ]
+}

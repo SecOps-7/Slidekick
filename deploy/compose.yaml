@@ -1,0 +1,25 @@
+# Slidekick stack. Install to /opt/slidekick/compose.yaml.
+# Secrets (SLIDEKICK_TOKEN) live in /opt/slidekick/slidekick.env (mode 600).
+services:
+  slidekick:
+    build:
+      context: /opt/slidekick/src
+    image: slidekick:local
+    container_name: slidekick
+    restart: unless-stopped
+    user: "1000:1000"
+    ports:
+      - "7410:7410"
+    env_file:
+      - /opt/slidekick/slidekick.env
+    environment:
+      SLIDEKICK_ADDR: ":7410"
+      SLIDEKICK_DATA: /data
+      SLIDEKICK_BASE_URL: ${SLIDEKICK_BASE_URL:-http://localhost:7410}
+    volumes:
+      - /opt/slidekick/data:/data
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

@@ -1,0 +1,206 @@
+/* Slidekick runtime: stage, layouts and elements. Themes set the --sk-* tokens. */
+
+.sk-viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--sk-bg, #111) 80%, #000);
+}
+.sk-stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  overflow: hidden;
+  transform-origin: center center;
+  background: var(--sk-bg);
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.6);
+}
+
+.sk-slide {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  gap: 48px;
+  padding: 110px 140px;
+  box-sizing: border-box;
+  background-color: var(--sk-bg);
+  color: var(--sk-text);
+  font-family: var(--sk-font-body);
+  font-size: var(--sk-size-md);
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+.sk-region {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ---- layouts ---- */
+.sk-layout-title {
+  grid-template: ". " 1fr "title" auto "subtitle" auto ". " 1.2fr / 1fr;
+  justify-items: center;
+  text-align: center;
+  gap: 36px;
+}
+.sk-layout-title .sk-region { align-items: center; }
+.sk-layout-title .sk-region-subtitle { --sk-fs: var(--sk-size-lg); max-width: 1400px; }
+
+.sk-layout-title-body { grid-template: "title" auto "body" 1fr / 1fr; gap: 56px; }
+
+.sk-layout-two-column { grid-template: "title title" auto "left right" 1fr / 1fr 1fr; column-gap: 88px; row-gap: 56px; }
+.sk-layout-two-column .sk-region-left,
+.sk-layout-two-column .sk-region-right { justify-content: center; }
+
+.sk-layout-hero-image { padding: 0; grid-template: "title" 1fr / 1fr; }
+.sk-layout-hero-image .sk-region-image { position: absolute; inset: 0; z-index: 0; }
+.sk-layout-hero-image .sk-region-image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.1) 55%, transparent);
+}
+.sk-layout-hero-image .sk-region-image figure,
+.sk-layout-hero-image .sk-region-image img { border-radius: 0; }
+.sk-layout-hero-image .sk-region-title,
+.sk-layout-hero-image .sk-region-caption {
+  position: absolute;
+  left: 140px;
+  right: 140px;
+  color: #fff;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.5);
+}
+.sk-layout-hero-image .sk-region-title { bottom: 220px; }
+.sk-layout-hero-image .sk-region-caption { bottom: 110px; --sk-fs: var(--sk-size-md); opacity: 0.9; }
+
+.sk-layout-big-number { grid-template: "." 1fr "number" auto "caption" auto "." 1fr / 1fr; justify-items: center; text-align: center; gap: 24px; }
+.sk-layout-big-number .sk-region { align-items: center; }
+.sk-layout-big-number .sk-stat-value { font-size: var(--sk-fs, calc(var(--sk-size-xxl) * 2.4)); }
+.sk-layout-big-number .sk-stat-label { font-size: var(--sk-size-lg); color: var(--sk-text); max-width: 1300px; }
+.sk-layout-big-number .sk-region-caption { --sk-fs: var(--sk-size-md); }
+
+.sk-layout-quote { grid-template: "." 1fr "quote" auto "." 1fr / 1fr; padding: 110px 240px; }
+
+/* Note: the grid-template shorthand forbids repeat() when areas are named. */
+.sk-layout-grid-3 { grid-template: "title title title" auto "a b c" 1fr / 1fr 1fr 1fr; gap: 48px; }
+.sk-card {
+  padding: 48px 44px;
+  border-radius: var(--sk-radius);
+  background: var(--sk-surface);
+  gap: 20px;
+}
+.sk-card .sk-el-text { --sk-fs: var(--sk-size-sm); color: var(--sk-muted); }
+
+.sk-layout-full-bleed { grid-template: "content" 1fr / 1fr; padding: 80px; }
+
+/* ---- elements ---- */
+.sk-el { position: relative; min-width: 0; }
+.sk-el p { margin: 0; }
+.sk-el-heading h1, .sk-el-heading h2, .sk-el-heading h3 {
+  margin: 0;
+  font-family: var(--sk-font-heading);
+  font-weight: 700;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+.sk-el-heading h1 { font-size: var(--sk-fs, var(--sk-size-xl)); }
+.sk-el-heading h2 { font-size: var(--sk-fs, var(--sk-size-lg)); }
+.sk-el-heading h3 { font-size: var(--sk-fs, var(--sk-size-md)); line-height: 1.15; }
+.sk-el-text p { font-size: var(--sk-fs, var(--sk-size-md)); text-wrap: pretty; max-width: 34em; }
+.sk-layout-title .sk-el-text p { max-width: none; }
+.sk-el strong { color: var(--sk-accent); font-weight: 700; }
+.sk-el em { font-style: italic; }
+.sk-el a { color: var(--sk-accent); text-underline-offset: 0.18em; }
+.sk-el :not(pre) > code {
+  font-family: var(--sk-font-mono);
+  font-size: 0.88em;
+  padding: 0.08em 0.35em;
+  border-radius: 0.3em;
+  background: color-mix(in oklab, var(--sk-text) 10%, transparent);
+}
+
+.sk-el-bullets ul, .sk-el-bullets ol { margin: 0; padding-left: 1.1em; font-size: var(--sk-fs, var(--sk-size-md)); }
+.sk-el-bullets li { margin: 0.45em 0; padding-left: 0.25em; }
+.sk-el-bullets li::marker { color: var(--sk-accent); }
+
+.sk-el-image { flex: 1; min-height: 0; display: flex; }
+.sk-el-image figure { margin: 0; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; border-radius: var(--sk-radius); overflow: hidden; }
+.sk-el-image img { flex: 1; min-height: 0; width: 100%; height: 100%; display: block; border-radius: var(--sk-radius); }
+.sk-el-image figcaption { font-size: var(--sk-size-xs); color: var(--sk-muted); }
+
+.sk-el-code pre {
+  margin: 0;
+  padding: 40px 48px;
+  border-radius: var(--sk-radius);
+  background: var(--sk-surface);
+  border: 1px solid color-mix(in oklab, var(--sk-text) 12%, transparent);
+  font-family: var(--sk-font-mono);
+  font-size: var(--sk-fs, var(--sk-size-sm));
+  line-height: 1.5;
+  white-space: pre;
+  overflow: hidden;
+  color: var(--sk-text);
+}
+
+.sk-stat-value {
+  font-family: var(--sk-font-heading);
+  font-size: var(--sk-fs, var(--sk-size-xxl));
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--sk-accent);
+}
+.sk-stat-label { margin-top: 16px; font-size: var(--sk-size-sm); color: var(--sk-muted); }
+
+.sk-el-quote blockquote { margin: 0; }
+.sk-el-quote blockquote p {
+  font-family: var(--sk-font-heading);
+  font-size: var(--sk-fs, var(--sk-size-lg));
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.sk-el-quote cite { display: block; margin-top: 36px; font-style: normal; font-size: var(--sk-size-sm); color: var(--sk-muted); }
+.sk-el-quote cite::before { content: "\2014\00a0"; }
+
+/* ---- builds and live edits ---- */
+.sk-pending { opacity: 0 !important; }
+
+.sk-flash { animation: sk-flash 1.6s ease-out; }
+.sk-slide.sk-flash { animation: none; }
+@keyframes sk-flash {
+  0%, 30% { box-shadow: 0 0 0 4px var(--sk-accent), 0 0 40px color-mix(in oklab, var(--sk-accent) 60%, transparent); border-radius: 10px; }
+  100% { box-shadow: 0 0 0 4px transparent, 0 0 0 transparent; border-radius: 10px; }
+}
+
+.sk-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: var(--sk-muted);
+  font-family: var(--sk-font-body);
+  font-size: var(--sk-size-md);
+  gap: 12px;
+}
+.sk-empty p { margin: 0; }
+.sk-empty p:first-child { color: var(--sk-text); font-size: var(--sk-size-lg); font-family: var(--sk-font-heading); }
+
+/* Morph: View Transitions timing follows theme motion tokens. */
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: var(--sk-vt-dur, 600ms);
+  animation-timing-function: var(--sk-ease, ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-flash { animation-duration: 0.01s; }
+}
