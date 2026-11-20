@@ -19,6 +19,7 @@ type Env struct {
 	Cat       *deck.Catalog
 	Themes    *deck.ThemeSet
 	Validator *deck.Validator
+	Store     *store.Store
 }
 
 func New(t testing.TB) *Env {
@@ -40,7 +41,7 @@ func New(t testing.TB) *Env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	return &Env{Svc: service.New(st, v, cat, themes, hub.New(), "http://test"), Cat: cat, Themes: themes, Validator: v}
+	return &Env{Svc: service.New(st, v, cat, themes, hub.New(), "http://test"), Cat: cat, Themes: themes, Validator: v, Store: st}
 }
 
 // Example reads a golden deck from /examples.

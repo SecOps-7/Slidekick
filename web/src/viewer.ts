@@ -4,7 +4,6 @@ import { applyPatch } from "../runtime/patch";
 import { Player, type Position } from "../runtime/player";
 import type { Catalog, Deck, LintIssue, PatchEvent } from "../runtime/types";
 import { Laser } from "./laser";
-import { storedToken } from "./auth";
 import { viewFetch } from "./key";
 import { Live, type PointerMsg, type PresentMsg } from "./sync";
 
@@ -262,6 +261,5 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
       live.textContent = state;
       live.dataset.state = state === "live" ? "on" : "off";
     },
-    storedToken() || undefined,
   );
 }

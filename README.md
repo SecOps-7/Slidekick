@@ -18,17 +18,18 @@ AI slide tools today either wrap Markdown (flat slides) or export PPTX and walk 
 ## Quick start
 
 ```bash
-TOKEN=$(openssl rand -hex 24); echo "your token: $TOKEN"
-docker run -d --name slidekick -p 7410:7410 -e SLIDEKICK_TOKEN="$TOKEN" \
+read -rsp "admin password: " PW
+docker run -d --name slidekick -p 7410:7410 \
+  -e SLIDEKICK_ADMIN_USERNAME=admin -e SLIDEKICK_ADMIN_PASSWORD="$PW" \
   -v slidekick-data:/data --tmpfs /tmp --shm-size 256m \
   ghcr.io/secops-7/slidekick:latest-render
 ```
 
-Connect Claude Code (other clients: [docs/agents.md](docs/agents.md)):
+Sign in at http://localhost:7410, create a personal agent token on the **Account** page, and connect Claude Code (other clients: [docs/agents.md](docs/agents.md)):
 
 ```bash
 claude mcp add --transport http slidekick http://localhost:7410/mcp \
-  --header "Authorization: Bearer $TOKEN"
+  --header "Authorization: Bearer skp_..."
 ```
 
 Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each slide with render_slide, and give me the link."*
@@ -40,6 +41,7 @@ Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each
 | **For agents** | 20 MCP tools: create and patch decks (RFC 6902), lint, screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links. Plus the schema, catalogues and a design guide as resources. |
 | **Elements** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, 99 icons, shapes, embeds, and a sandboxed HTML escape hatch. 8 layouts. |
 | **Motion** | Fade, fade-up, scale-in, wipe, typewriter and line-drawing builds with spring physics; fade, slide, push, zoom and **morph** transitions; respects `prefers-reduced-motion`. |
+| **Accounts** | Admin, editor and viewer roles; password sign-in and single sign-on (OpenID Connect: Entra, Google, Authentik, Keycloak); personal agent tokens. |
 | **Sharing** | Public or private (keyed) links, and per-deck edit tokens for agents or colleagues. |
 | **Themes** | Aurora, Paper, Swiss, Ember and Meadow, with self-hosted fonts. Write your own: [docs/themes.md](docs/themes.md). |
 | **Editor** | Follows the agent as it works; slide sorter, inline text editing, property panel, build timeline, undo/redo across agent and human edits. |
@@ -56,7 +58,9 @@ Docker Compose, TLS, configuration and the security model: [docs/self-hosting.md
 
 | Variable | Default | |
 | --- | --- | --- |
-| `SLIDEKICK_TOKEN` | empty | Required for every write. At least 24 characters. |
+| `SLIDEKICK_ADMIN_USERNAME`, `SLIDEKICK_ADMIN_PASSWORD` | empty | Create the first admin on first run (or use `/setup`). |
+| `SLIDEKICK_TOKEN` | empty | Optional server token with full access, for automation and recovery. At least 24 characters. |
+| `SLIDEKICK_SECRET_KEY` | key file in the data folder | Encrypts stored SSO and AI secrets. |
 | `SLIDEKICK_BASE_URL` | `http://localhost:7410` | Public URL used in share links |
 | `SLIDEKICK_DATA` | `/data` | SQLite database and uploads |
 | `SLIDEKICK_ADDR` | `:7410` | Listen address |

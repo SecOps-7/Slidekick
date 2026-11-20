@@ -4,16 +4,20 @@ Slidekick is an MCP server. Any MCP client can create and edit decks; the human 
 
 ## Claude Code (HTTP)
 
+Create a personal agent token on your **Account** page (`skp_...`). The agent acts as you, with your role, so it can never do more than you can, and the decks it creates are yours.
+
 ```bash
 claude mcp add --transport http slidekick http://<host>:7410/mcp \
-  --header "Authorization: Bearer $SLIDEKICK_TOKEN"
+  --header "Authorization: Bearer skp_..."
 ```
+
+The server token (`SLIDEKICK_TOKEN`) also works and has full access; prefer a personal token so edits are attributed and limited to your role.
 
 Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, then give me the link."*
 
 ### A token for one deck
 
-To let an agent (or a colleague) work on one deck without the server token, open the deck in the editor, choose **Share → Create token**, and use that `ske_...` token instead. It can edit, present, comment on and export that deck only: other decks answer "this token can only edit deck ...", `create_deck` is refused, and `list_decks` shows just the one deck. The editor shows the token once and the exact `claude mcp add` command. Replace or revoke it from the same menu.
+To let an agent (or a colleague) work on one deck without the server token, open the deck in the editor, choose **Share → Create token** (you need to own the deck or be an admin), and use that `ske_...` token instead. It can edit, present, comment on and export that deck only: other decks answer "this token can only edit deck ...", `create_deck` is refused, and `list_decks` shows just the one deck. The editor shows the token once and the exact `claude mcp add` command. Replace or revoke it from the same menu.
 
 ## Claude Desktop, Cursor and other clients (stdio)
 

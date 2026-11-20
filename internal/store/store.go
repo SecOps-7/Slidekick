@@ -33,6 +33,8 @@ type Summary struct {
 	Version   int       `json:"version"`
 	Slides    int       `json:"slides"`
 	UpdatedAt time.Time `json:"updatedAt"`
+	Owner     string    `json:"owner,omitempty"`
+	OwnerName string    `json:"ownerName,omitempty"`
 }
 
 // VersionEntry is one entry of a deck's history.
@@ -110,6 +112,10 @@ func Open(dir string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
+	if err := migrateAccounts(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
 	return &Store{db: db}, nil
 }
 
@@ -124,6 +130,12 @@ func parseTime(v string) time.Time {
 
 // Create inserts a new deck at version 1.
 func (s *Store) Create(ctx context.Context, id, title, theme string, slides int, doc []byte, actor string) error {
+	return s.CreateOwned(ctx, id, "", title, theme, slides, doc, actor)
+}
+
+// CreateOwned stores a new deck owned by a user ("" = no owner: only admins
+// and the server token may change it).
+func (s *Store) CreateOwned(ctx context.Context, id, owner, title, theme string, slides int, doc []byte, actor string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -131,8 +143,8 @@ func (s *Store) Create(ctx context.Context, id, title, theme string, slides int,
 	defer tx.Rollback()
 	ts := now()
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO decks(id,title,theme,slides,version,doc,created_at,updated_at) VALUES(?,?,?,?,1,?,?,?)`,
-		id, title, theme, slides, doc, ts, ts); err != nil {
+		`INSERT INTO decks(id,title,theme,slides,version,doc,created_at,updated_at,owner) VALUES(?,?,?,?,1,?,?,?,?)`,
+		id, title, theme, slides, doc, ts, ts, owner); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx,
@@ -186,7 +198,7 @@ func (s *Store) Update(ctx context.Context, id string, base int, title, theme st
 // List returns all decks, most recently updated first.
 func (s *Store) List(ctx context.Context) ([]Summary, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id,title,theme,version,slides,updated_at FROM decks ORDER BY updated_at DESC`)
+		`SELECT d.id,d.title,d.theme,d.version,d.slides,d.updated_at,d.owner,COALESCE(u.username,'') FROM decks d LEFT JOIN users u ON u.id=d.owner ORDER BY d.updated_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +207,7 @@ func (s *Store) List(ctx context.Context) ([]Summary, error) {
 	for rows.Next() {
 		var r Summary
 		var ts string
-		if err := rows.Scan(&r.ID, &r.Title, &r.Theme, &r.Version, &r.Slides, &ts); err != nil {
+		if err := rows.Scan(&r.ID, &r.Title, &r.Theme, &r.Version, &r.Slides, &ts, &r.Owner, &r.OwnerName); err != nil {
 			return nil, err
 		}
 		r.UpdatedAt = parseTime(ts)

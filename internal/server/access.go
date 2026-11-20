@@ -5,33 +5,46 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
+
+	"github.com/SecOps-7/slidekick/internal/accounts"
+	"github.com/SecOps-7/slidekick/internal/authz"
+	"github.com/SecOps-7/slidekick/internal/store"
 )
 
-// principal is who a request acts as: the server token holder (admin) or the
-// holder of one deck's edit token.
-type principal struct {
-	admin bool
-	deck  string
+// How a request proves who it is, in order:
+//
+//	Authorization: Bearer <SLIDEKICK_TOKEN>   server token: full access (automation, recovery)
+//	Authorization: Bearer skp_...             personal API token: acts as that user, with their role
+//	Authorization: Bearer ske_...             deck edit token: one deck only
+//	Cookie: sk_session=...                    signed-in browser (writes also need X-CSRF-Token)
+//	nothing                                   anonymous: only public or keyed deck links
+//
+// With no server token and no accounts yet, the server runs in the legacy
+// open mode (everyone is admin) until the first admin is created.
+
+const (
+	sessionCookie = "sk_session"
+	ssoCookie     = "sk_sso"
+	csrfHeader    = "X-CSRF-Token"
+)
+
+type reqAuth struct {
+	p       authz.Principal
+	user    *store.User
+	session string // session cookie value, when signed in by cookie
+	csrf    string
 }
 
-func (p principal) can(deckID string) bool { return p.admin || (p.deck != "" && p.deck == deckID) }
+type authKey struct{}
 
-func (p principal) scope() string {
-	if p.admin {
-		return "admin"
-	}
-	return "deck"
-}
-
-type principalKey struct{}
-
-func principalFrom(ctx context.Context) (principal, bool) {
-	p, ok := ctx.Value(principalKey{}).(principal)
-	return p, ok
+func authFrom(ctx context.Context) reqAuth {
+	a, _ := ctx.Value(authKey{}).(reqAuth)
+	return a
 }
 
 func bearer(r *http.Request) string {
@@ -42,93 +55,188 @@ func bearer(r *http.Request) string {
 	return ""
 }
 
-// resolveToken maps a token to a principal. Without a server token the
-// server is open and everyone is admin.
-func (s *server) resolveToken(ctx context.Context, tok string) (principal, bool) {
-	if s.opt.Token == "" {
-		return principal{admin: true}, true
-	}
-	if tok == "" {
-		return principal{}, false
-	}
-	if subtle.ConstantTimeCompare([]byte(tok), []byte(s.opt.Token)) == 1 {
-		return principal{admin: true}, true
-	}
-	if id, ok := s.svc.DeckForToken(ctx, tok); ok {
-		return principal{deck: id}, true
-	}
-	return principal{}, false
+func (s *server) openMode(ctx context.Context) bool {
+	return s.opt.Token == "" && (s.acc == nil || s.acc.SetupNeeded(ctx))
 }
 
-// auth requires a valid token (server or deck) and records the principal.
-// Failures count towards the per-IP lockout.
-func (s *server) auth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.opt.Token == "" {
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, principal{admin: true})))
-			return
+// resolveToken maps a bearer token to a principal.
+func (s *server) resolveToken(ctx context.Context, tok string) (reqAuth, bool) {
+	if tok == "" {
+		return reqAuth{}, false
+	}
+	if s.opt.Token != "" && subtle.ConstantTimeCompare([]byte(tok), []byte(s.opt.Token)) == 1 {
+		return reqAuth{p: authz.Principal{Kind: authz.KindServer, Username: "server-token"}}, true
+	}
+	if s.acc != nil {
+		if u, ok := s.acc.APITokenUser(ctx, tok); ok {
+			return reqAuth{p: accounts.Principal(u), user: u}, true
 		}
+	}
+	if id, ok := s.svc.DeckForToken(ctx, tok); ok {
+		return reqAuth{p: authz.Principal{Kind: authz.KindDeck, Deck: id}}, true
+	}
+	return reqAuth{}, false
+}
+
+// identify works out who is calling. bad means credentials were offered but
+// didn't check out (counts toward the lockout).
+func (s *server) identify(r *http.Request) (a reqAuth, bad bool) {
+	ctx := r.Context()
+	if tok := bearer(r); tok != "" {
+		a, ok := s.resolveToken(ctx, tok)
+		return a, !ok
+	}
+	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" && s.acc != nil {
+		if u, ss, err := s.acc.SessionUser(ctx, c.Value); err == nil {
+			return reqAuth{p: accounts.Principal(u), user: u, session: c.Value, csrf: ss.CSRF}, false
+		}
+	}
+	if s.openMode(ctx) {
+		return reqAuth{p: authz.Principal{Kind: authz.KindOpen, Username: "open-mode"}}, false
+	}
+	return reqAuth{}, false
+}
+
+func unsafeMethod(m string) bool {
+	return m != http.MethodGet && m != http.MethodHead && m != http.MethodOptions
+}
+
+// sameOrigin rejects cross-site browser requests: the Origin (or Referer)
+// must match this server. Requests from non-browser clients carry neither.
+func (s *server) sameOrigin(r *http.Request) bool {
+	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		return false
+	}
+	o := r.Header.Get("Origin")
+	if o == "" || o == "null" {
+		if ref := r.Header.Get("Referer"); ref != "" {
+			o = ref
+		} else {
+			return o == ""
+		}
+	}
+	u, err := url.Parse(o)
+	if err != nil {
+		return false
+	}
+	if strings.EqualFold(u.Host, r.Host) {
+		return true
+	}
+	if b, err := url.Parse(s.opt.BaseURL); err == nil && b.Host != "" && strings.EqualFold(u.Host, b.Host) {
+		return true
+	}
+	return false
+}
+
+// authn identifies the caller, enforces the lockout and, for cookie-signed-in
+// writes, the CSRF token and same-origin check. It never rejects anonymous
+// callers: require does that.
+func (s *server) authn(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP(r)
-		if !s.fails.allowed(ip) {
+		hasCreds := bearer(r) != ""
+		if hasCreds && !s.fails.allowed(ip) {
 			w.Header().Set("Retry-After", "300")
 			http.Error(w, "too many failed attempts; try again in a few minutes", http.StatusTooManyRequests)
 			return
 		}
-		p, ok := s.resolveToken(r.Context(), bearer(r))
-		if !ok {
+		a, bad := s.identify(r)
+		if bad {
 			s.fails.fail(ip)
 			w.Header().Set("WWW-Authenticate", `Bearer realm="slidekick"`)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		s.fails.succeed(ip)
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, p)))
+		if hasCreds {
+			s.fails.succeed(ip)
+		}
+		if a.session != "" && unsafeMethod(r.Method) {
+			got := r.Header.Get(csrfHeader)
+			if !s.sameOrigin(r) || got == "" || subtle.ConstantTimeCompare([]byte(got), []byte(a.csrf)) != 1 {
+				writeJSON(w, http.StatusForbidden, map[string]string{"error": "missing or wrong CSRF token; reload the page"})
+				return
+			}
+		}
+		ctx := context.WithValue(r.Context(), authKey{}, a)
+		next.ServeHTTP(w, r.WithContext(authz.WithPrincipal(ctx, a.p)))
 	})
 }
 
-// admin requires the server token.
-func (s *server) admin(next http.Handler) http.Handler {
-	return s.auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if p, _ := principalFrom(r.Context()); !p.admin {
-			http.Error(w, "this needs the server token", http.StatusForbidden)
+func (s *server) policy() authz.Policy {
+	if s.acc == nil {
+		return authz.Policy{}
+	}
+	return s.acc.Policy()
+}
+
+// deckRef loads what a policy decision needs about the deck in the path.
+func (s *server) deckRef(ctx context.Context, id string) (*authz.Deck, error) {
+	owner, err := s.svc.DeckOwner(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &authz.Deck{ID: id, Owner: owner}, nil
+}
+
+// require allows the request only if the caller may perform action (on the
+// deck named by the {id} path value when perDeck).
+func (s *server) require(action authz.Action, perDeck bool, next http.HandlerFunc) http.Handler {
+	return s.authn(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a := authFrom(r.Context())
+		if !a.p.Authenticated() {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="slidekick"`)
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "sign in first"})
 			return
 		}
-		next.ServeHTTP(w, r)
+		var d *authz.Deck
+		if perDeck {
+			var err error
+			if d, err = s.deckRef(r.Context(), r.PathValue("id")); err != nil {
+				writeErr(w, err)
+				return
+			}
+		}
+		if action != anyAuthenticated && !s.policy().Can(a.p, action, d) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": forbiddenMsg(a.p, action)})
+			return
+		}
+		next(w, r)
 	}))
 }
 
-// deckAuth requires a token that may edit the deck named in the path.
-func (s *server) deckAuth(next http.Handler) http.Handler {
-	return s.auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if p, _ := principalFrom(r.Context()); !p.can(r.PathValue("id")) {
-			http.Error(w, "this token can't edit that deck", http.StatusForbidden)
-			return
-		}
-		next.ServeHTTP(w, r)
-	}))
+func forbiddenMsg(p authz.Principal, a authz.Action) string {
+	switch {
+	case p.Kind == authz.KindDeck:
+		return "this token can't do that (it only edits deck " + p.Deck + ")"
+	case p.Role == authz.RoleViewer:
+		return "your role (viewer) can't do that"
+	case a == authz.Edit || a == authz.Share || a == authz.MintDeckToken:
+		return "only the deck's owner or an admin can do that"
+	}
+	return "your role can't do that"
 }
 
 // viewable reports whether the request may watch a deck: the deck is public,
-// the request carries its view key (?k=), or a token that may edit it.
+// the request carries its view key (?k=), or the caller may view it.
 // Private decks answer 404 otherwise, so their ids can't be probed.
 func (s *server) viewable(r *http.Request, id string) bool {
 	if s.svc.CanView(r.Context(), id, r.URL.Query().Get("k")) {
 		return true
 	}
-	tok := bearer(r)
-	if tok == "" {
-		return false
-	}
 	ip := clientIP(r)
-	if !s.fails.allowed(ip) {
+	if bearer(r) != "" && !s.fails.allowed(ip) {
 		return false
 	}
-	p, ok := s.resolveToken(r.Context(), tok)
-	if !ok {
+	a, bad := s.identify(r)
+	if bad {
 		s.fails.fail(ip)
 		return false
 	}
-	return p.can(id)
+	if !a.p.Authenticated() {
+		return false
+	}
+	d, err := s.deckRef(r.Context(), id)
+	return err == nil && s.policy().Can(a.p, authz.View, d)
 }
 
 func (s *server) viewGate(next http.HandlerFunc) http.HandlerFunc {
@@ -141,30 +249,44 @@ func (s *server) viewGate(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// mcpAuth hands the principal to the MCP SDK as TokenInfo, so tools can
-// scope themselves and sessions can't be reused under another token.
+// mcpAuth requires a bearer token (server, personal or deck) and hands the
+// principal to the MCP SDK as TokenInfo, so tools can enforce roles and an MCP
+// session can't be reused under another principal. In open mode MCP is open.
 func (s *server) mcpAuth(next http.Handler) http.Handler {
-	if s.opt.Token == "" {
-		return next
-	}
 	verify := func(ctx context.Context, tok string, _ *http.Request) (*auth.TokenInfo, error) {
-		p, ok := principalFrom(ctx)
-		if !ok {
+		p := authz.FromContext(ctx)
+		if p.Kind != authz.KindServer && p.Kind != authz.KindUser && p.Kind != authz.KindDeck {
 			return nil, auth.ErrInvalidToken
 		}
-		ti := &auth.TokenInfo{Expiration: time.Now().Add(time.Hour), UserID: "admin", Extra: map[string]any{}}
-		if !p.admin {
-			ti.UserID = "deck:" + p.deck
-			ti.Extra["deck"] = p.deck
-		}
+		ti := authz.TokenInfo(p)
+		ti.Expiration = time.Now().Add(time.Hour)
 		return ti, nil
 	}
-	return s.auth(auth.RequireBearerToken(verify, nil)(next))
+	guarded := auth.RequireBearerToken(verify, nil)(next)
+	return s.authn(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authFrom(r.Context()).p.Kind == authz.KindOpen {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if bearer(r) == "" { // cookies don't authenticate MCP
+			w.Header().Set("WWW-Authenticate", `Bearer realm="slidekick"`)
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "MCP needs a bearer token: a personal API token (Account page), a deck token or the server token"})
+			return
+		}
+		guarded.ServeHTTP(w, r)
+	}))
 }
 
 func (s *server) authInfo(w http.ResponseWriter, r *http.Request) {
-	p, _ := principalFrom(r.Context())
-	writeJSON(w, 200, map[string]any{"ok": true, "required": s.opt.Token != "", "scope": p.scope(), "deck": p.deck})
+	p := authFrom(r.Context()).p
+	scope := "admin"
+	switch {
+	case p.Kind == authz.KindDeck:
+		scope = "deck"
+	case p.Kind == authz.KindUser && p.Role != authz.RoleAdmin:
+		scope = string(p.Role)
+	}
+	writeJSON(w, 200, map[string]any{"ok": true, "required": !s.openMode(r.Context()), "scope": scope, "deck": p.Deck, "user": p.Username})
 }
 
 func (s *server) getAccess(w http.ResponseWriter, r *http.Request) {
@@ -209,3 +331,21 @@ func (s *server) revokeEditToken(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
+
+// wsAuth checks a token sent in a WebSocket auth message: may it present this deck?
+func (s *server) wsAuth(ctx context.Context, ip, tok, deckID string) bool {
+	if !s.fails.allowed(ip) {
+		return false
+	}
+	a, ok := s.resolveToken(ctx, tok)
+	if !ok {
+		s.fails.fail(ip)
+		return false
+	}
+	s.fails.succeed(ip)
+	d, err := s.deckRef(ctx, deckID)
+	return err == nil && s.policy().Can(a.p, authz.Present, d)
+}
+
+// anyAuthenticated lets any valid principal through require.
+const anyAuthenticated authz.Action = ""

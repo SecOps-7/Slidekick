@@ -15,6 +15,13 @@ First public release.
 - Motion: build steps with six presets (including `draw`, which traces icons and other line art), spring entrances and stagger from Motion, per-item bullet builds, count-up stats, drawn-in charts, and fade, slide, push, zoom and morph transitions (View Transitions API, with a FLIP fallback in other browsers).
 - Five themes (Aurora, Paper, Swiss, Ember, Meadow) with self-hosted fonts.
 
+### Accounts and sign-in
+- User accounts with admin, editor and viewer roles, enforced on every REST route, the live WebSocket and MCP. Decks have owners; everyone signed in can view every deck, and only owners and admins change one (or every editor, with an instance setting).
+- Sign-in with username and password (argon2id), 14-day session cookies with CSRF protection, per-address and per-username lockout, sign-out. First admin from `SLIDEKICK_ADMIN_*` or `/setup` with a one-time code; `slidekick admin` resets access from the host.
+- Single sign-on with OpenID Connect, several providers at once (Entra, Google, Authentik, Keycloak...): discovery, code flow with PKCE, state, nonce, issuer and audience checks, trailing-slash tolerant issuers, group and email role rules, optional account auto-creation.
+- Personal agent tokens (`skp_...`) let agents act as a user with that user's role. The server token and deck tokens keep working; existing decks keep their links and pass to the first admin.
+- Stored secrets are encrypted with AES-256-GCM (`SLIDEKICK_SECRET_KEY` or a generated key file).
+
 ### People
 - Live viewer: follows agent edits, highlights changes, lint panel.
 - Private decks: links carry a view key; rotating it disconnects old viewers.

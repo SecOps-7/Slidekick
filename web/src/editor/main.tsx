@@ -41,7 +41,7 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
   followRef.current = followAgent;
   useEffect(() => {
     api.access().then(setAccess, () => {});
-    api.whoami().then((w) => setAdmin(w.scope === "admin"), () => {});
+    api.me().then((m) => setAdmin(Boolean(m.can["deck:deck-token"])), () => {});
   }, []);
   const key = access?.private ? access.viewKey : "";
 
@@ -132,7 +132,6 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
         lintTimer = window.setTimeout(async () => setLint((await api.load()).lint), 350);
       },
       setLive,
-      api.token, // unlocks the live feed of private decks (no ?k= in editor links)
     );
     return () => live.close();
   }, []);
@@ -495,6 +494,12 @@ export async function mountEditor(host: HTMLElement, deckId: string) {
   document.body.classList.add("ed-page");
   document.title = "Edit · Slidekick";
   const token = await ensureAuth("edit this deck", deckId);
+  const can = (await import("../auth")).currentMe()?.can ?? {};
+  if (!can["deck:edit"]) {
+    // Viewers (and editors on someone else's deck) watch instead; the server would refuse their edits anyway.
+    location.replace(`/d/${encodeURIComponent(deckId)}${location.hash}`);
+    return;
+  }
   const api = new Api(deckId, token);
   const [cat, initial] = await Promise.all([api.catalog(), api.load().catch(() => null)]);
   if (!initial) {

@@ -103,6 +103,21 @@ func (s *Service) Lint(ctx context.Context, id string) ([]lint.Issue, int, error
 
 // Create makes a new deck. Slides may be nil; ids are assigned where missing.
 func (s *Service) Create(ctx context.Context, title, theme, aspect string, slides []any, actor string) (*Result, error) {
+	return s.CreateFor(ctx, "", title, theme, aspect, slides, actor)
+}
+
+// DeckOwner returns the user id that owns a deck ("" when unowned).
+func (s *Service) DeckOwner(ctx context.Context, id string) (string, error) {
+	return s.store.DeckOwner(ctx, id)
+}
+
+// SetDeckOwner hands a deck to another user.
+func (s *Service) SetDeckOwner(ctx context.Context, id, owner string) error {
+	return s.store.SetDeckOwner(ctx, id, owner)
+}
+
+// CreateFor makes a deck owned by a user ("" = unowned: admins only).
+func (s *Service) CreateFor(ctx context.Context, owner, title, theme, aspect string, slides []any, actor string) (*Result, error) {
 	if theme == "" {
 		theme = "aurora"
 	}
@@ -135,7 +150,7 @@ func (s *Service) Create(ctx context.Context, title, theme, aspect string, slide
 	if err != nil {
 		return nil, err
 	}
-	if err := s.store.Create(ctx, d.ID, d.Title, d.Theme, len(d.Slides), raw, actor); err != nil {
+	if err := s.store.CreateOwned(ctx, d.ID, owner, d.Title, d.Theme, len(d.Slides), raw, actor); err != nil {
 		return nil, err
 	}
 	return &Result{DeckID: d.ID, Version: 1, Lint: lint.Deck(d, s.Cat, s.Themes), URL: s.ShareURL(d.ID)}, nil

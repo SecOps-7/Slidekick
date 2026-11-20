@@ -73,7 +73,7 @@ export class Api {
   addComment = (slideId: string, elementId: string, text: string) => this.req<Comment>("POST", `${this.base}/comments`, { slideId, elementId, text });
   resolve = (id: string, reply = "") => this.req<{ ok: boolean }>("POST", `${this.base}/comments/${encodeURIComponent(id)}/resolve`, { reply });
   exportFile = (format: "pdf" | "png") => this.req<{ url: string; name: string; bytes: number }>("POST", `${this.base}/export?format=${format}`);
-  whoami = () => this.req<{ scope: "admin" | "deck"; required: boolean }>("GET", "/api/auth");
+  me = () => this.req<{ can: Record<string, boolean>; user?: { username: string; role: string } }>("GET", `/api/me?deck=${encodeURIComponent(this.deckId)}`);
   access = () => this.req<Access>("GET", `${this.base}/access`);
   setAccess = (priv: boolean, rotate = false) => this.req<Access>("POST", `${this.base}/access`, { private: priv, rotate });
   issueEditToken = () => this.req<{ token: string }>("POST", `${this.base}/edit-token`);

@@ -5,7 +5,7 @@ import { Player, type Position } from "../runtime/player";
 import { renderSlide, STAGE } from "../runtime/render";
 import type { Catalog, Deck, PatchEvent } from "../runtime/types";
 import { applyPatch } from "../runtime/patch";
-import { authHeaders, ensureAuth } from "./auth";
+import { ensureAuth } from "./auth";
 import { withKey } from "./key";
 import { Laser } from "./laser";
 import { Live } from "./sync";
@@ -20,7 +20,8 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 export async function mountPresenter(host: HTMLElement, deckId: string) {
   document.body.classList.add("pr-page");
   const token = await ensureAuth("present this deck to remote viewers", deckId);
-  const deckFetch = () => fetch(`/api/decks/${encodeURIComponent(deckId)}`, { cache: "no-store", headers: authHeaders(token) });
+  void token;
+  const deckFetch = () => fetch(`/api/decks/${encodeURIComponent(deckId)}`, { cache: "no-store" });
   const [catalog, data] = await Promise.all([
     fetch("/api/catalog").then((r) => r.json() as Promise<Catalog>),
     deckFetch().then((r) => (r.ok ? (r.json() as Promise<{ version: number; deck: Deck }>) : null)),
@@ -85,7 +86,6 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
       await player.refresh();
     },
     (s) => (status.textContent = s === "live" ? "live · viewers follow you" : "offline: audience windows on this machine still follow"),
-    token,
   );
 
   const send = (p: Position) => live.broadcast({ type: "present", index: p.index, step: p.step });

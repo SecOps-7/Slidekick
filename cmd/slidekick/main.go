@@ -2,6 +2,7 @@
 //
 //	slidekick serve   HTTP server: web app, live sync, MCP at /mcp (default)
 //	slidekick stdio   MCP over stdin/stdout for local agents, plus the web app
+//	slidekick admin   create or reset an admin account (recovery): slidekick admin <username>
 //	slidekick version
 package main
 
@@ -84,9 +85,15 @@ func main() {
 			os.Exit(1)
 		}
 		return
+	case "admin":
+		if err := adminCommand(*data, fl.Args()); err != nil {
+			fmt.Fprintln(os.Stderr, "slidekick admin:", err)
+			os.Exit(1)
+		}
+		return
 	case "serve", "stdio":
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command %q (want serve, stdio or version)\n", cmd)
+		fmt.Fprintf(os.Stderr, "unknown command %q (want serve, stdio, admin or version)\n", cmd)
 		os.Exit(2)
 	}
 
@@ -134,6 +141,11 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		return err
 	}
 
+	acc, err := openAccounts(ctx, cmd, st, data, token, log)
+	if err != nil {
+		return err
+	}
+
 	exp := &export.Exporter{Web: slidekick.Web(), Cat: cat, Themes: themes,
 		Assets: func(ctx context.Context, name string) (string, []byte, error) {
 			a, b, err := svc.ReadAsset(ctx, name)
@@ -151,7 +163,7 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 	mcpSrv := mcpserver.New(svc, slidekick.Schema, version, mcpserver.Options{Renderer: rnd, Exporter: exp,
 		Files: func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error) {
 			return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
-		}})
+		}, Policy: acc.Policy()})
 	files := func(ctx context.Context, deckID, format string) (*store.Asset, error) {
 		d, _, _, err := svc.Get(ctx, deckID)
 		if err != nil {
@@ -159,14 +171,14 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		}
 		return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
 	}
-	handler := server.New(svc, mcpSrv, server.Options{Token: token, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
+	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, Accounts: acc, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 2 * time.Minute, IdleTimeout: 2 * time.Minute}
 	httpErr := make(chan error, 1)
 	go func() {
-		log.Info("slidekick listening", "addr", addr, "url", baseURL, "data", data, "auth", token != "")
-		if token == "" && !isLoopback(addr) {
-			log.Warn("SLIDEKICK_TOKEN is not set: /mcp and the write API are open to anyone who can reach this port")
+		log.Info("slidekick listening", "addr", addr, "url", baseURL, "data", data, "server_token", token != "")
+		if token == "" && acc.SetupNeeded(ctx) && !isLoopback(addr) {
+			log.Warn("no accounts and no SLIDEKICK_TOKEN yet: the server is open to anyone who can reach this port until the first admin is created at /setup")
 		}
 		err := srv.ListenAndServe()
 		if errors.Is(err, http.ErrServerClosed) {

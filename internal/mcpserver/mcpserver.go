@@ -18,6 +18,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/SecOps-7/slidekick/internal/authz"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/lint"
@@ -48,14 +49,16 @@ type Options struct {
 	Exporter *export.Exporter
 	// Files makes PDF or PNG exports and stores them as downloadable files.
 	Files func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error)
+	// Policy decides what each caller may do (roles, deck owners).
+	Policy authz.Policy
 }
 
 // New builds the MCP server around a deck service.
 func New(svc *service.Service, schemaFS fs.FS, version string, opt Options) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "slidekick", Title: "Slidekick", Version: version},
 		&mcp.ServerOptions{Instructions: instructions})
-	h := &handlers{svc: svc, render: opt.Renderer, export: opt.Exporter, files: opt.Files}
-	s.AddReceivingMiddleware(scopeMiddleware)
+	h := &handlers{svc: svc, render: opt.Renderer, export: opt.Exporter, files: opt.Files, policy: opt.Policy}
+	s.AddReceivingMiddleware(h.scopeMiddleware)
 	h.tools(s)
 	resources(s, svc, schemaFS)
 	prompts(s)
@@ -67,9 +70,8 @@ type handlers struct {
 	render *render.Renderer
 	export *export.Exporter
 	files  func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error)
+	policy authz.Policy
 }
-
-const actor = "agent"
 
 // ---- tool inputs and outputs ----
 
@@ -275,13 +277,13 @@ func (h *handlers) tools(s *mcp.Server) {
 	}
 
 	mcp.AddTool(s, write("create_deck", "Create a new deck, optionally with all its slides in one call."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in CreateDeckIn) (*mcp.CallToolResult, *service.Result, error) {
-			r, err := h.svc.Create(ctx, in.Title, in.Theme, in.Aspect, in.Slides, actor)
+		func(ctx context.Context, req *mcp.CallToolRequest, in CreateDeckIn) (*mcp.CallToolResult, *service.Result, error) {
+			r, err := h.svc.CreateFor(ctx, principal(req).UserID, in.Title, in.Theme, in.Aspect, in.Slides, actorOf(req))
 			return nil, r, err
 		})
 
 	mcp.AddTool(s, read("get_deck", "Read a deck's full JSON and current version."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *GetDeckOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *GetDeckOut, error) {
 			_, raw, ver, err := h.svc.Get(ctx, in.DeckID)
 			if err != nil {
 				return nil, nil, notFound(err, in.DeckID)
@@ -310,49 +312,49 @@ func (h *handlers) tools(s *mcp.Server) {
 		})
 
 	mcp.AddTool(s, write("add_slide", "Add one slide."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in AddSlideIn) (*mcp.CallToolResult, *service.Result, error) {
-			r, err := h.svc.AddSlide(ctx, in.DeckID, in.BaseVersion, in.Slide, in.Position, actor)
+		func(ctx context.Context, req *mcp.CallToolRequest, in AddSlideIn) (*mcp.CallToolResult, *service.Result, error) {
+			r, err := h.svc.AddSlide(ctx, in.DeckID, in.BaseVersion, in.Slide, in.Position, actorOf(req))
 			return nil, r, notFound(err, in.DeckID)
 		})
 
 	mcp.AddTool(s, write("update_slide", "Replace some top-level fields of a slide (for example its regions or transition)."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in UpdateSlideIn) (*mcp.CallToolResult, *service.Result, error) {
-			r, err := h.svc.UpdateSlide(ctx, in.DeckID, in.BaseVersion, in.SlideID, in.Fields, actor)
+		func(ctx context.Context, req *mcp.CallToolRequest, in UpdateSlideIn) (*mcp.CallToolResult, *service.Result, error) {
+			r, err := h.svc.UpdateSlide(ctx, in.DeckID, in.BaseVersion, in.SlideID, in.Fields, actorOf(req))
 			return nil, r, notFound(err, in.DeckID)
 		})
 
 	mcp.AddTool(s, write("delete_slide", "Delete a slide."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in SlideRef) (*mcp.CallToolResult, *service.Result, error) {
-			r, err := h.svc.DeleteSlide(ctx, in.DeckID, in.BaseVersion, in.SlideID, actor)
+		func(ctx context.Context, req *mcp.CallToolRequest, in SlideRef) (*mcp.CallToolResult, *service.Result, error) {
+			r, err := h.svc.DeleteSlide(ctx, in.DeckID, in.BaseVersion, in.SlideID, actorOf(req))
 			return nil, r, notFound(err, in.DeckID)
 		})
 
 	mcp.AddTool(s, write("move_slide", "Move a slide to a new position."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in MoveSlideIn) (*mcp.CallToolResult, *service.Result, error) {
-			r, err := h.svc.MoveSlide(ctx, in.DeckID, in.BaseVersion, in.SlideID, in.To, actor)
+		func(ctx context.Context, req *mcp.CallToolRequest, in MoveSlideIn) (*mcp.CallToolResult, *service.Result, error) {
+			r, err := h.svc.MoveSlide(ctx, in.DeckID, in.BaseVersion, in.SlideID, in.To, actorOf(req))
 			return nil, r, notFound(err, in.DeckID)
 		})
 
 	mcp.AddTool(s, write("patch_deck", "Apply RFC 6902 JSON Patch operations to the deck atomically. Best for precise element edits, e.g. "+
 		`{"op":"replace","path":"/slides/2/regions/body/0/props/text","value":"..."}. All ops succeed or none do.`),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in PatchDeckIn) (*mcp.CallToolResult, *service.Result, error) {
-			r, err := h.svc.Patch(ctx, in.DeckID, in.BaseVersion, in.Ops, actor)
+		func(ctx context.Context, req *mcp.CallToolRequest, in PatchDeckIn) (*mcp.CallToolResult, *service.Result, error) {
+			r, err := h.svc.Patch(ctx, in.DeckID, in.BaseVersion, in.Ops, actorOf(req))
 			return nil, r, notFound(err, in.DeckID)
 		})
 
 	mcp.AddTool(s, write("set_theme", "Switch the deck's theme. Content is untouched; the look changes."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in SetThemeIn) (*mcp.CallToolResult, *service.Result, error) {
-			r, err := h.svc.SetTheme(ctx, in.DeckID, in.BaseVersion, in.Theme, actor)
+		func(ctx context.Context, req *mcp.CallToolRequest, in SetThemeIn) (*mcp.CallToolResult, *service.Result, error) {
+			r, err := h.svc.SetTheme(ctx, in.DeckID, in.BaseVersion, in.Theme, actorOf(req))
 			return nil, r, notFound(err, in.DeckID)
 		})
 
 	mcp.AddTool(s, read("list_themes", "List themes with their descriptions and colour tokens."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, _ NoInput) (*mcp.CallToolResult, *ListThemesOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, _ NoInput) (*mcp.CallToolResult, *ListThemesOut, error) {
 			return nil, &ListThemesOut{Themes: themeInfos(h.svc)}, nil
 		})
 
 	mcp.AddTool(s, read("lint_deck", "Check a deck for overflow, density, contrast, alt text and animation problems, with fix hints."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *LintOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *LintOut, error) {
 			issues, ver, err := h.svc.Lint(ctx, in.DeckID)
 			if err != nil {
 				return nil, nil, notFound(err, in.DeckID)
@@ -361,7 +363,7 @@ func (h *handlers) tools(s *mcp.Server) {
 		})
 
 	mcp.AddTool(s, &mcp.Tool{Name: "upload_asset", Description: "Upload an image or video and get a /files/... url to use in the deck. Identical files get the same url."},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in UploadIn) (*mcp.CallToolResult, *UploadOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in UploadIn) (*mcp.CallToolResult, *UploadOut, error) {
 			data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(in.DataBase64))
 			if err != nil {
 				return nil, nil, fmt.Errorf("data_base64 is not valid base64: %w", err)
@@ -374,7 +376,7 @@ func (h *handlers) tools(s *mcp.Server) {
 		})
 
 	mcp.AddTool(s, read("export_deck", "Export a deck: html (one self-contained file that plays offline with all animations), pdf or png. Returns a download link."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in ExportIn) (*mcp.CallToolResult, *ExportOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in ExportIn) (*mcp.CallToolResult, *ExportOut, error) {
 			if in.Format == "pdf" || in.Format == "png" {
 				if h.files == nil || h.render == nil || !h.render.Available() {
 					return nil, nil, render.ErrUnavailable
@@ -410,7 +412,7 @@ func (h *handlers) tools(s *mcp.Server) {
 		})
 
 	mcp.AddTool(s, read("render_slide", "Screenshot one slide (optionally at a build step) exactly as viewers see it, to check your work visually. Returns a PNG and that slide's lint findings."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in RenderIn) (*mcp.CallToolResult, *RenderOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in RenderIn) (*mcp.CallToolResult, *RenderOut, error) {
 			if h.render == nil || !h.render.Available() {
 				return nil, nil, render.ErrUnavailable
 			}
@@ -467,7 +469,7 @@ func (h *handlers) tools(s *mcp.Server) {
 		})
 
 	mcp.AddTool(s, read("list_comments", "Read notes humans pinned to the deck, its slides or elements (\"Send to agent\"). Act on them, then resolve them."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in CommentsIn) (*mcp.CallToolResult, *CommentsOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in CommentsIn) (*mcp.CallToolResult, *CommentsOut, error) {
 			cs, err := h.svc.Comments(ctx, in.DeckID, in.All)
 			if err != nil {
 				return nil, nil, notFound(err, in.DeckID)
@@ -476,7 +478,7 @@ func (h *handlers) tools(s *mcp.Server) {
 		})
 
 	mcp.AddTool(s, &mcp.Tool{Name: "resolve_comment", Description: "Mark a human's comment as done, with a short reply describing what you changed."},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in ResolveIn) (*mcp.CallToolResult, *OK, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in ResolveIn) (*mcp.CallToolResult, *OK, error) {
 			if err := h.svc.ResolveComment(ctx, in.DeckID, in.CommentID, in.Reply); err != nil {
 				if errors.Is(err, store.ErrNotFound) {
 					return nil, nil, fmt.Errorf("no comment %q on deck %q", in.CommentID, in.DeckID)
@@ -487,7 +489,7 @@ func (h *handlers) tools(s *mcp.Server) {
 		})
 
 	mcp.AddTool(s, read("get_history", "List a deck's versions (who changed it and when), newest first."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in HistoryIn) (*mcp.CallToolResult, *HistoryOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in HistoryIn) (*mcp.CallToolResult, *HistoryOut, error) {
 			if _, _, _, err := h.svc.Get(ctx, in.DeckID); err != nil {
 				return nil, nil, notFound(err, in.DeckID)
 			}
@@ -509,19 +511,19 @@ func (h *handlers) tools(s *mcp.Server) {
 		})
 
 	mcp.AddTool(s, write("restore_version", "Bring back the deck exactly as it was at an earlier version (undo). History is kept: the restore is a new version."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in RestoreIn) (*mcp.CallToolResult, *service.Result, error) {
-			r, err := h.svc.Restore(ctx, in.DeckID, in.BaseVersion, in.Version, actor)
+		func(ctx context.Context, req *mcp.CallToolRequest, in RestoreIn) (*mcp.CallToolResult, *service.Result, error) {
+			r, err := h.svc.Restore(ctx, in.DeckID, in.BaseVersion, in.Version, actorOf(req))
 			return nil, r, notFound(err, in.DeckID)
 		})
 
 	mcp.AddTool(s, write("set_deck_access", "Make a deck private (viewers need a link carrying its key) or public again. rotate=true issues a new key, so links shared so far stop working."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in SetAccessIn) (*mcp.CallToolResult, *service.Access, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in SetAccessIn) (*mcp.CallToolResult, *service.Access, error) {
 			a, err := h.svc.SetPrivate(ctx, in.DeckID, in.Private, in.Rotate)
 			return nil, a, notFound(err, in.DeckID)
 		})
 
 	mcp.AddTool(s, read("get_share_url", "Get the live viewer link for a deck to give to the user."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *ShareOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *ShareOut, error) {
 			if _, _, _, err := h.svc.Get(ctx, in.DeckID); err != nil {
 				return nil, nil, notFound(err, in.DeckID)
 			}

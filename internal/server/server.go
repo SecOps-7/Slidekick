@@ -18,6 +18,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/SecOps-7/slidekick/internal/accounts"
+	"github.com/SecOps-7/slidekick/internal/authz"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/service"
@@ -25,7 +27,9 @@ import (
 )
 
 type Options struct {
-	Token    string // bearer token for /mcp and write API; empty disables auth
+	Token    string // server token (SLIDEKICK_TOKEN): full access for automation and recovery
+	BaseURL  string // public URL: Secure cookies when https, SSO redirect URLs, origin checks
+	Accounts *accounts.Service
 	SchemaFS fs.FS
 	Web      fs.FS
 	Log      *slog.Logger
@@ -36,6 +40,7 @@ type Options struct {
 
 type server struct {
 	svc     *service.Service
+	acc     *accounts.Service
 	opt     Options
 	fails   *failLimiter
 	conns   *connLimiter
@@ -44,28 +49,32 @@ type server struct {
 
 // New returns the root handler.
 func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler {
-	s := &server{svc: svc, opt: opt, fails: newFailLimiter(), conns: newConnLimiter(50, 500), exports: newExportCache(2, 8)}
+	s := &server{svc: svc, acc: opt.Accounts, opt: opt, fails: newFailLimiter(), conns: newConnLimiter(50, 500), exports: newExportCache(2, 8)}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok\n") })
-	// Deck ids are share links: listing needs a token (a deck token sees only its deck).
-	mux.Handle("GET /api/decks", s.auth(http.HandlerFunc(s.listDecks)))
+	// Every route states the action it needs; authz.Policy decides (see access.go).
+	// Deck ids are share links: listing needs a signed-in user (a deck token sees only its deck).
+	mux.Handle("GET /api/decks", s.require(authz.ListDecks, false, s.listDecks))
+	mux.Handle("POST /api/decks", s.require(authz.Create, false, s.createDeck))
 	mux.HandleFunc("GET /api/decks/{id}", s.viewGate(s.getDeck))
 	mux.HandleFunc("GET /api/decks/{id}/history", s.viewGate(s.history))
-	mux.Handle("POST /api/decks/{id}/patch", s.deckAuth(http.HandlerFunc(s.patchDeck)))
+	mux.Handle("POST /api/decks/{id}/patch", s.require(authz.Edit, true, s.patchDeck))
 	mux.HandleFunc("GET /api/catalog", s.catalog)
 	mux.HandleFunc("GET /api/decks/{id}/export.html", s.viewGate(s.exportHTML))
-	mux.Handle("POST /api/decks/{id}/export", s.deckAuth(http.HandlerFunc(s.exportFile)))
-	mux.Handle("GET /api/auth", s.auth(http.HandlerFunc(s.authInfo)))
+	mux.Handle("POST /api/decks/{id}/export", s.require(authz.Export, true, s.exportFile))
+	mux.Handle("GET /api/auth", s.require(anyAuthenticated, false, s.authInfo))
 	mux.HandleFunc("GET /api/decks/{id}/comments", s.viewGate(s.listComments))
-	mux.Handle("POST /api/decks/{id}/comments", s.deckAuth(http.HandlerFunc(s.addComment)))
-	mux.Handle("POST /api/decks/{id}/comments/{cid}/resolve", s.deckAuth(http.HandlerFunc(s.resolveComment)))
-	mux.Handle("POST /api/decks/{id}/restore", s.deckAuth(http.HandlerFunc(s.restore)))
-	mux.Handle("GET /api/decks/{id}/access", s.deckAuth(http.HandlerFunc(s.getAccess)))
-	mux.Handle("POST /api/decks/{id}/access", s.deckAuth(http.HandlerFunc(s.setAccess)))
-	mux.Handle("POST /api/decks/{id}/edit-token", s.admin(http.HandlerFunc(s.issueEditToken)))
-	mux.Handle("DELETE /api/decks/{id}/edit-token", s.admin(http.HandlerFunc(s.revokeEditToken)))
-	mux.Handle("POST /api/files", s.auth(http.HandlerFunc(s.uploadFile)))
+	mux.Handle("POST /api/decks/{id}/comments", s.require(authz.Comment, true, s.addComment))
+	mux.Handle("POST /api/decks/{id}/comments/{cid}/resolve", s.require(authz.Edit, true, s.resolveComment))
+	mux.Handle("POST /api/decks/{id}/restore", s.require(authz.Edit, true, s.restore))
+	mux.Handle("GET /api/decks/{id}/access", s.require(authz.Share, true, s.getAccess))
+	mux.Handle("POST /api/decks/{id}/access", s.require(authz.Share, true, s.setAccess))
+	mux.Handle("POST /api/decks/{id}/edit-token", s.require(authz.MintDeckToken, true, s.issueEditToken))
+	mux.Handle("DELETE /api/decks/{id}/edit-token", s.require(authz.MintDeckToken, true, s.revokeEditToken))
+	mux.Handle("PUT /api/decks/{id}/owner", s.require(authz.ManageUsers, true, s.setDeckOwner))
+	mux.Handle("POST /api/files", s.require(authz.Upload, false, s.uploadFile))
+	s.accountRoutes(mux)
 	mux.HandleFunc("GET /files/{name}", s.serveFile)
 	mux.HandleFunc("GET /ws/decks/{id}", s.ws)
 	mux.HandleFunc("GET /schema/deck.schema.json", func(w http.ResponseWriter, r *http.Request) {
@@ -144,10 +153,10 @@ func (s *server) listDecks(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if p, _ := principalFrom(r.Context()); !p.admin {
+	if p := authFrom(r.Context()).p; p.Kind == authz.KindDeck {
 		mine := rows[:0]
 		for _, row := range rows {
-			if p.can(row.ID) {
+			if row.ID == p.Deck {
 				mine = append(mine, row)
 			}
 		}
@@ -237,20 +246,17 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 	}
 	defer c.CloseNow()
 	c.SetReadLimit(8 << 10)
-	ip0 := clientIP(r)
-	authed := s.opt.Token == ""
-	tokenAuth := func(tok string) bool {
-		if !s.fails.allowed(ip0) {
-			return false
+	// Signed-in browsers authenticate with their session cookie (the Origin
+	// check in websocket.Accept stops other sites from using it); token
+	// holders send {"type":"auth","token":...}.
+	cookieOK := false
+	if a, _ := s.identify(r); a.p.Authenticated() {
+		if d, err := s.deckRef(r.Context(), id); err == nil {
+			cookieOK = s.policy().Can(a.p, authz.Present, d)
 		}
-		p, ok := s.resolveToken(r.Context(), tok)
-		if !ok {
-			s.fails.fail(ip0)
-			return false
-		}
-		s.fails.succeed(ip0)
-		return p.can(id)
 	}
+	authed := cookieOK
+	tokenAuth := func(tok string) bool { return tok != "" && s.wsAuth(r.Context(), ip, tok, id) }
 	if !keyOK && !authed {
 		actx, done := context.WithTimeout(r.Context(), 10*time.Second)
 		_, data, err := c.Read(actx)
@@ -298,7 +304,7 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 			}
 			switch m.Type {
 			case "auth":
-				ok := s.opt.Token == "" || tokenAuth(m.Token)
+				ok := cookieOK || tokenAuth(m.Token)
 				authMu.Lock()
 				authed = ok || (authed && !keyOK) // a key-less private viewer keeps its earlier proof
 				authMu.Unlock()

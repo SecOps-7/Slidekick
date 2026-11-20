@@ -232,3 +232,15 @@ button { font: inherit; }
 /* ---- audience window ---- */
 .sk-audience, .sk-audience .sk-viewport { cursor: none; }
 .sk-audience .hud-progress { display: none; }
+
+/* account widget in page headers */
+.acct { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+.acct a { color: var(--app-accent); text-decoration: none; }
+.acct a:hover { text-decoration: underline; }
+.acct button { font: inherit; font-size: 14px; border: 1px solid var(--app-line); border-radius: 8px; background: none; color: var(--app-text); padding: 4px 10px; cursor: pointer; }
+.acct-who { color: var(--app-muted); }
+.acct .acct-warn { color: var(--app-warn); }
+.home-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.home-decks-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.home-decks-head h2 { margin: 0 0 14px; }
+.new-deck { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--app-accent); background: var(--app-accent); color: #04221f; font-weight: 600; cursor: pointer; }

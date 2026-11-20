@@ -1,5 +1,5 @@
 // Deck list plus "connect your agent" instructions.
-import { authHeaders, ensureAuth } from "./auth";
+import { accountMenu, authHeaders, goSignIn, me } from "./auth";
 
 interface Summary {
   id: string;
@@ -8,6 +8,7 @@ interface Summary {
   version: number;
   slides: number;
   updatedAt: string;
+  ownerName?: string;
 }
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
@@ -25,15 +26,38 @@ function ago(iso: string) {
   return new Date(iso).toLocaleDateString();
 }
 
-export function mountHome(host: HTMLElement) {
+export async function mountHome(host: HTMLElement) {
+  const who = await me();
+  if (!who.signedIn) goSignIn();
   document.body.classList.add("home-page");
   document.title = "Slidekick";
   const page = el("main", "home");
   const head = el("header", "home-head");
-  head.append(el("h1", undefined, "Slidekick"), el("p", undefined, "Agents write the deck. You watch it move."));
+  const top = el("div", "home-top");
+  top.append(el("h1", undefined, "Slidekick"), accountMenu(who));
+  head.append(top, el("p", undefined, "Agents write the deck. You watch it move."));
 
   const decks = el("section", "home-decks");
-  decks.append(el("h2", undefined, "Decks"));
+  const decksHead = el("div", "home-decks-head");
+  decksHead.append(el("h2", undefined, "Decks"));
+  if (who.can.create) {
+    const nb = el("button", "new-deck", "New deck");
+    nb.type = "button";
+    nb.onclick = async () => {
+      const title = prompt("Deck title", "Untitled deck");
+      if (title === null) return;
+      const r = await fetch("/api/decks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ title, slides: [{ layout: "title", regions: { title: [{ type: "heading", props: { text: title || "Untitled deck", level: 1 } }] } }] }),
+      });
+      const d = await r.json();
+      if (r.ok) location.href = `/d/${encodeURIComponent(d.deckId)}/edit`;
+      else alert(d.error ?? "Couldn't create the deck");
+    };
+    decksHead.append(nb);
+  }
+  decks.append(decksHead);
   const list = el("div", "deck-list");
   decks.append(list);
 
@@ -41,10 +65,10 @@ export function mountHome(host: HTMLElement) {
   const connect = el("section", "home-connect");
   connect.append(
     el("h2", undefined, "Connect an agent"),
-    el("p", undefined, "Slidekick speaks MCP over streamable HTTP. Add it to Claude Code with:"),
+    el("p", undefined, "Slidekick speaks MCP over streamable HTTP. Create a personal agent token on your Account page, then add it to Claude Code:"),
   );
   const cmd = el("pre");
-  cmd.textContent = `claude mcp add --transport http slidekick ${mcpURL} \\\n  --header "Authorization: Bearer $SLIDEKICK_TOKEN"`;
+  cmd.textContent = `claude mcp add --transport http slidekick ${mcpURL} \\\n  --header "Authorization: Bearer <your agent token>"`;
   const copy = el("button", "copy", "Copy");
   copy.type = "button";
   copy.onclick = async () => {
@@ -62,14 +86,10 @@ export function mountHome(host: HTMLElement) {
   page.append(head, decks, connect);
   host.append(page);
 
-  let token = "";
   const load = async () => {
     try {
-      const r = await fetch("/api/decks", { cache: "no-store", headers: authHeaders(token) });
-      if (r.status === 401) {
-        token = await ensureAuth("see the list of decks");
-        return load();
-      }
+      const r = await fetch("/api/decks", { cache: "no-store" });
+      if (r.status === 401) goSignIn();
       const { decks: rows } = (await r.json()) as { decks: Summary[] };
       if (!rows.length) {
         list.replaceChildren(el("p", "empty", "No decks yet. Connect an agent and ask it for one; it will show up here."));
@@ -81,7 +101,7 @@ export function mountHome(host: HTMLElement) {
           a.href = `/d/${encodeURIComponent(d.id)}`;
           a.append(
             el("span", "deck-title", d.title),
-            el("span", "deck-meta", `${d.slides} slide${d.slides === 1 ? "" : "s"} · ${d.theme} · v${d.version} · ${ago(d.updatedAt)}`),
+            el("span", "deck-meta", `${d.slides} slide${d.slides === 1 ? "" : "s"} · ${d.theme} · ${d.ownerName ? `${d.ownerName} · ` : ""}${ago(d.updatedAt)}`),
           );
           const card = el("div", "deck-card-wrap");
           const links = el("span", "deck-links");

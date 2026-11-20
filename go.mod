@@ -5,10 +5,12 @@ go 1.27.4
 require (
 	github.com/chromedp/chromedp v0.24.0
 	github.com/coder/websocket v1.8.15
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+	golang.org/x/oauth2 v0.38.0
 	modernc.org/sqlite v1.62.0
 )
 
@@ -16,6 +18,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/cdproto v0.160.1 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260213210345-44df1a37e875 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -37,7 +40,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
