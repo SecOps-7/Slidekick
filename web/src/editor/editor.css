@@ -211,3 +211,17 @@
 .ed-export-menu a, .ed-export-menu button { display: grid; text-align: left; padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--ed-text); text-decoration: none; cursor: pointer; }
 .ed-export-menu a:hover, .ed-export-menu button:hover { background: var(--ed-bg); }
 .ed-export-menu small { color: var(--ed-muted); }
+
+/* ---- share menu and follow toggle ---- */
+.ed-follow { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ed-muted, #9aa3b5); cursor: pointer; white-space: nowrap; }
+.ed-share { width: min(380px, 92vw); gap: 10px; padding: 12px; }
+.ed-share-row { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.ed-share-row small, .ed-share small { display: block; color: var(--ed-muted, #9aa3b5); }
+.ed-share-link { display: flex; gap: 6px; }
+.ed-share-link input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--ed-line); background: var(--ed-bg); color: var(--ed-text); font: 12px ui-monospace, monospace; }
+.ed-share .ed-btn { display: inline-flex; place-items: center; }
+.ed-share .ed-link { padding: 2px 0; color: var(--ed-accent, #8ab4ff); font-size: 12px; text-decoration: underline; }
+.ed-share-token { border-top: 1px solid var(--ed-line); padding-top: 10px; display: grid; gap: 6px; }
+.ed-share-token h4 { margin: 0; font-size: 13px; }
+.ed-share-token p { margin: 0; }
+.ed-share-cmd { display: block; padding: 8px; border-radius: 6px; background: var(--ed-bg); font: 11px/1.4 ui-monospace, monospace; word-break: break-all; user-select: all; }

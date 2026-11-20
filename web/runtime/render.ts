@@ -54,6 +54,7 @@ export function applyTheme(root: HTMLElement, theme: Theme) {
   for (const [k, v] of Object.entries(t.size)) root.style.setProperty(`--sk-size-${k}`, `${v}px`);
   root.style.setProperty("--sk-radius", `${t.radius}px`);
   root.style.setProperty("--sk-ease", t.motion.easing);
+  root.style.setProperty("--sk-bounce", String(t.motion.bounce ?? 0));
   root.style.setProperty("--sk-dur-fast", `${t.motion.fast}ms`);
   root.style.setProperty("--sk-dur-base", `${t.motion.base}ms`);
   root.style.setProperty("--sk-dur-slow", `${t.motion.slow}ms`);
@@ -76,6 +77,27 @@ function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, html?: s
   if (cls) n.className = cls;
   if (html !== undefined) n.innerHTML = html;
   return n;
+}
+
+const TOKEN_VARS = ["bg", "surface", "text", "muted", "accent", "accent2"].map((c) => `--sk-${c}`).concat(
+  ["heading", "body", "mono"].map((f) => `--sk-font-${f}`),
+  ["xs", "sm", "md", "lg", "xl", "xxl"].map((s) => `--sk-size-${s}`),
+  ["--sk-radius"],
+);
+
+/** Wraps an html element's markup in a locked-down document carrying the theme tokens. */
+export function htmlDoc(body: string): string {
+  const cs = typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+  const vars = TOKEN_VARS.map((v) => {
+    const val = cs?.getPropertyValue(v).trim();
+    return val ? `${v}:${val.replace(/[<>]/g, "")};` : "";
+  }).join("");
+  const csp = "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; font-src https: data:; media-src https: data:";
+  return (
+    `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}">` +
+    `<style>:root{${vars}}html,body{margin:0;height:100%;background:transparent;color:var(--sk-text);` +
+    `font-family:var(--sk-font-body);font-size:var(--sk-size-md);line-height:1.4}</style></head><body>${body}</body></html>`
+  );
 }
 
 const str = (e: Element, k: string) => (typeof e.props[k] === "string" ? (e.props[k] as string) : "");
@@ -202,6 +224,24 @@ function renderElement(e: Element, units: BuildUnit[], pending: Promise<unknown>
         const box = h("div", "sk-shape", label ? `<span>${inline(label)}</span>` : undefined);
         wrap.append(box);
       }
+      break;
+    }
+    case "html": {
+      // Escape hatch: author HTML in a frame with no scripts, no same-origin
+      // access and (via its own CSP) no network beyond https images/fonts.
+      const f = h("iframe");
+      f.className = "sk-html";
+      f.title = str(e, "title") || "Custom content";
+      f.setAttribute("sandbox", "");
+      f.referrerPolicy = "no-referrer";
+      f.srcdoc = htmlDoc(str(e, "html"));
+      pending.push(
+        new Promise<void>((resolve) => {
+          f.addEventListener("load", () => resolve(), { once: true });
+          setTimeout(resolve, 3000);
+        }),
+      );
+      wrap.append(f);
       break;
     }
     case "embed": {

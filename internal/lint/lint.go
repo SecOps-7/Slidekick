@@ -131,6 +131,12 @@ func slide(i int, s, prev *deck.Slide, cat *deck.Catalog, theme *deck.Theme) []I
 				add("info", "diagram-caption", e.ID, "Diagram has no caption, so screen readers get no description.",
 					"Set props.caption to one sentence describing what it shows.")
 			}
+		case "html":
+			add("warning", "html-escape-hatch", e.ID, "Raw HTML element: it bypasses the theme's layouts and lint checks.",
+				"Prefer a structured element (text, shape, chart, diagram...). Keep it only if nothing else can express this.")
+			if strings.TrimSpace(e.Str("title")) == "" {
+				add("error", "html-title", e.ID, "HTML element has no title.", "Set props.title to describe the content for screen readers.")
+			}
 		case "embed":
 			if e.Str("kind") == "iframe" && strings.TrimSpace(e.Str("title")) == "" {
 				add("error", "embed-title", e.ID, "Iframe has no title.", "Set props.title to describe the embedded content.")
@@ -234,7 +240,7 @@ func chart(i int, s *deck.Slide, e *deck.Element) []Issue {
 	return out
 }
 
-var noContrastCheck = map[string]bool{"image": true, "chart": true, "diagram": true, "embed": true, "shape": true}
+var noContrastCheck = map[string]bool{"image": true, "chart": true, "diagram": true, "embed": true, "shape": true, "html": true}
 
 func contrast(i int, s *deck.Slide, e *deck.Element, theme *deck.Theme) []Issue {
 	if theme == nil || noContrastCheck[e.Type] {
@@ -351,7 +357,7 @@ func weight(e *deck.Element) float64 {
 		}
 	}
 	switch e.Type {
-	case "image", "chart", "diagram", "embed", "icon":
+	case "image", "chart", "diagram", "embed", "icon", "html":
 		return 0
 	case "code":
 		// Code height is driven by line count; ~24 body characters per line.

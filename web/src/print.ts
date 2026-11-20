@@ -2,13 +2,14 @@
 // per page at the deck's native size. Signals window.__skReady when drawn.
 import { applyTheme, renderSlide, STAGE, themeReady } from "../runtime/render";
 import type { Catalog, Deck } from "../runtime/types";
+import { viewFetch } from "./key";
 
 export async function mountPrint(host: HTMLElement, deckId: string) {
   const w = window as { __skReduced?: boolean; __skReady?: boolean };
   w.__skReduced = true;
   const [catalog, data] = await Promise.all([
     fetch("/api/catalog").then((r) => r.json() as Promise<Catalog>),
-    fetch(`/api/decks/${encodeURIComponent(deckId)}`, { cache: "no-store" }).then((r) => r.json() as Promise<{ deck: Deck }>),
+    viewFetch(`/api/decks/${encodeURIComponent(deckId)}`).then((r) => r.json() as Promise<{ deck: Deck }>),
   ]);
   const deck = data.deck;
   const theme = catalog.themes[deck.theme];

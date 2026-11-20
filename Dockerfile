@@ -1,9 +1,14 @@
 # syntax=docker/dockerfile:1
 # Slidekick: one static Go binary with the web app embedded, on distroless.
 
+# Base images are pinned to their multi-arch index digest (tag kept for
+# readability). Dependabot (.github/dependabot.yml) proposes updates weekly; to
+# refresh by hand, run `docker buildx imagetools inspect <image:tag>` and copy
+# the top-level Digest (the index, not a per-platform manifest).
+
 # Web and Go stages run on the build machine's platform and cross-compile, so
 # multi-arch builds (buildx --platform linux/amd64,linux/arm64) stay fast.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS web
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-fund --no-audit
@@ -11,7 +16,7 @@ COPY web/ ./
 COPY schema/ /src/schema/
 RUN npm run build
 
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -22,7 +27,7 @@ ARG VERSION=0.1.0-dev
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/slidekick ./cmd/slidekick
 
 # ---- render: adds headless Chromium for render_slide (tag: slidekick:<ver>-render)
-FROM debian:trixie-slim AS render
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS render
 RUN apt-get update \
  && apt-get install -y --no-install-recommends chromium fonts-noto-core fonts-noto-color-emoji fonts-liberation ca-certificates \
  && rm -rf /var/lib/apt/lists/*
@@ -39,7 +44,7 @@ LABEL org.opencontainers.image.source="https://github.com/SecOps-7/slidekick" or
       org.opencontainers.image.description="Slidekick with headless Chromium for render_slide and PDF/PNG export"
 
 # ---- default: minimal distroless image (render_slide reports Chromium is missing)
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 COPY --from=build /out/slidekick /usr/local/bin/slidekick
 ENV SLIDEKICK_ADDR=:7410 SLIDEKICK_DATA=/data
 VOLUME /data

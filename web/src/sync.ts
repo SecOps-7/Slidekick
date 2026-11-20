@@ -2,6 +2,8 @@
 // Presenter position and the laser pointer also travel over a same-machine
 // BroadcastChannel, so an audience window follows instantly even offline.
 
+import { viewKey } from "./key";
+
 export interface PresentMsg {
   type: "present";
   index: number;
@@ -43,7 +45,10 @@ export class Live {
 
   private connect() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${location.host}/ws/decks/${encodeURIComponent(this.deckId)}`);
+    const key = viewKey();
+    const q = key ? `?k=${encodeURIComponent(key)}` : "";
+    // A private deck opened without its key is unlocked by the auth message.
+    const ws = new WebSocket(`${proto}://${location.host}/ws/decks/${encodeURIComponent(this.deckId)}${q}`);
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 500;
@@ -57,9 +62,15 @@ export class Live {
       if ((msg.type === "present" || msg.type === "pointer") && msg.from === this.conn) return; // own echo
       this.onMsg(msg);
     };
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       this.authed = false;
       if (this.closed) return;
+      if (e.code === 1008) {
+        // Policy violation: the deck went private or its key changed.
+        this.onState("offline");
+        this.onMsg({ type: "denied" });
+        return;
+      }
       this.onState("offline");
       setTimeout(() => this.connect(), this.retry);
       this.retry = Math.min(this.retry * 2, 10000);

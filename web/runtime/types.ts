@@ -1,17 +1,43 @@
-// Types mirroring schema/deck.schema.json. Keep in step with the schema.
+// Runtime types. The enums and element props come from schema.gen.ts, which
+// is generated from schema/deck.schema.json (npm run types), so the schema
+// stays the single contract. Props stay loose at runtime (decks may come
+// from older schema versions); ElementProps types them where it matters.
+import type * as S from "./schema.gen";
 
-export type ColorToken = "bg" | "surface" | "text" | "muted" | "accent" | "accent2";
-export type Size = "xs" | "sm" | "md" | "lg" | "xl" | "xxl";
-export type TransitionType = "none" | "fade" | "slide" | "zoom" | "push" | "morph";
-export type BuildPreset = "fade" | "fade-up" | "scale-in" | "wipe" | "typewriter";
-export type Duration = "fast" | "base" | "slow";
+export type ColorToken = S.ColorToken;
+export type Size = NonNullable<S.Style["size"]>;
+export type TransitionType = S.Transition["type"];
+export type BuildPreset = NonNullable<S.Build["preset"]>;
+export type Duration = NonNullable<S.Transition["duration"]>;
+export type Layout = S.Slide["layout"];
+export type ElementType = S.Element["type"];
+
+/** Props of each element type, as the schema defines them. */
+export interface ElementProps {
+  heading: S.PropsHeading;
+  text: S.PropsText;
+  bullets: S.PropsBullets;
+  image: S.PropsImage;
+  code: S.PropsCode;
+  stat: S.PropsStat;
+  quote: S.PropsQuote;
+  chart: S.PropsChart;
+  diagram: S.PropsDiagram;
+  icon: S.PropsIcon;
+  shape: S.PropsShape;
+  embed: S.PropsEmbed;
+  html: S.PropsHtml;
+}
+// Fails to compile if the schema gains an element type ElementProps lacks (or the reverse).
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+export const elementPropsCoverSchema: Same<keyof ElementProps, ElementType> = true;
 
 export interface Deck {
   schemaVersion: number;
   id: string;
   title: string;
   theme: string;
-  aspect: "16:9" | "4:3";
+  aspect: S.SlidekickDeck["aspect"];
   slides: Slide[];
 }
 
@@ -19,17 +45,17 @@ export interface Slide {
   id: string;
   layout: string;
   regions: Record<string, Element[]>;
-  transition?: { type: TransitionType; duration?: Duration };
+  transition?: S.Transition;
   notes?: string;
-  background?: { token?: ColorToken; image?: string; dim?: number };
+  background?: S.Background;
 }
 
 export interface Element {
   id: string;
-  type: "heading" | "text" | "bullets" | "image" | "code" | "stat" | "quote" | "chart" | "diagram" | "icon" | "shape" | "embed";
+  type: ElementType;
   props: Record<string, unknown>;
-  style?: { color?: ColorToken; size?: Size; align?: "start" | "center" | "end"; weight?: "regular" | "bold"; colorRaw?: string };
-  build?: { step: number; preset?: BuildPreset };
+  style?: S.Style;
+  build?: S.Build;
 }
 
 export interface Theme {
@@ -43,7 +69,7 @@ export interface Theme {
     fonts: string[];
     size: Record<Size, number>;
     radius: number;
-    motion: { fast: number; base: number; slow: number; easing: string };
+    motion: { fast: number; base: number; slow: number; easing: string; bounce?: number };
   };
 }
 

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -39,7 +40,7 @@ Workflow:
 6. Check your work visually: render_slide returns a screenshot of any slide (when Chromium is installed).
 7. Give the user the url from get_share_url so they can watch or present. export_deck makes a standalone HTML file.
 
-Never write HTML. Compose elements (heading, text, bullets, image, code, stat, quote, chart, diagram, icon, shape, embed) inside layout regions; style only with theme tokens. Upload images with upload_asset and use the returned /files/... url.`
+Don't write HTML: compose elements (heading, text, bullets, image, code, stat, quote, chart, diagram, icon, shape, embed) inside layout regions. The sandboxed html element is a last resort for something no element can express; lint warns on it; style only with theme tokens. Upload images with upload_asset and use the returned /files/... url.`
 
 // Options carries optional collaborators.
 type Options struct {
@@ -54,6 +55,7 @@ func New(svc *service.Service, schemaFS fs.FS, version string, opt Options) *mcp
 	s := mcp.NewServer(&mcp.Implementation{Name: "slidekick", Title: "Slidekick", Version: version},
 		&mcp.ServerOptions{Instructions: instructions})
 	h := &handlers{svc: svc, render: opt.Renderer, export: opt.Exporter, files: opt.Files}
+	s.AddReceivingMiddleware(scopeMiddleware)
 	h.tools(s)
 	resources(s, svc, schemaFS)
 	prompts(s)
@@ -76,6 +78,19 @@ type CreateDeckIn struct {
 	Theme  string `json:"theme,omitempty" jsonschema:"theme name from list_themes; defaults to aurora"`
 	Aspect string `json:"aspect,omitempty" jsonschema:"16:9 (default) or 4:3"`
 	Slides []any  `json:"slides,omitempty" jsonschema:"optional slides to start with, each matching the slide schema; ids are assigned when omitted"`
+}
+
+type SetAccessIn struct {
+	DeckID  string `json:"deck_id"`
+	Private bool   `json:"private" jsonschema:"true: only people with the link (which carries a key) can watch"`
+	Rotate  bool   `json:"rotate,omitempty" jsonschema:"issue a new key; old links stop working"`
+}
+
+func keyParam(k string) string {
+	if k == "" {
+		return ""
+	}
+	return "&k=" + url.QueryEscape(k)
 }
 
 type DeckRef struct {
@@ -277,13 +292,17 @@ func (h *handlers) tools(s *mcp.Server) {
 		})
 
 	mcp.AddTool(s, read("list_decks", "List decks, most recently edited first."),
-		func(ctx context.Context, _ *mcp.CallToolRequest, _ NoInput) (*mcp.CallToolResult, *ListDecksOut, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, _ NoInput) (*mcp.CallToolResult, *ListDecksOut, error) {
 			rows, err := h.svc.List(ctx)
 			if err != nil {
 				return nil, nil, err
 			}
 			out := &ListDecksOut{Decks: []DeckSummary{}}
+			only := scopedDeck(req)
 			for _, r := range rows {
+				if only != "" && r.ID != only {
+					continue
+				}
 				out.Decks = append(out.Decks, DeckSummary{ID: r.ID, Title: r.Title, Theme: r.Theme, Version: r.Version,
 					Slides: r.Slides, UpdatedAt: r.UpdatedAt.Format(time.RFC3339), URL: h.svc.ShareURL(r.ID)})
 			}
@@ -386,7 +405,7 @@ func (h *handlers) tools(s *mcp.Server) {
 				return nil, nil, err
 			}
 			name := export.Filename(d.Title)
-			return nil, &ExportOut{URL: h.svc.BaseURL + "/api/decks/" + in.DeckID + "/export.html?download=1", Filename: name, Bytes: len(out),
+			return nil, &ExportOut{URL: h.svc.BaseURL + "/api/decks/" + in.DeckID + "/export.html?download=1" + keyParam(h.svc.ViewKey(ctx, in.DeckID)), Filename: name, Bytes: len(out),
 				Note: "Self-contained: runtime, theme and uploaded images are inlined. Web fonts and remote images load from the internet when online."}, nil
 		})
 
@@ -493,6 +512,12 @@ func (h *handlers) tools(s *mcp.Server) {
 		func(ctx context.Context, _ *mcp.CallToolRequest, in RestoreIn) (*mcp.CallToolResult, *service.Result, error) {
 			r, err := h.svc.Restore(ctx, in.DeckID, in.BaseVersion, in.Version, actor)
 			return nil, r, notFound(err, in.DeckID)
+		})
+
+	mcp.AddTool(s, write("set_deck_access", "Make a deck private (viewers need a link carrying its key) or public again. rotate=true issues a new key, so links shared so far stop working."),
+		func(ctx context.Context, _ *mcp.CallToolRequest, in SetAccessIn) (*mcp.CallToolResult, *service.Access, error) {
+			a, err := h.svc.SetPrivate(ctx, in.DeckID, in.Private, in.Rotate)
+			return nil, a, notFound(err, in.DeckID)
 		})
 
 	mcp.AddTool(s, read("get_share_url", "Get the live viewer link for a deck to give to the user."),

@@ -5,7 +5,8 @@ import { Player, type Position } from "../runtime/player";
 import { renderSlide, STAGE } from "../runtime/render";
 import type { Catalog, Deck, PatchEvent } from "../runtime/types";
 import { applyPatch } from "../runtime/patch";
-import { ensureAuth } from "./auth";
+import { authHeaders, ensureAuth } from "./auth";
+import { withKey } from "./key";
 import { Laser } from "./laser";
 import { Live } from "./sync";
 
@@ -18,10 +19,11 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 
 export async function mountPresenter(host: HTMLElement, deckId: string) {
   document.body.classList.add("pr-page");
-  const token = await ensureAuth("present this deck to remote viewers");
+  const token = await ensureAuth("present this deck to remote viewers", deckId);
+  const deckFetch = () => fetch(`/api/decks/${encodeURIComponent(deckId)}`, { cache: "no-store", headers: authHeaders(token) });
   const [catalog, data] = await Promise.all([
     fetch("/api/catalog").then((r) => r.json() as Promise<Catalog>),
-    fetch(`/api/decks/${encodeURIComponent(deckId)}`, { cache: "no-store" }).then((r) => (r.ok ? (r.json() as Promise<{ version: number; deck: Deck }>) : null)),
+    deckFetch().then((r) => (r.ok ? (r.json() as Promise<{ version: number; deck: Deck }>) : null)),
   ]);
   if (!data) {
     host.textContent = "Deck not found.";
@@ -75,7 +77,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
         if (ev.baseVersion !== version) throw new Error("gap");
         deck = applyPatch(deck, ev.ops);
       } catch {
-        const r = await fetch(`/api/decks/${encodeURIComponent(deckId)}`, { cache: "no-store" }).then((x) => x.json());
+        const r = await deckFetch().then((x) => x.json());
         deck = r.deck;
       }
       version = ev.version;
@@ -157,7 +159,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   // ---- audience window ----
   openAud.onclick = () => {
     const p = player.position;
-    window.open(`/d/${encodeURIComponent(deckId)}?audience=1#${p.index + 1}${p.step ? `.${p.step}` : ""}`, `slidekick-audience-${deckId}`, "popup,width=1280,height=720");
+    window.open(withKey(`/d/${encodeURIComponent(deckId)}?audience=1`) + `#${p.index + 1}${p.step ? `.${p.step}` : ""}`, `slidekick-audience-${deckId}`, "popup,width=1280,height=720");
     setTimeout(() => send(player.position), 1200);
   };
 

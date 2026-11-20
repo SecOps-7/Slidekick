@@ -31,6 +31,7 @@ themes/
 - All six colour tokens are required. Keep `text` and `muted` at 4.5:1 contrast or better against `bg` and `surface`; lint checks overrides against them.
 - `size` values are pixels on the 1920×1080 stage.
 - `motion` sets the speed and feel of every build and transition. Calm themes use longer durations and ease-in-out; punchy themes use shorter durations and an overshooting curve.
+- `motion.bounce` (optional, 0 to 1) turns build entrances into physical springs ([Motion](https://motion.dev)): Ember uses 0.35, Meadow 0.15. Leave it out for a plain easing curve. Transitions keep `easing`.
 - `fonts` lists self-hosted families by key. The available keys are in `themes/fonts/faces.json`. To add a family, add it to `web/scripts/gen-fonts.mjs` (any Fontsource package under the SIL Open Font License), run `npm --prefix web run fonts`, and commit `themes/fonts`.
 
 ## theme.css

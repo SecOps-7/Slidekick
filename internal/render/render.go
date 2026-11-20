@@ -32,6 +32,20 @@ type Renderer struct {
 	stop    context.CancelFunc
 	sem     chan struct{}
 	proxy   *egressProxy
+
+	// ViewKey returns a private deck's view key, so the headless browser can
+	// load it like a viewer holding the link would. Nil: decks are public.
+	ViewKey func(ctx context.Context, deckID string) string
+}
+
+func (r *Renderer) key(ctx context.Context, deckID, sep string) string {
+	if r.ViewKey == nil {
+		return ""
+	}
+	if k := r.ViewKey(ctx, deckID); k != "" {
+		return sep + "k=" + url.QueryEscape(k)
+	}
+	return ""
 }
 
 // New finds Chromium (SLIDEKICK_CHROME, then common names on PATH).
@@ -115,7 +129,7 @@ func (r *Renderer) Close() {
 // PDF prints the deck's print view (every slide, one per page).
 func (r *Renderer) PDF(ctx context.Context, deckID string) ([]byte, error) {
 	var out []byte
-	err := r.withPage(ctx, fmt.Sprintf("%s/d/%s/print", r.base, url.PathEscape(deckID)), 1920, 1080, 90*time.Second, func(tctx context.Context) error {
+	err := r.withPage(ctx, fmt.Sprintf("%s/d/%s/print%s", r.base, url.PathEscape(deckID), r.key(ctx, deckID, "?")), 1920, 1080, 90*time.Second, func(tctx context.Context) error {
 		b, err := chromedp.Run(tctx, chromedp.PrintToPDF(chromedp.PDFPreferCSSPageSize(), chromedp.PDFPrintBackground(), chromedp.PDFMargin(0)))
 		out = b
 		return err
@@ -128,7 +142,7 @@ func (r *Renderer) Slide(ctx context.Context, deckID string, slide, step, width,
 	if step < 0 {
 		step = 99 // the player clamps to the last build
 	}
-	u := fmt.Sprintf("%s/d/%s?render=1#%d.%d", r.base, url.PathEscape(deckID), slide+1, step)
+	u := fmt.Sprintf("%s/d/%s?render=1%s#%d.%d", r.base, url.PathEscape(deckID), r.key(ctx, deckID, "&"), slide+1, step)
 	var out []byte
 	err := r.withPage(ctx, u, width, height, 30*time.Second, func(tctx context.Context) error {
 		b, err := chromedp.Run(tctx, chromedp.CaptureScreenshot())

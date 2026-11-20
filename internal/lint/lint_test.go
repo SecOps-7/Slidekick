@@ -89,3 +89,22 @@ func TestContrast(t *testing.T) {
 		t.Fatalf("same colour = %v", r)
 	}
 }
+
+func TestHTMLElement(t *testing.T) {
+	env := testenv.New(t)
+	raw := `{"schemaVersion":1,"id":"d1","title":"T","theme":"aurora","aspect":"16:9","slides":[
+	 {"id":"s1","layout":"title-body","regions":{"title":[{"id":"h","type":"heading","props":{"text":"x"}}],
+	  "body":[{"id":"x1","type":"html","props":{"html":"<b>hi</b>"}}]}}]}`
+	d, err := env.Validator.Validate([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := codes(lint.Deck(d, env.Cat, env.Themes))
+	if c["html-escape-hatch"] != 1 || c["html-title"] != 1 {
+		t.Fatalf("codes %v", c)
+	}
+	bad := strings.Replace(raw, `"html":"<b>hi</b>"`, `"src":"x"`, 1)
+	if _, err := env.Validator.Validate([]byte(bad)); err == nil {
+		t.Fatal("html element without html prop validated")
+	}
+}

@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "id": "d_gallery",
+  "title": "Layout gallery",
+  "theme": "paper",
+  "aspect": "16:9",
+  "slides": [
+    {
+      "id": "g1",
+      "layout": "hero-image",
+      "regions": {
+        "image": [
+          {
+            "id": "g1i",
+            "type": "image",
+            "props": {
+              "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20160%2090%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%231d3b6e%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23e2683c%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22160%22%20height%3D%2290%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22118%22%20cy%3D%2230%22%20r%3D%2214%22%20fill%3D%22%23ffd27a%22/%3E%3Cpath%20d%3D%22M0%2070%20L40%2048%20L70%2062%20L110%2040%20L160%2066%20L160%2090%20L0%2090Z%22%20fill%3D%22%230d1b33%22%20opacity%3D%22.8%22/%3E%3C/svg%3E",
+              "alt": "Abstract mountains at sunset"
+            }
+          }
+        ],
+        "title": [
+          {
+            "id": "g1t",
+            "type": "heading",
+            "props": {
+              "text": "Hero image layout",
+              "level": 1
+            }
+          }
+        ],
+        "caption": [
+          {
+            "id": "g1c",
+            "type": "text",
+            "props": {
+              "text": "Title and caption laid over a full-bleed picture."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "g2",
+      "layout": "full-bleed",
+      "regions": {
+        "content": [
+          {
+            "id": "g2h",
+            "type": "heading",
+            "props": {
+              "text": "Full bleed, with an escape hatch",
+              "level": 2
+            }
+          },
+          {
+            "id": "g2x",
+            "type": "html",
+            "props": {
+              "title": "Three custom tiles",
+              "html": "<style>.r{display:flex;gap:24px;height:100%;align-items:center}.t{flex:1;padding:28px;border-radius:var(--sk-radius);background:var(--sk-surface);border:2px solid var(--sk-accent)}.t b{display:block;font-size:var(--sk-size-xl);color:var(--sk-accent)}</style><div class=\"r\"><div class=\"t\"><b>01</b>Plan</div><div class=\"t\"><b>02</b>Build</div><div class=\"t\"><b>03</b>Ship</div></div>"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "g3",
+      "layout": "title-body",
+      "regions": {
+        "title": [
+          {
+            "id": "g3t",
+            "type": "heading",
+            "props": {
+              "text": "Icons draw themselves",
+              "level": 2
+            }
+          }
+        ],
+        "body": [
+          {
+            "id": "g3i",
+            "type": "icon",
+            "props": {
+              "name": "rocket"
+            },
+            "style": {
+              "size": "xxl",
+              "color": "accent"
+            },
+            "build": {
+              "step": 1,
+              "preset": "draw"
+            }
+          },
+          {
+            "id": "g3s",
+            "type": "shape",
+            "props": {
+              "kind": "pill",
+              "fill": "accent",
+              "label": "draw preset"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "g4",
+      "layout": "quote",
+      "regions": {
+        "quote": [
+          {
+            "id": "g4q",
+            "type": "quote",
+            "props": {
+              "text": "Make the agent show its work.",
+              "attribution": "Slidekick design guide"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

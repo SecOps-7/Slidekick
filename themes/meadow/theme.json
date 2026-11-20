@@ -35,7 +35,8 @@
       "fast": 300,
       "base": 620,
       "slow": 1000,
-      "easing": "cubic-bezier(0.25, 0.1, 0.25, 1)"
+      "easing": "cubic-bezier(0.25, 0.1, 0.25, 1)",
+      "bounce": 0.15
     }
   }
 }

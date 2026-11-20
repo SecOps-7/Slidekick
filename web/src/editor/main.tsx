@@ -8,8 +8,10 @@ import { applyTheme } from "../../runtime/render";
 import type { Catalog, Deck, Element, LintIssue, PatchEvent, PatchOp } from "../../runtime/types";
 import { ensureAuth } from "../auth";
 import { Live } from "../sync";
-import { Api, ApiError, type Comment } from "./api";
+import { withKey } from "../key";
+import { Api, ApiError, type Access, type Comment } from "./api";
 import { Canvas } from "./canvas";
+import { checkPatch } from "./check";
 import { elPath, findEl, slidePath, slideTemplate, stripIds } from "./ops";
 import { Panel } from "./panel";
 import { Sorter } from "./sorter";
@@ -32,6 +34,16 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
   const [toast, setToast] = useState("");
   const [flash, setFlash] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [followAgent, setFollowAgent] = useState(true);
+  const [access, setAccess] = useState<Access | null>(null);
+  const [admin, setAdmin] = useState(false);
+  const followRef = useRef(followAgent);
+  followRef.current = followAgent;
+  useEffect(() => {
+    api.access().then(setAccess, () => {});
+    api.whoami().then((w) => setAdmin(w.scope === "admin"), () => {});
+  }, []);
+  const key = access?.private ? access.viewKey : "";
 
   // Refs mirror state for use inside socket callbacks.
   const deckRef = useRef(deck);
@@ -99,6 +111,7 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
       async (m) => {
         if (m.type === "hello" && m.version !== versionRef.current) await reload();
         if (m.type === "comments") loadComments();
+        if (m.type === "access") api.access().then(setAccess, () => {});
         if (m.type !== "patch") return;
         const ev = m as unknown as PatchEvent;
         if (ev.version <= versionRef.current) return;
@@ -109,6 +122,8 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
           return reload();
         }
         if (ev.actor !== "human") {
+          // Follow the agent to the slide it is working on.
+          if (followRef.current && ev.focusSlide && deckRef.current.slides.some((s) => s.id === ev.focusSlide)) setSlideId(ev.focusSlide);
           setFlash(new Set(ev.changed));
           setTimeout(() => setFlash(new Set()), 1700);
           say(`Agent edit · version ${ev.version}`);
@@ -117,6 +132,7 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
         lintTimer = window.setTimeout(async () => setLint((await api.load()).lint), 350);
       },
       setLive,
+      api.token, // unlocks the live feed of private decks (no ?k= in editor links)
     );
     return () => live.close();
   }, []);
@@ -125,6 +141,11 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
   const commit = useCallback(
     async (ops: PatchOp[], label: string) => {
       if (!ops.length) return;
+      const problems = checkPatch(deckRef.current, ops);
+      if (problems.length) {
+        say(`${label} not saved: ${problems[0]}`);
+        return;
+      }
       setBusy(true);
       try {
         const res = await api.patch(versionRef.current, ops);
@@ -254,10 +275,14 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
         <span class={`ed-status ${busy ? "busy" : ""}`}>{busy ? "Saving…" : `v${version}`}</span>
         <span class={`ed-live ${live}`}>{live}</span>
         <span class={`ed-lint-badge ${problems ? "warn" : "ok"}`}>{problems ? `${problems} to fix` : "Lint clean"}</span>
-        <a class="ed-btn" href={`/d/${api.deckId}#${slideIndex + 1}`} target="_blank" rel="noopener">
+        <label class="ed-follow" title="Jump to the slide the agent is editing">
+          <input type="checkbox" checked={followAgent} onChange={(e) => setFollowAgent(e.currentTarget.checked)} /> Follow agent
+        </label>
+        <a class="ed-btn" href={withKey(`/d/${api.deckId}#${slideIndex + 1}`, key)} target="_blank" rel="noopener">
           View
         </a>
-        <ExportMenu api={api} say={say} />
+        <ShareMenu api={api} access={access} admin={admin} onChange={setAccess} say={say} />
+        <ExportMenu api={api} say={say} viewKey={key ?? ""} />
         <a class="ed-btn primary" href={`/d/${api.deckId}/present#${slideIndex + 1}`} target="_blank" rel="noopener">
           ▶ Present
         </a>
@@ -323,7 +348,106 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
   );
 }
 
-function ExportMenu({ api, say }: { api: Api; say: (m: string) => void }) {
+function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Access | null; admin: boolean; onChange: (a: Access) => void; say: (m: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [token, setToken] = useState("");
+  if (!access) return null;
+  const run = async (f: () => Promise<void>) => {
+    try {
+      await f();
+    } catch (err) {
+      say(`Sharing change failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  const copy = (text: string, what: string) =>
+    navigator.clipboard?.writeText(text).then(
+      () => say(`${what} copied`),
+      () => say(`Couldn't copy; select it by hand`),
+    );
+  const origin = location.origin;
+  return (
+    <div class="ed-export">
+      <button type="button" class="ed-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {access.private ? "🔒 Private ▾" : "Share ▾"}
+      </button>
+      {open && (
+        <div class="ed-export-menu ed-share" role="dialog" aria-label="Sharing">
+          <label class="ed-share-row">
+            <input type="checkbox" checked={access.private} onChange={(e) => run(async () => onChange(await api.setAccess(e.currentTarget.checked)))} />
+            <span>
+              Private <small>only people with the link below can watch</small>
+            </span>
+          </label>
+          <div class="ed-share-link">
+            <input readOnly value={access.shareUrl} aria-label="Viewer link" onFocus={(e) => e.currentTarget.select()} />
+            <button type="button" class="ed-btn" onClick={() => copy(access.shareUrl, "Link")}>
+              Copy
+            </button>
+          </div>
+          {access.private && (
+            <button type="button" class="ed-link" onClick={() => confirm("Make a new link? Links shared so far stop working.") && run(async () => onChange(await api.setAccess(true, true)))}>
+              Make a new link (old links stop working)
+            </button>
+          )}
+          {admin && (
+            <div class="ed-share-token">
+              <h4>Deck edit token</h4>
+              <p>
+                <small>Lets an agent or person edit, present and export this deck only.</small>
+              </p>
+              {token ? (
+                <>
+                  <div class="ed-share-link">
+                    <input readOnly value={token} aria-label="Edit token" onFocus={(e) => e.currentTarget.select()} />
+                    <button type="button" class="ed-btn" onClick={() => copy(token, "Token")}>
+                      Copy
+                    </button>
+                  </div>
+                  <p>
+                    <small>Shown once. Connect an agent with:</small>
+                  </p>
+                  <code class="ed-share-cmd">{`claude mcp add --transport http slidekick-${api.deckId} ${origin}/mcp --header "Authorization: Bearer ${token}"`}</code>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  class="ed-btn"
+                  onClick={() =>
+                    (!access.hasEditToken || confirm("Replace the existing edit token? The old one stops working.")) &&
+                    run(async () => {
+                      setToken((await api.issueEditToken()).token);
+                      onChange({ ...access, hasEditToken: true });
+                    })
+                  }
+                >
+                  {access.hasEditToken ? "Replace token" : "Create token"}
+                </button>
+              )}
+              {access.hasEditToken && (
+                <button
+                  type="button"
+                  class="ed-link"
+                  onClick={() =>
+                    confirm("Revoke the edit token?") &&
+                    run(async () => {
+                      await api.revokeEditToken();
+                      setToken("");
+                      onChange({ ...access, hasEditToken: false });
+                    })
+                  }
+                >
+                  Revoke token
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExportMenu({ api, say, viewKey }: { api: Api; say: (m: string) => void; viewKey: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const make = async (format: "pdf" | "png") => {
@@ -345,7 +469,7 @@ function ExportMenu({ api, say }: { api: Api; say: (m: string) => void }) {
       </button>
       {open && (
         <div class="ed-export-menu" role="menu">
-          <a role="menuitem" href={`/api/decks/${api.deckId}/export.html?download=1`} onClick={() => setOpen(false)}>
+          <a role="menuitem" href={withKey(`/api/decks/${api.deckId}/export.html?download=1`, viewKey)} onClick={() => setOpen(false)}>
             HTML <small>plays offline, with animations</small>
           </a>
           <button type="button" role="menuitem" onClick={() => make("pdf")}>
@@ -370,7 +494,7 @@ function TitleInput({ title, onCommit }: { title: string; onCommit: (v: string) 
 export async function mountEditor(host: HTMLElement, deckId: string) {
   document.body.classList.add("ed-page");
   document.title = "Edit · Slidekick";
-  const token = await ensureAuth("edit this deck");
+  const token = await ensureAuth("edit this deck", deckId);
   const api = new Api(deckId, token);
   const [cat, initial] = await Promise.all([api.catalog(), api.load().catch(() => null)]);
   if (!initial) {

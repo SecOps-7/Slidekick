@@ -2,7 +2,8 @@
 // stage scales to the window, and every animation between states.
 import { animateChart } from "./chart";
 import { applyTheme, formatStat, renderSlide, STAGE, themeReady, type Rendered } from "./render";
-import { builds, countUp, motionFor, prefersReducedMotion, transitions } from "./presets";
+import { staggerDelays } from "./motion";
+import { builds, countUp, flipDelta, motionFor, prefersReducedMotion, transitions } from "./presets";
 import type { Catalog, Deck, Element, TransitionType } from "./types";
 
 export interface Position {
@@ -174,8 +175,12 @@ export class Player {
 
   private async morph(from: Rendered, to: Rendered, m: { duration: number; easing: string; reduced: boolean }) {
     const doc = document as DocWithVT;
+    if (!doc.startViewTransition && !m.reduced) {
+      await this.flipMorph(from, to, m);
+      return;
+    }
     if (!doc.startViewTransition || m.reduced) {
-      // Fallback: crossfade.
+      // Reduced motion: crossfade.
       this.stage.append(to.el);
       const anims = transitions.fade(from.el, to.el, m);
       this.emit();
@@ -197,6 +202,34 @@ export class Player {
     });
     await vt.finished.catch(() => {});
     untag(to);
+  }
+
+  /**
+   * Morph without View Transitions (FLIP): elements sharing an id animate from
+   * their old box to their new one; the rest crossfade.
+   */
+  private async flipMorph(from: Rendered, to: Rendered, m: { duration: number; easing: string; reduced: boolean }) {
+    const first = new Map<string, DOMRect>();
+    from.el.querySelectorAll<HTMLElement>("[data-el-id]").forEach((el) => first.set(el.dataset.elId!, el.getBoundingClientRect()));
+    if (from.el.parentNode === this.stage) this.stage.insertBefore(to.el, from.el); // old slide fades out on top, revealing the new one
+    else this.stage.append(to.el);
+    const scale = to.el.offsetWidth ? to.el.getBoundingClientRect().width / to.el.offsetWidth : 1;
+    const opts: KeyframeAnimationOptions = { duration: m.duration, easing: m.easing, fill: "both" };
+    const anims: Animation[] = [];
+    to.el.querySelectorAll<HTMLElement>("[data-el-id]").forEach((el) => {
+      const f = first.get(el.dataset.elId!);
+      if (f) {
+        anims.push(el.animate([{ transformOrigin: "0 0", transform: flipDelta(f, el.getBoundingClientRect(), scale) }, { transformOrigin: "0 0", transform: "none" }], opts));
+        from.el.querySelector<HTMLElement>(`[data-el-id="${CSS.escape(el.dataset.elId!)}"]`)?.style.setProperty("visibility", "hidden");
+      } else {
+        anims.push(el.animate([{ opacity: 0 }, { opacity: 1 }], opts));
+      }
+    });
+    anims.push(from.el.animate([{ opacity: 1 }, { opacity: 0 }], { ...opts, duration: m.duration * 0.6 }));
+    this.emit();
+    await Promise.all(anims.map((a) => a.finished.catch(() => {})));
+    from.el.remove();
+    anims.forEach((a) => a.cancel());
   }
 
   next(): Promise<void> {
@@ -225,13 +258,18 @@ export class Player {
 
   private reveal(r: Rendered, step: number) {
     this.finishRunning();
-    const m = { ...motionFor(document.documentElement, "base"), reduced: prefersReducedMotion() };
+    const m = { ...motionFor(document.documentElement, "base", { spring: true }), reduced: prefersReducedMotion() };
     const units = r.units.filter((u) => u.step === step);
+    const delays = m.reduced ? [] : staggerDelays(units.length); // units sharing a step enter one after another
     units.forEach((u, i) => {
       u.node.classList.remove("sk-pending");
       const anims = builds[u.preset](u.node, m);
-      // Stagger units that share a step.
-      if (i > 0 && !m.reduced) anims.forEach((a) => (a.startTime = (document.timeline.currentTime as number) + i * 90));
+      if (delays[i]) {
+        for (const a of anims) {
+          const t = a.effect?.getTiming();
+          a.effect?.updateTiming({ delay: Number(t?.delay ?? 0) + delays[i] });
+        }
+      }
       this.running.push(...anims);
     });
     this.appear(r, (el) => units.some((u) => u.node === el));

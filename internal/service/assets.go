@@ -7,12 +7,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/SecOps-7/slidekick/internal/blob"
 	"github.com/SecOps-7/slidekick/internal/store"
 )
 
@@ -33,10 +34,10 @@ var AllowedMIME = map[string]string{
 
 var assetIDRe = regexp.MustCompile(`^f_[0-9a-f]{20}$`)
 
-// UploadAsset stores bytes content-addressed under FilesDir and returns the
+// UploadAsset stores bytes content-addressed in Storage() and returns the
 // asset. Identical bytes always get the same id.
 func (s *Service) UploadAsset(ctx context.Context, name, mime string, data []byte) (*store.Asset, error) {
-	if s.FilesDir == "" {
+	if s.Storage() == nil {
 		return nil, errors.New("asset storage is not configured")
 	}
 	mime = strings.ToLower(strings.TrimSpace(strings.Split(mime, ";")[0]))
@@ -68,33 +69,29 @@ func (s *Service) SaveGenerated(ctx context.Context, name, mime string, data []b
 	return s.saveFile(ctx, name, mime, ext, data)
 }
 
+// Storage returns where file bytes live: Blobs if set, else a disk store
+// under FilesDir, else nil (uploads disabled).
+func (s *Service) Storage() blob.Store {
+	if s.Blobs != nil {
+		return s.Blobs
+	}
+	if s.FilesDir != "" {
+		return blob.NewDisk(s.FilesDir)
+	}
+	return nil
+}
+
 func (s *Service) saveFile(ctx context.Context, name, mime, ext string, data []byte) (*store.Asset, error) {
-	if s.FilesDir == "" {
+	bs := s.Storage()
+	if bs == nil {
 		return nil, errors.New("asset storage is not configured")
 	}
 	sum := sha256.Sum256(data)
 	hexsum := hex.EncodeToString(sum[:])
 	a := &store.Asset{ID: "f_" + hexsum[:20], Name: cleanName(name), MIME: mime, Ext: ext, Size: int64(len(data)), SHA256: hexsum}
 
-	if err := os.MkdirAll(s.FilesDir, 0o700); err != nil {
+	if err := bs.Put(ctx, a.ID+a.Ext, mime, data); err != nil {
 		return nil, err
-	}
-	dst := filepath.Join(s.FilesDir, a.ID+a.Ext)
-	if _, err := os.Stat(dst); err != nil {
-		tmp, err := os.CreateTemp(s.FilesDir, ".upload-*")
-		if err != nil {
-			return nil, err
-		}
-		_, werr := tmp.Write(data)
-		cerr := tmp.Close()
-		if werr != nil || cerr != nil {
-			os.Remove(tmp.Name())
-			return nil, errors.Join(werr, cerr)
-		}
-		if err := os.Rename(tmp.Name(), dst); err != nil {
-			os.Remove(tmp.Name())
-			return nil, err
-		}
 	}
 	if err := s.store.PutAsset(ctx, a); err != nil {
 		return nil, err
@@ -102,26 +99,38 @@ func (s *Service) saveFile(ctx context.Context, name, mime, ext string, data []b
 	return a, nil
 }
 
-// OpenAsset resolves "f_xxx" or "f_xxx.ext" to its metadata and file path.
-func (s *Service) OpenAsset(ctx context.Context, name string) (*store.Asset, string, error) {
+// OpenAsset resolves "f_xxx" or "f_xxx.ext" to its metadata and a seekable
+// reader over its bytes. The caller closes the reader.
+func (s *Service) OpenAsset(ctx context.Context, name string) (*store.Asset, io.ReadSeekCloser, error) {
 	id := strings.TrimSuffix(name, filepath.Ext(name))
 	if !assetIDRe.MatchString(id) {
-		return nil, "", store.ErrNotFound
+		return nil, nil, store.ErrNotFound
+	}
+	bs := s.Storage()
+	if bs == nil {
+		return nil, nil, store.ErrNotFound
 	}
 	a, err := s.store.GetAsset(ctx, id)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
-	return a, filepath.Join(s.FilesDir, a.ID+a.Ext), nil
+	r, _, err := bs.Open(ctx, a.ID+a.Ext)
+	if errors.Is(err, blob.ErrNotFound) {
+		return nil, nil, store.ErrNotFound
+	} else if err != nil {
+		return nil, nil, err
+	}
+	return a, r, nil
 }
 
 // ReadAsset returns an asset's bytes, for export inlining.
 func (s *Service) ReadAsset(ctx context.Context, name string) (*store.Asset, []byte, error) {
-	a, path, err := s.OpenAsset(ctx, name)
+	a, r, err := s.OpenAsset(ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
-	b, err := os.ReadFile(path)
+	defer r.Close()
+	b, err := io.ReadAll(r)
 	return a, b, err
 }
 

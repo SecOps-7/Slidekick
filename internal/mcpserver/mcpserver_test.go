@@ -53,8 +53,8 @@ func TestAgentLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 19 {
-		t.Fatalf("want 19 tools, got %d", len(tools.Tools))
+	if len(tools.Tools) != 20 {
+		t.Fatalf("want 20 tools, got %d", len(tools.Tools))
 	}
 
 	var deck map[string]any

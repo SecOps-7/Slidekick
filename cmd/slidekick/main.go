@@ -130,6 +130,9 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 
 	svc := service.New(st, v, cat, themes, hub.New(), baseURL)
 	svc.FilesDir = filepath.Join(data, "files")
+	if svc.Blobs, err = openBlobs(ctx, data, log); err != nil {
+		return err
+	}
 
 	exp := &export.Exporter{Web: slidekick.Web(), Cat: cat, Themes: themes,
 		Assets: func(ctx context.Context, name string) (string, []byte, error) {
@@ -141,6 +144,7 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		}}
 	_, port, _ := net.SplitHostPort(addr)
 	rnd := render.New("http://127.0.0.1:"+port, log)
+	rnd.ViewKey = svc.ViewKey
 	defer rnd.Close()
 	log.Info("slide rendering", "available", rnd.Available())
 

@@ -1,5 +1,5 @@
 // Turns editor actions into JSON Patch operations against the deck.
-import type { Deck, Element, PatchOp, Slide } from "../../runtime/types";
+import type { Deck, Element, ElementProps, PatchOp, Slide } from "../../runtime/types";
 
 export const esc = (s: string) => s.replace(/~/g, "~0").replace(/\//g, "~1");
 
@@ -61,7 +61,8 @@ const PLACEHOLDER_IMG =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9"><rect width="16" height="9" fill="#8885"/><path d="M5 6.5l2-2.5 1.5 1.8L10 4l2 2.5z" fill="#8889"/></svg>',
   );
 
-export const ELEMENT_DEFAULTS: Record<Element["type"], Element["props"]> = {
+// Typed against the schema's props, so a default that the server would reject fails to compile.
+export const ELEMENT_DEFAULTS: { [K in keyof ElementProps]: ElementProps[K] } = {
   heading: { text: "New heading", level: 2 },
   text: { text: "Say one thing clearly." },
   bullets: { items: ["First point", "Second point", "Third point"] },
@@ -73,11 +74,12 @@ export const ELEMENT_DEFAULTS: Record<Element["type"], Element["props"]> = {
   diagram: { source: "flowchart LR\n  A[Start] --> B[Finish]", caption: "What the diagram shows" },
   icon: { name: "star" },
   shape: { kind: "pill", fill: "accent", label: "Label" },
+  html: { title: "Custom badge", html: '<div style="display:grid;place-items:center;height:100%"><span style="padding:.4em 1em;border-radius:999px;background:var(--sk-accent);color:var(--sk-bg)">Custom HTML</span></div>' },
   embed: { kind: "iframe", src: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ", title: "Embedded video" },
 };
 
 export function newElement(type: Element["type"]): Omit<Element, "id"> {
-  return { type, props: structuredClone(ELEMENT_DEFAULTS[type]) };
+  return { type, props: structuredClone(ELEMENT_DEFAULTS[type]) as unknown as Element["props"] };
 }
 
 const h = (text: string, level = 2) => ({ type: "heading", props: { text, level } });

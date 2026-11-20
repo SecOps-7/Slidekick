@@ -181,7 +181,8 @@
             "fade-up",
             "scale-in",
             "wipe",
-            "typewriter"
+            "typewriter",
+            "draw"
           ],
           "default": "fade-up"
         }
@@ -254,7 +255,8 @@
             "diagram",
             "icon",
             "shape",
-            "embed"
+            "embed",
+            "html"
           ]
         },
         "props": {
@@ -456,6 +458,22 @@
             "properties": {
               "props": {
                 "$ref": "#/$defs/props-embed"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "html"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-html"
               }
             }
           }
@@ -796,6 +814,27 @@
         },
         "muted": {
           "type": "boolean"
+        }
+      }
+    },
+    "props-html": {
+      "type": "object",
+      "required": [
+        "html"
+      ],
+      "additionalProperties": false,
+      "description": "Escape hatch: raw HTML and CSS for something the other elements can't express. Rendered in a sandboxed frame with no scripts, forms or network access except https images and fonts. Theme tokens are available as CSS variables (--sk-text, --sk-accent, --sk-font-body, --sk-size-md...). Lint warns every time it is used.",
+      "properties": {
+        "html": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000,
+          "description": "HTML fragment (may include a <style> block). Scripts never run."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Describes the content for screen readers."
         }
       }
     }

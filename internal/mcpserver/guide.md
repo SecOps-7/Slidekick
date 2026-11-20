@@ -37,7 +37,10 @@ A slide supports what the speaker says. It is not a document.
 {"type":"icon","props":{"name":"rocket"},"style":{"size":"xl"}}
 {"type":"shape","props":{"kind":"pill","fill":"accent","label":"New"}}
 {"type":"embed","props":{"kind":"iframe","src":"https://www.youtube-nocookie.com/embed/VIDEO_ID","title":"Product demo"}}
+{"type":"html","props":{"title":"Pricing badge","html":"<div style=\"font-size:var(--sk-size-xl);color:var(--sk-accent)\">From $9</div>"}}
 ```
+The `html` element is an escape hatch, not a shortcut: it runs in a sandbox with no scripts, skips most lint checks and always gets a warning. Use it only for something no other element can express, keep it small, and style it with the theme's CSS variables (`var(--sk-accent)`, `var(--sk-font-body)`, `var(--sk-size-lg)`).
+
 Images and videos: call `upload_asset` and use the `/files/...` url it returns.
 
 Style overrides use tokens only: `"style":{"color":"accent","size":"xl","align":"center"}`.
