@@ -1,4 +1,5 @@
 // Deck list plus "connect your agent" instructions.
+import { authHeaders, ensureAuth } from "./auth";
 
 interface Summary {
   id: string;
@@ -61,9 +62,14 @@ export function mountHome(host: HTMLElement) {
   page.append(head, decks, connect);
   host.append(page);
 
+  let token = "";
   const load = async () => {
     try {
-      const r = await fetch("/api/decks", { cache: "no-store" });
+      const r = await fetch("/api/decks", { cache: "no-store", headers: authHeaders(token) });
+      if (r.status === 401) {
+        token = await ensureAuth("see the list of decks");
+        return load();
+      }
       const { decks: rows } = (await r.json()) as { decks: Summary[] };
       if (!rows.length) {
         list.replaceChildren(el("p", "empty", "No decks yet. Connect an agent and ask it for one; it will show up here."));

@@ -55,6 +55,9 @@ func (e *ConflictError) Error() string {
 	return fmt.Sprintf("base_version %d is stale: the deck is now at version %d (someone else edited it). Re-read it with get_deck and retry.", e.Base, e.Current)
 }
 
+// MaxDeckBytes caps one deck document; every version is stored in full.
+const MaxDeckBytes = 2 << 20
+
 // ErrNotFound is returned for unknown decks.
 var ErrNotFound = store.ErrNotFound
 
@@ -107,7 +110,7 @@ func (s *Service) Create(ctx context.Context, title, theme, aspect string, slide
 	}
 	doc := map[string]any{
 		"schemaVersion": deck.CurrentSchemaVersion,
-		"id":            deck.NewID("d"),
+		"id":            deck.NewLongID("d"),
 		"title":         title,
 		"theme":         theme,
 		"aspect":        aspect,
@@ -116,6 +119,9 @@ func (s *Service) Create(ctx context.Context, title, theme, aspect string, slide
 	raw, err := json.Marshal(doc)
 	if err != nil {
 		return nil, err
+	}
+	if len(raw) > MaxDeckBytes {
+		return nil, fmt.Errorf("deck is %d bytes; the limit is %d (upload images with upload_asset instead of inlining them)", len(raw), MaxDeckBytes)
 	}
 	d, err := s.v.Validate(raw)
 	if err != nil {
@@ -258,6 +264,9 @@ func (s *Service) mutate(ctx context.Context, id string, base *int, actor string
 	newRaw, err := patch.Apply(raw)
 	if err != nil {
 		return nil, fmt.Errorf("patch failed: %v (paths are JSON Pointers into the deck, e.g. /slides/0/regions/title/0/props/text; read the deck with get_deck)", err)
+	}
+	if len(newRaw) > MaxDeckBytes {
+		return nil, fmt.Errorf("deck would be %d bytes; the limit is %d (upload images with upload_asset instead of inlining them)", len(newRaw), MaxDeckBytes)
 	}
 	d, err := s.v.Validate(newRaw)
 	if err != nil {

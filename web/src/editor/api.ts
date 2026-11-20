@@ -65,6 +65,7 @@ export class Api {
   comments = async (all = false) => (await this.req<{ comments: Comment[] }>("GET", `${this.base}/comments${all ? "?all=1" : ""}`)).comments;
   addComment = (slideId: string, elementId: string, text: string) => this.req<Comment>("POST", `${this.base}/comments`, { slideId, elementId, text });
   resolve = (id: string, reply = "") => this.req<{ ok: boolean }>("POST", `${this.base}/comments/${encodeURIComponent(id)}/resolve`, { reply });
+  exportFile = (format: "pdf" | "png") => this.req<{ url: string; name: string; bytes: number }>("POST", `${this.base}/export?format=${format}`);
   upload = (file: File) =>
     this.req<{ url: string }>("POST", `/api/files?name=${encodeURIComponent(file.name)}`, file, { "Content-Type": file.type || "application/octet-stream" });
 }

@@ -205,3 +205,9 @@
   .ed { grid-template-columns: 170px 1fr 300px; }
 }
 
+
+.ed-export { position: relative; }
+.ed-export-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; display: grid; min-width: 230px; padding: 4px; border-radius: 8px; background: var(--ed-panel2); border: 1px solid var(--ed-line); box-shadow: 0 12px 30px -10px rgba(0,0,0,.6); }
+.ed-export-menu a, .ed-export-menu button { display: grid; text-align: left; padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--ed-text); text-decoration: none; cursor: pointer; }
+.ed-export-menu a:hover, .ed-export-menu button:hover { background: var(--ed-bg); }
+.ed-export-menu small { color: var(--ed-muted); }

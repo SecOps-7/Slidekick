@@ -53,25 +53,29 @@ func do(t *testing.T, method, url, tok string, body any) *http.Response {
 }
 
 func TestWritesNeedToken(t *testing.T) {
+	routes := []struct{ method, path string }{
+		{"GET", "/api/auth"},
+		{"GET", "/api/decks"},
+		{"POST", "/api/decks/{id}/patch"},
+		{"POST", "/api/decks/{id}/restore"},
+		{"POST", "/api/decks/{id}/export?format=pdf"},
+		{"POST", "/api/decks/{id}/comments"},
+		{"POST", "/api/decks/{id}/comments/c_x/resolve"},
+		{"POST", "/api/files"},
+		{"POST", "/mcp"},
+	}
+	for _, rt := range routes {
+		ts, id := setup(t) // fresh server: keep below the failed-attempt lockout
+		u := ts.URL + strings.ReplaceAll(rt.path, "{id}", id)
+		if res := do(t, rt.method, u, "", nil); res.StatusCode != 401 {
+			t.Errorf("%s %s without token: %d", rt.method, rt.path, res.StatusCode)
+		}
+		if res := do(t, rt.method, u, "wrong", nil); res.StatusCode != 401 {
+			t.Errorf("%s %s wrong token: %d", rt.method, rt.path, res.StatusCode)
+		}
+	}
 	ts, id := setup(t)
 	base := ts.URL + "/api/decks/" + id
-	writes := []struct{ method, url string }{
-		{"GET", ts.URL + "/api/auth"},
-		{"POST", base + "/patch"},
-		{"POST", base + "/restore"},
-		{"POST", base + "/comments"},
-		{"POST", base + "/comments/c_x/resolve"},
-		{"POST", ts.URL + "/api/files"},
-		{"POST", ts.URL + "/mcp"},
-	}
-	for _, w := range writes {
-		if res := do(t, w.method, w.url, "", nil); res.StatusCode != 401 {
-			t.Errorf("%s %s without token: %d", w.method, w.url, res.StatusCode)
-		}
-		if res := do(t, w.method, w.url, "wrong", nil); res.StatusCode != 401 {
-			t.Errorf("%s %s wrong token: %d", w.method, w.url, res.StatusCode)
-		}
-	}
 	// Reads stay open.
 	for _, u := range []string{base, base + "/comments", ts.URL + "/api/catalog", ts.URL + "/themes/aurora/theme.css", ts.URL + "/d/" + id} {
 		if res := do(t, "GET", u, "", nil); res.StatusCode != 200 {
@@ -128,5 +132,34 @@ func TestPresentRelayNeedsAuth(t *testing.T) {
 	json.Unmarshal(b, &m)
 	if m["type"] != "present" || m["index"].(float64) != 1 || m["step"].(float64) != 2 {
 		t.Fatalf("viewer got %s (the unauthenticated message must not be relayed)", b)
+	}
+}
+
+func TestBruteForceLockout(t *testing.T) {
+	ts, _ := setup(t)
+	for i := 0; i < 10; i++ {
+		do(t, "GET", ts.URL+"/api/auth", "guess", nil)
+	}
+	// Locked out now, even with the right token.
+	if res := do(t, "GET", ts.URL+"/api/auth", token, nil); res.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("want 429 after 10 failures, got %d", res.StatusCode)
+	}
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	ts, id := setup(t)
+	res, err := http.Get(ts.URL + "/d/" + id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	csp := res.Header.Get("Content-Security-Policy")
+	for _, want := range []string{"script-src 'self'", "frame-ancestors 'none'", "object-src 'none'"} {
+		if !strings.Contains(csp, want) {
+			t.Errorf("CSP missing %q: %s", want, csp)
+		}
+	}
+	if res.Header.Get("X-Frame-Options") != "DENY" {
+		t.Error("missing X-Frame-Options")
 	}
 }

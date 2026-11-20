@@ -17,6 +17,15 @@ func NewID(prefix string) string {
 	return prefix + "_" + strings.ToLower(idEncoding.EncodeToString(b[:]))
 }
 
+// NewLongID returns an id with 80 random bits, for ids that act as share links.
+func NewLongID(prefix string) string {
+	var b [10]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic(err)
+	}
+	return prefix + "_" + strings.ToLower(idEncoding.EncodeToString(b[:]))
+}
+
 var elementTypes = map[string]bool{
 	"heading": true, "text": true, "bullets": true, "image": true,
 	"code": true, "stat": true, "quote": true,

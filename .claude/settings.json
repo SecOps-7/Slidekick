@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "GATEGUARD_EXEMPT_GLOBS": "**/*.md,docs/**,scripts/**,**/*_test.go,**/testdata/**,.github/**"
+  }
+}

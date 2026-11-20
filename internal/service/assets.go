@@ -53,6 +53,25 @@ func (s *Service) UploadAsset(ctx context.Context, name, mime string, data []byt
 	if err := checkContent(mime, data); err != nil {
 		return nil, err
 	}
+	return s.saveFile(ctx, name, mime, ext, data)
+}
+
+// generatedMIME are types the server itself produces (exports); users can't upload them.
+var generatedMIME = map[string]string{"application/pdf": ".pdf", "application/zip": ".zip"}
+
+// SaveGenerated stores a server-made file (PDF or zip export) as an asset.
+func (s *Service) SaveGenerated(ctx context.Context, name, mime string, data []byte) (*store.Asset, error) {
+	ext, ok := generatedMIME[mime]
+	if !ok {
+		return nil, fmt.Errorf("not a generated type: %s", mime)
+	}
+	return s.saveFile(ctx, name, mime, ext, data)
+}
+
+func (s *Service) saveFile(ctx context.Context, name, mime, ext string, data []byte) (*store.Asset, error) {
+	if s.FilesDir == "" {
+		return nil, errors.New("asset storage is not configured")
+	}
 	sum := sha256.Sum256(data)
 	hexsum := hex.EncodeToString(sum[:])
 	a := &store.Asset{ID: "f_" + hexsum[:20], Name: cleanName(name), MIME: mime, Ext: ext, Size: int64(len(data)), SHA256: hexsum}

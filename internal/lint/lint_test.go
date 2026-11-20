@@ -60,7 +60,7 @@ func TestRules(t *testing.T) {
 	raw := `{"schemaVersion":1,"id":"d1","title":"T","theme":"paper","aspect":"16:9","slides":[
 	 {"id":"s1","layout":"title-body","regions":{"body":[
 	   {"id":"b","type":"bullets","props":{"items":["a","b","c","d","e","f","g","this bullet is far too long to sit on a slide because it keeps going and going and going well past any sensible limit"]}},
-	   {"id":"i","type":"image","props":{"src":"x.png"}}
+	   {"id":"i","type":"image","props":{"src":"https://example.com/x.png"}}
 	 ]}},
 	 {"id":"s2","layout":"title","transition":{"type":"morph"},"regions":{"title":[
 	   {"id":"h","type":"heading","props":{"text":"Hi"},"style":{"color":"bg"}},

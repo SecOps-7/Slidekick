@@ -151,7 +151,8 @@
         "image": {
           "type": "string",
           "minLength": 1,
-          "description": "Image URL."
+          "description": "Image URL: https, an uploaded file (/files/...) or a data:image URI.",
+          "pattern": "^(https://|/files/f_[0-9a-f]{20}\\.[a-z0-9]+$|data:image/)"
         },
         "dim": {
           "type": "number",
@@ -532,7 +533,9 @@
       "properties": {
         "src": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^(https://|/files/f_[0-9a-f]{20}\\.[a-z0-9]+$|data:image/)",
+          "description": "https URL, an uploaded file (/files/... from upload_asset) or a data:image URI."
         },
         "alt": {
           "type": "string",
@@ -773,7 +776,7 @@
         },
         "src": {
           "type": "string",
-          "pattern": "^(https://|/files/)",
+          "pattern": "^(https://|/files/f_[0-9a-f]{20}\\.[a-z0-9]+$)",
           "description": "https URL, or an uploaded file (/files/...) for video."
         },
         "title": {
@@ -783,7 +786,7 @@
         },
         "poster": {
           "type": "string",
-          "pattern": "^(https://|/files/)"
+          "pattern": "^(https://|/files/f_[0-9a-f]{20}\\.[a-z0-9]+$|data:image/)"
         },
         "autoplay": {
           "type": "boolean"
