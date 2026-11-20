@@ -6,7 +6,7 @@ const env = (globalThis as { process?: { env: Record<string, string | undefined>
 const backend = env.SLIDEKICK_DEV_BACKEND ?? "http://localhost:7410";
 
 export default defineConfig({
-  build: { outDir: "dist", emptyOutDir: true, target: "es2022", sourcemap: true },
+  build: { outDir: "dist", emptyOutDir: true, target: "es2022", sourcemap: false, chunkSizeWarningLimit: 3000 },
   server: {
     fs: { allow: [".."] },
     proxy: {

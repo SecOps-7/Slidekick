@@ -1,5 +1,9 @@
 // Renders a slide from deck JSON into DOM. No animation here: the player
 // decides what is visible and how it moves.
+import { renderChart } from "./chart";
+import { highlight } from "./code";
+import { renderDiagram } from "./diagram";
+import { ICONS } from "./icons.gen";
 import { inline } from "./inline";
 import type { BuildPreset, Deck, Element, Slide, Theme } from "./types";
 
@@ -16,9 +20,29 @@ export interface Rendered {
   el: HTMLElement;
   units: BuildUnit[];
   maxStep: number;
+  /** Async work (highlighting, diagrams, image decode) the slide waits on before it is "ready". */
+  pending: Promise<unknown>[];
 }
 
 const loadedThemes = new Set<string>();
+const themeLoads: Promise<unknown>[] = [];
+
+const linkLoaded = (l: HTMLLinkElement) =>
+  new Promise<void>((res) => {
+    l.addEventListener("load", () => res(), { once: true });
+    l.addEventListener("error", () => res(), { once: true });
+  });
+
+/** Resolves when theme stylesheets have loaded and the theme's fonts are usable. */
+export async function themeReady(theme: Theme | undefined): Promise<void> {
+  await Promise.all(themeLoads);
+  if (!theme) return;
+  const f = theme.tokens.font;
+  await Promise.all(
+    [`700 64px ${f.heading}`, `400 32px ${f.body}`, `400 24px ${f.mono}`].map((spec) => document.fonts.load(spec).catch(() => [])),
+  );
+  await document.fonts.ready;
+}
 
 /** Applies theme tokens as CSS variables on root and loads the theme's CSS and fonts once. */
 export function applyTheme(root: HTMLElement, theme: Theme) {
@@ -36,16 +60,19 @@ export function applyTheme(root: HTMLElement, theme: Theme) {
   for (const c of [...root.classList]) if (c.startsWith("sk-theme-")) root.classList.remove(c);
   root.classList.add(`sk-theme-${theme.name}`);
   root.dataset.dark = String(theme.dark);
-  if (!loadedThemes.has(theme.name)) {
+  const inlined = document.querySelector(`style[data-sk-theme="${CSS.escape(theme.name)}"]`);
+  if (!loadedThemes.has(theme.name) && !inlined) {
     loadedThemes.add(theme.name);
     const css = document.createElement("link");
     css.rel = "stylesheet";
     css.href = `/themes/${encodeURIComponent(theme.name)}/theme.css`;
+    themeLoads.push(linkLoaded(css));
     document.head.append(css);
     if (t.fontImport) {
       const f = document.createElement("link");
       f.rel = "stylesheet";
       f.href = t.fontImport;
+      themeLoads.push(linkLoaded(f));
       document.head.append(f);
     }
   }
@@ -66,7 +93,9 @@ export function formatStat(e: Element, value: number): string {
   return `${str(e, "prefix")}${n}${str(e, "suffix")}`;
 }
 
-function renderElement(e: Element, units: BuildUnit[]): HTMLElement {
+const SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
+
+function renderElement(e: Element, units: BuildUnit[], pending: Promise<unknown>[]): HTMLElement {
   const wrap = h("div", `sk-el sk-el-${e.type}`);
   wrap.dataset.elId = e.id;
   wrap.dataset.type = e.type;
@@ -119,6 +148,7 @@ function renderElement(e: Element, units: BuildUnit[]): HTMLElement {
       img.loading = "eager";
       img.decoding = "async";
       img.style.objectFit = str(e, "fit") || "cover";
+      pending.push(img.decode().catch(() => {}));
       fig.append(img);
       const cap = str(e, "caption");
       if (cap) {
@@ -137,6 +167,75 @@ function renderElement(e: Element, units: BuildUnit[]): HTMLElement {
       if (lang) pre.dataset.lang = lang;
       pre.append(code);
       wrap.append(pre);
+      if (lang) pending.push(highlight(code, str(e, "code"), lang));
+      break;
+    }
+    case "chart":
+      wrap.append(renderChart(e));
+      break;
+    case "diagram": {
+      const fig = h("figure", "sk-diagram");
+      const host = h("div", "sk-diagram-svg");
+      fig.append(host);
+      const cap = str(e, "caption");
+      if (cap) {
+        host.setAttribute("role", "img");
+        host.setAttribute("aria-label", cap);
+        const fc = h("figcaption");
+        fc.textContent = cap;
+        fig.append(fc);
+      }
+      wrap.append(fig);
+      pending.push(renderDiagram(host, str(e, "source")));
+      break;
+    }
+    case "icon": {
+      const body = ICONS[str(e, "name")];
+      if (!body) break;
+      const label = str(e, "label");
+      const svg = `<svg ${SVG_ATTRS} ${label ? `role="img" aria-label="${label.replace(/[&"<>]/g, "")}"` : 'aria-hidden="true"'}>${body}</svg>`;
+      wrap.append(h("span", "sk-icon", svg));
+      break;
+    }
+    case "shape": {
+      const kind = str(e, "kind") || "rect";
+      wrap.classList.add(`sk-shape-${kind}`);
+      const fill = str(e, "fill") || "accent";
+      wrap.style.setProperty("--sk-shape-fill", `var(--sk-${fill})`);
+      if (kind === "line" || kind === "arrow") {
+        wrap.innerHTML = `<svg viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true"><line x1="2" y1="12" x2="${kind === "arrow" ? 380 : 398}" y2="12" />${kind === "arrow" ? '<path d="M372 2 L398 12 L372 22 Z" />' : ""}</svg>`;
+      } else {
+        const label = str(e, "label");
+        const box = h("div", "sk-shape", label ? `<span>${inline(label)}</span>` : undefined);
+        wrap.append(box);
+      }
+      break;
+    }
+    case "embed": {
+      const src = str(e, "src");
+      if (!/^(https:\/\/|\/files\/|data:)/.test(src)) break;
+      if (str(e, "kind") === "video") {
+        const v = h("video");
+        v.src = src;
+        v.playsInline = true;
+        v.controls = !e.props.autoplay;
+        v.autoplay = Boolean(e.props.autoplay);
+        v.loop = Boolean(e.props.loop);
+        v.muted = Boolean(e.props.muted ?? e.props.autoplay);
+        const poster = str(e, "poster");
+        if (poster) v.poster = poster;
+        if (str(e, "title")) v.setAttribute("aria-label", str(e, "title"));
+        wrap.append(v);
+      } else {
+        const f = h("iframe");
+        f.src = src;
+        f.title = str(e, "title") || "Embedded content";
+        f.loading = "eager";
+        f.allow = "autoplay; fullscreen; picture-in-picture; encrypted-media";
+        f.referrerPolicy = "strict-origin-when-cross-origin";
+        f.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups");
+        wrap.append(f);
+      }
       break;
     }
     case "stat": {
@@ -176,6 +275,7 @@ export function renderSlide(_deck: Deck, slide: Slide, regionOrder: string[]): R
     el.style.backgroundPosition = "center";
   }
   const units: BuildUnit[] = [];
+  const pending: Promise<unknown>[] = [];
   const names = [...regionOrder, ...Object.keys(slide.regions).filter((r) => !regionOrder.includes(r)).sort()];
   for (const r of names) {
     const items = slide.regions[r];
@@ -183,9 +283,9 @@ export function renderSlide(_deck: Deck, slide: Slide, regionOrder: string[]): R
     const region = h("div", `sk-region sk-region-${r}`);
     if (slide.layout === "grid-3" && ["a", "b", "c"].includes(r)) region.classList.add("sk-card");
     region.style.gridArea = r;
-    for (const e of items) region.append(renderElement(e, units));
+    for (const e of items) region.append(renderElement(e, units, pending));
     el.append(region);
   }
   const maxStep = units.reduce((m, u) => Math.max(m, u.step), 0);
-  return { el, units, maxStep };
+  return { el, units, maxStep, pending };
 }

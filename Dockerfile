@@ -18,6 +18,21 @@ COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=0.1.0-dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/slidekick ./cmd/slidekick
 
+# ---- render: adds headless Chromium for render_slide (tag: slidekick:<ver>-render)
+FROM debian:trixie-slim AS render
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends chromium fonts-noto-core fonts-noto-color-emoji fonts-liberation ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=build /out/slidekick /usr/local/bin/slidekick
+ENV SLIDEKICK_ADDR=:7410 SLIDEKICK_DATA=/data SLIDEKICK_CHROME=/usr/bin/chromium HOME=/tmp
+USER 65532:65532
+VOLUME /data
+EXPOSE 7410
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s CMD ["/usr/local/bin/slidekick", "health"]
+ENTRYPOINT ["/usr/local/bin/slidekick"]
+CMD ["serve"]
+
+# ---- default: minimal distroless image (render_slide reports Chromium is missing)
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/slidekick /usr/local/bin/slidekick
 ENV SLIDEKICK_ADDR=:7410 SLIDEKICK_DATA=/data

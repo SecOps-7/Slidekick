@@ -4,15 +4,46 @@
   "title": "Slidekick deck",
   "description": "A Slidekick deck. Agents compose elements inside named layout regions; the theme decides how everything looks. Never write raw HTML.",
   "type": "object",
-  "required": ["schemaVersion", "id", "title", "theme", "aspect", "slides"],
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "theme",
+    "aspect",
+    "slides"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schemaVersion": { "const": 1, "description": "Schema version. Older decks are migrated on load." },
-    "id": { "$ref": "#/$defs/id" },
-    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
-    "theme": { "type": "string", "pattern": "^[a-z0-9-]+$", "description": "Theme name; see the theme catalogue resource." },
-    "aspect": { "enum": ["16:9", "4:3"] },
-    "slides": { "type": "array", "items": { "$ref": "#/$defs/slide" }, "maxItems": 300 }
+    "schemaVersion": {
+      "const": 1,
+      "description": "Schema version. Older decks are migrated on load."
+    },
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "theme": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Theme name; see the theme catalogue resource."
+    },
+    "aspect": {
+      "enum": [
+        "16:9",
+        "4:3"
+      ]
+    },
+    "slides": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/slide"
+      },
+      "maxItems": 300
+    }
   },
   "$defs": {
     "id": {
@@ -21,59 +52,138 @@
       "description": "Stable id. Keep it when editing so patches stay precise and morph transitions can match elements across slides."
     },
     "colorToken": {
-      "enum": ["bg", "surface", "text", "muted", "accent", "accent2"],
+      "enum": [
+        "bg",
+        "surface",
+        "text",
+        "muted",
+        "accent",
+        "accent2"
+      ],
       "description": "Theme colour token."
     },
     "slide": {
       "type": "object",
-      "required": ["id", "layout", "regions"],
+      "required": [
+        "id",
+        "layout",
+        "regions"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
         "layout": {
-          "enum": ["title", "title-body", "two-column", "hero-image", "big-number", "quote", "grid-3", "full-bleed"],
+          "enum": [
+            "title",
+            "title-body",
+            "two-column",
+            "hero-image",
+            "big-number",
+            "quote",
+            "grid-3",
+            "full-bleed"
+          ],
           "description": "Layout preset; see the layout catalogue resource for each layout's region names."
         },
         "regions": {
           "type": "object",
           "description": "Map of region name to the elements placed in it, in order.",
-          "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" },
-          "additionalProperties": { "type": "array", "items": { "$ref": "#/$defs/element" }, "maxItems": 12 }
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/element"
+            },
+            "maxItems": 12
+          }
         },
-        "transition": { "$ref": "#/$defs/transition" },
-        "notes": { "type": "string", "maxLength": 5000, "description": "Speaker notes." },
-        "background": { "$ref": "#/$defs/background" }
+        "transition": {
+          "$ref": "#/$defs/transition"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 5000,
+          "description": "Speaker notes."
+        },
+        "background": {
+          "$ref": "#/$defs/background"
+        }
       }
     },
     "transition": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "additionalProperties": false,
       "properties": {
         "type": {
-          "enum": ["none", "fade", "slide", "zoom", "push", "morph"],
+          "enum": [
+            "none",
+            "fade",
+            "slide",
+            "zoom",
+            "push",
+            "morph"
+          ],
           "description": "How this slide enters. 'morph' animates elements that share an id with the previous slide."
         },
-        "duration": { "enum": ["fast", "base", "slow"] }
+        "duration": {
+          "enum": [
+            "fast",
+            "base",
+            "slow"
+          ]
+        }
       }
     },
     "background": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "token": { "$ref": "#/$defs/colorToken" },
-        "image": { "type": "string", "minLength": 1, "description": "Image URL." },
-        "dim": { "type": "number", "minimum": 0, "maximum": 0.9, "description": "Darken an image background for legibility." }
+        "token": {
+          "$ref": "#/$defs/colorToken"
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Image URL."
+        },
+        "dim": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.9,
+          "description": "Darken an image background for legibility."
+        }
       }
     },
     "build": {
       "type": "object",
-      "required": ["step"],
+      "required": [
+        "step"
+      ],
       "additionalProperties": false,
       "description": "Reveal this element on a build step. Elements without a build are visible when the slide appears.",
       "properties": {
-        "step": { "type": "integer", "minimum": 1, "maximum": 20 },
-        "preset": { "enum": ["fade", "fade-up", "scale-in", "wipe", "typewriter"], "default": "fade-up" }
+        "step": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "preset": {
+          "enum": [
+            "fade",
+            "fade-up",
+            "scale-in",
+            "wipe",
+            "typewriter"
+          ],
+          "default": "fade-up"
+        }
       }
     },
     "style": {
@@ -81,10 +191,32 @@
       "additionalProperties": false,
       "description": "Overrides limited to theme tokens.",
       "properties": {
-        "color": { "$ref": "#/$defs/colorToken" },
-        "size": { "enum": ["xs", "sm", "md", "lg", "xl", "xxl"] },
-        "align": { "enum": ["start", "center", "end"] },
-        "weight": { "enum": ["regular", "bold"] },
+        "color": {
+          "$ref": "#/$defs/colorToken"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl",
+            "xxl"
+          ]
+        },
+        "align": {
+          "enum": [
+            "start",
+            "center",
+            "end"
+          ]
+        },
+        "weight": {
+          "enum": [
+            "regular",
+            "bold"
+          ]
+        },
         "colorRaw": {
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$",
@@ -98,113 +230,570 @@
     },
     "element": {
       "type": "object",
-      "required": ["id", "type", "props"],
+      "required": [
+        "id",
+        "type",
+        "props"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["heading", "text", "bullets", "image", "code", "stat", "quote"] },
-        "props": { "type": "object" },
-        "style": { "$ref": "#/$defs/style" },
-        "build": { "$ref": "#/$defs/build" }
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "enum": [
+            "heading",
+            "text",
+            "bullets",
+            "image",
+            "code",
+            "stat",
+            "quote",
+            "chart",
+            "diagram",
+            "icon",
+            "shape",
+            "embed"
+          ]
+        },
+        "props": {
+          "type": "object"
+        },
+        "style": {
+          "$ref": "#/$defs/style"
+        },
+        "build": {
+          "$ref": "#/$defs/build"
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "heading" } } },
-          "then": { "properties": { "props": { "$ref": "#/$defs/props-heading" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "heading"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-heading"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "text" } } },
-          "then": { "properties": { "props": { "$ref": "#/$defs/props-text" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "text"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-text"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "bullets" } } },
-          "then": { "properties": { "props": { "$ref": "#/$defs/props-bullets" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "bullets"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-bullets"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "image" } } },
-          "then": { "properties": { "props": { "$ref": "#/$defs/props-image" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "image"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-image"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "code" } } },
-          "then": { "properties": { "props": { "$ref": "#/$defs/props-code" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "code"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-code"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "stat" } } },
-          "then": { "properties": { "props": { "$ref": "#/$defs/props-stat" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "stat"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-stat"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "quote" } } },
-          "then": { "properties": { "props": { "$ref": "#/$defs/props-quote" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "quote"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-quote"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "chart"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-chart"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "diagram"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-diagram"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "icon"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-icon"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "shape"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-shape"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "embed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/props-embed"
+              }
+            }
+          }
         }
       ]
     },
     "props-heading": {
       "type": "object",
-      "required": ["text"],
+      "required": [
+        "text"
+      ],
       "additionalProperties": false,
       "properties": {
-        "text": { "$ref": "#/$defs/inline", "minLength": 1, "maxLength": 200 },
-        "level": { "enum": [1, 2, 3], "default": 1 }
+        "text": {
+          "$ref": "#/$defs/inline",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "level": {
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "default": 1
+        }
       }
     },
     "props-text": {
       "type": "object",
-      "required": ["text"],
+      "required": [
+        "text"
+      ],
       "additionalProperties": false,
       "properties": {
-        "text": { "$ref": "#/$defs/inline", "minLength": 1, "maxLength": 2000 }
+        "text": {
+          "$ref": "#/$defs/inline",
+          "minLength": 1,
+          "maxLength": 2000
+        }
       }
     },
     "props-bullets": {
       "type": "object",
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false,
       "properties": {
-        "items": { "type": "array", "minItems": 1, "maxItems": 12, "items": { "$ref": "#/$defs/inline", "minLength": 1, "maxLength": 400 } },
-        "ordered": { "type": "boolean" },
-        "buildEach": { "type": "boolean", "description": "Reveal items one build step at a time, starting at this element's build step." }
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "$ref": "#/$defs/inline",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "ordered": {
+          "type": "boolean"
+        },
+        "buildEach": {
+          "type": "boolean",
+          "description": "Reveal items one build step at a time, starting at this element's build step."
+        }
       }
     },
     "props-image": {
       "type": "object",
-      "required": ["src"],
+      "required": [
+        "src"
+      ],
       "additionalProperties": false,
       "properties": {
-        "src": { "type": "string", "minLength": 1 },
-        "alt": { "type": "string", "maxLength": 300, "description": "Required for accessibility unless purely decorative (then set decorative: true)." },
-        "decorative": { "type": "boolean" },
-        "fit": { "enum": ["cover", "contain"], "default": "cover" },
-        "caption": { "type": "string", "maxLength": 200 }
+        "src": {
+          "type": "string",
+          "minLength": 1
+        },
+        "alt": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Required for accessibility unless purely decorative (then set decorative: true)."
+        },
+        "decorative": {
+          "type": "boolean"
+        },
+        "fit": {
+          "enum": [
+            "cover",
+            "contain"
+          ],
+          "default": "cover"
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 200
+        }
       }
     },
     "props-code": {
       "type": "object",
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "additionalProperties": false,
       "properties": {
-        "code": { "type": "string", "minLength": 1, "maxLength": 4000 },
-        "language": { "type": "string", "maxLength": 40 }
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 40
+        }
       }
     },
     "props-stat": {
       "type": "object",
-      "required": ["value"],
+      "required": [
+        "value"
+      ],
       "additionalProperties": false,
       "properties": {
-        "value": { "type": "number", "description": "Counts up from zero when the element appears." },
-        "decimals": { "type": "integer", "minimum": 0, "maximum": 4 },
-        "prefix": { "type": "string", "maxLength": 8 },
-        "suffix": { "type": "string", "maxLength": 12 },
-        "label": { "type": "string", "maxLength": 120 }
+        "value": {
+          "type": "number",
+          "description": "Counts up from zero when the element appears."
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "prefix": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "suffix": {
+          "type": "string",
+          "maxLength": 12
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 120
+        }
       }
     },
     "props-quote": {
       "type": "object",
-      "required": ["text"],
+      "required": [
+        "text"
+      ],
       "additionalProperties": false,
       "properties": {
-        "text": { "$ref": "#/$defs/inline", "minLength": 1, "maxLength": 500 },
-        "attribution": { "type": "string", "maxLength": 120 }
+        "text": {
+          "$ref": "#/$defs/inline",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "attribution": {
+          "type": "string",
+          "maxLength": 120
+        }
+      }
+    },
+    "props-chart": {
+      "type": "object",
+      "required": [
+        "kind",
+        "labels",
+        "series"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "bar",
+            "line",
+            "pie"
+          ],
+          "description": "bar and line plot every series against labels; pie uses the first series only."
+        },
+        "labels": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 24,
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "series": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": [
+              "values"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 24,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "color": {
+                "$ref": "#/$defs/colorToken"
+              }
+            }
+          }
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 12,
+          "description": "Suffix for values, e.g. '%' or 'k'."
+        },
+        "showValues": {
+          "type": "boolean",
+          "description": "Print each value on the chart."
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Short description, also used as the accessible label."
+        }
+      }
+    },
+    "props-diagram": {
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "Mermaid source, e.g. 'flowchart LR\\n  A[Agent] --> B[Deck]'."
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Accessible description of what the diagram shows."
+        }
+      }
+    },
+    "props-icon": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Icon name from the icon catalogue (slidekick://catalog/elements)."
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Accessible label. Omit for a decorative icon."
+        }
+      }
+    },
+    "props-shape": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "rect",
+            "circle",
+            "pill",
+            "line",
+            "arrow"
+          ]
+        },
+        "fill": {
+          "$ref": "#/$defs/colorToken"
+        },
+        "label": {
+          "$ref": "#/$defs/inline",
+          "maxLength": 80,
+          "description": "Optional text inside the shape."
+        }
+      }
+    },
+    "props-embed": {
+      "type": "object",
+      "required": [
+        "kind",
+        "src"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "iframe",
+            "video"
+          ]
+        },
+        "src": {
+          "type": "string",
+          "pattern": "^(https://|/files/)",
+          "description": "https URL, or an uploaded file (/files/...) for video."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Required for iframes (accessibility)."
+        },
+        "poster": {
+          "type": "string",
+          "pattern": "^(https://|/files/)"
+        },
+        "autoplay": {
+          "type": "boolean"
+        },
+        "loop": {
+          "type": "boolean"
+        },
+        "muted": {
+          "type": "boolean"
+        }
       }
     }
   }

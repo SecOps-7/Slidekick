@@ -24,8 +24,10 @@ import (
 
 	"github.com/SecOps-7/slidekick"
 	"github.com/SecOps-7/slidekick/internal/deck"
+	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/hub"
 	"github.com/SecOps-7/slidekick/internal/mcpserver"
+	"github.com/SecOps-7/slidekick/internal/render"
 	"github.com/SecOps-7/slidekick/internal/server"
 	"github.com/SecOps-7/slidekick/internal/service"
 	"github.com/SecOps-7/slidekick/internal/store"
@@ -123,8 +125,23 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 	defer st.Close()
 
 	svc := service.New(st, v, cat, themes, hub.New(), baseURL)
-	mcpSrv := mcpserver.New(svc, slidekick.Schema, version)
-	handler := server.New(svc, mcpSrv, server.Options{Token: token, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log})
+	svc.FilesDir = filepath.Join(data, "files")
+
+	exp := &export.Exporter{Web: slidekick.Web(), Cat: cat, Themes: themes,
+		Assets: func(ctx context.Context, name string) (string, []byte, error) {
+			a, b, err := svc.ReadAsset(ctx, name)
+			if err != nil {
+				return "", nil, err
+			}
+			return a.MIME, b, nil
+		}}
+	_, port, _ := net.SplitHostPort(addr)
+	rnd := render.New("http://127.0.0.1:"+port, log)
+	defer rnd.Close()
+	log.Info("slide rendering", "available", rnd.Available())
+
+	mcpSrv := mcpserver.New(svc, slidekick.Schema, version, mcpserver.Options{Renderer: rnd, Exporter: exp})
+	handler := server.New(svc, mcpSrv, server.Options{Token: token, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp})
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	httpErr := make(chan error, 1)

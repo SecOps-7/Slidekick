@@ -1,0 +1,41 @@
+/* Meadow: soft organic blobs in the corners, rounded cards. */
+.sk-theme-meadow .sk-slide::before,
+.sk-theme-meadow .sk-slide::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 46% 54% 58% 42% / 52% 40% 60% 48%;
+}
+.sk-theme-meadow .sk-slide::before {
+  width: 620px;
+  height: 560px;
+  right: -180px;
+  top: -200px;
+  background: color-mix(in oklab, var(--sk-accent) 14%, transparent);
+  animation: sk-meadow-drift 18s ease-in-out infinite alternate;
+}
+.sk-theme-meadow .sk-slide::after {
+  width: 480px;
+  height: 440px;
+  left: -200px;
+  bottom: -220px;
+  background: color-mix(in oklab, var(--sk-accent2) 14%, transparent);
+  animation: sk-meadow-drift 22s ease-in-out infinite alternate-reverse;
+}
+.sk-theme-meadow .sk-slide[data-bg-image]::before,
+.sk-theme-meadow .sk-slide[data-bg-image]::after { display: none; }
+@keyframes sk-meadow-drift {
+  from { transform: rotate(0deg) scale(1); }
+  to   { transform: rotate(14deg) scale(1.06); }
+}
+.sk-theme-meadow .sk-el-heading h1,
+.sk-theme-meadow .sk-el-heading h2,
+.sk-theme-meadow .sk-el-heading h3 { font-weight: 400; letter-spacing: -0.005em; }
+.sk-theme-meadow .sk-card { background: var(--sk-surface); box-shadow: 0 18px 40px -24px rgba(29, 42, 31, 0.35); }
+.sk-theme-meadow .sk-stat-value { font-weight: 400; }
+.sk-theme-meadow .sk-el-bullets li::marker { content: "\2022  "; color: var(--sk-accent2); }
+@media (prefers-reduced-motion: reduce) {
+  .sk-theme-meadow .sk-slide::before,
+  .sk-theme-meadow .sk-slide::after { animation: none; }
+}

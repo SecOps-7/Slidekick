@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/SecOps-7/slidekick/internal/deck"
+	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/service"
 	"github.com/SecOps-7/slidekick/internal/store"
 )
@@ -27,6 +29,7 @@ type Options struct {
 	SchemaFS fs.FS
 	Web      fs.FS
 	Log      *slog.Logger
+	Exporter *export.Exporter
 }
 
 type server struct {
@@ -45,6 +48,9 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux.HandleFunc("GET /api/decks/{id}/history", s.history)
 	mux.Handle("POST /api/decks/{id}/patch", s.auth(http.HandlerFunc(s.patchDeck)))
 	mux.HandleFunc("GET /api/catalog", s.catalog)
+	mux.HandleFunc("GET /api/decks/{id}/export.html", s.exportHTML)
+	mux.Handle("POST /api/files", s.auth(http.HandlerFunc(s.uploadFile)))
+	mux.HandleFunc("GET /files/{name}", s.serveFile)
 	mux.HandleFunc("GET /ws/decks/{id}", s.ws)
 	mux.HandleFunc("GET /schema/deck.schema.json", func(w http.ResponseWriter, r *http.Request) {
 		b, _ := fs.ReadFile(opt.SchemaFS, "schema/deck.schema.json")
@@ -252,4 +258,62 @@ func (s *server) spa() http.Handler {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Write(idx)
 	})
+}
+
+// serveFile serves an uploaded asset. Uploaded SVGs could carry script, so
+// every file is served with a locked-down CSP sandbox.
+func (s *server) serveFile(w http.ResponseWriter, r *http.Request) {
+	a, path, err := s.svc.OpenAsset(r.Context(), r.PathValue("name"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	h := w.Header()
+	h.Set("Content-Type", a.MIME)
+	h.Set("Content-Security-Policy", "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; media-src 'self'; sandbox")
+	h.Set("Cache-Control", "public, max-age=31536000, immutable")
+	http.ServeContent(w, r, a.ID+a.Ext, a.CreatedAt, f)
+}
+
+func (s *server) uploadFile(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, service.MaxAssetBytes+1))
+	if err != nil {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "file too large or unreadable"})
+		return
+	}
+	name := r.URL.Query().Get("name")
+	a, err := s.svc.UploadAsset(r.Context(), name, r.Header.Get("Content-Type"), body)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"id": a.ID, "url": a.URL(), "mime": a.MIME, "size": a.Size})
+}
+
+func (s *server) exportHTML(w http.ResponseWriter, r *http.Request) {
+	if s.opt.Exporter == nil {
+		http.Error(w, "export not configured", http.StatusNotImplemented)
+		return
+	}
+	d, raw, _, err := s.svc.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	out, err := s.opt.Exporter.HTML(r.Context(), raw)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if r.URL.Query().Get("download") != "" {
+		w.Header().Set("Content-Disposition", `attachment; filename="`+export.Filename(d.Title)+`"`)
+	}
+	w.Write(out)
 }

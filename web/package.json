@@ -6,11 +6,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node -e \"require('fs').writeFileSync('dist/.gitkeep','')\"",
-    "typecheck": "tsc --noEmit"
+    "build": "node scripts/gen-icons.mjs && tsc --noEmit && vite build && vite build -c vite.standalone.config.ts && SK_LITE=1 vite build -c vite.standalone.config.ts && node -e \"require('fs').writeFileSync('dist/.gitkeep','')\"",
+    "typecheck": "tsc --noEmit",
+    "icons": "node scripts/gen-icons.mjs"
   },
   "devDependencies": {
+    "@tabler/icons": "^3.52.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.8"
+  },
+  "dependencies": {
+    "mermaid": "^11.17.2",
+    "shiki": "^3.23.0"
   }
 }

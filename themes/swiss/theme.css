@@ -1,0 +1,25 @@
+/* Swiss: flush-left grid, heavy grotesk, a red signal bar. */
+.sk-theme-swiss .sk-slide::after {
+  content: "";
+  position: absolute;
+  left: 140px;
+  top: 64px;
+  width: 96px;
+  height: 14px;
+  background: var(--sk-accent);
+}
+.sk-theme-swiss .sk-slide[data-bg-image]::after,
+.sk-theme-swiss .sk-layout-hero-image::after,
+.sk-theme-swiss .sk-layout-full-bleed::after { display: none; }
+.sk-theme-swiss .sk-el-heading h1,
+.sk-theme-swiss .sk-el-heading h2 { font-weight: 800; letter-spacing: -0.035em; line-height: 0.98; }
+.sk-theme-swiss .sk-el-heading h3 { font-weight: 800; letter-spacing: -0.01em; }
+.sk-theme-swiss .sk-layout-title { justify-items: start; text-align: left; grid-template: "." 1fr "title" auto "subtitle" auto "." 0.6fr / 1fr; }
+.sk-theme-swiss .sk-layout-title .sk-region { align-items: flex-start; }
+.sk-theme-swiss .sk-layout-big-number,
+.sk-theme-swiss .sk-layout-big-number .sk-region { justify-items: start; align-items: flex-start; text-align: left; }
+.sk-theme-swiss .sk-stat-value { color: var(--sk-text); letter-spacing: -0.05em; }
+.sk-theme-swiss .sk-card { background: transparent; border-top: 4px solid var(--sk-text); border-radius: 0; padding: 36px 0 0; }
+.sk-theme-swiss .sk-el-bullets li::marker { content: "\2014  "; color: var(--sk-accent); }
+.sk-theme-swiss .sk-el-quote blockquote p { font-weight: 800; letter-spacing: -0.02em; }
+.sk-theme-swiss .sk-el-code pre { border: 0; border-left: 6px solid var(--sk-accent); }

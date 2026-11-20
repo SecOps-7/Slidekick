@@ -10,7 +10,9 @@ export interface MotionOpts {
   direction?: 1 | -1;
 }
 
-export const prefersReducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** Headless renders and exports can force instant motion with window.__skReduced = true. */
+export const prefersReducedMotion = () =>
+  (window as { __skReduced?: boolean }).__skReduced === true || matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export function motionFor(root: HTMLElement, d: Duration = "base"): { duration: number; easing: string } {
   const cs = getComputedStyle(root);

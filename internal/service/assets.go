@@ -1,0 +1,145 @@
+package service
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/SecOps-7/slidekick/internal/store"
+)
+
+// MaxAssetBytes caps one upload.
+const MaxAssetBytes = 15 << 20
+
+// AllowedMIME maps uploadable types to the extension they are stored with.
+var AllowedMIME = map[string]string{
+	"image/png":     ".png",
+	"image/jpeg":    ".jpg",
+	"image/gif":     ".gif",
+	"image/webp":    ".webp",
+	"image/avif":    ".avif",
+	"image/svg+xml": ".svg",
+	"video/mp4":     ".mp4",
+	"video/webm":    ".webm",
+}
+
+var assetIDRe = regexp.MustCompile(`^f_[0-9a-f]{20}$`)
+
+// UploadAsset stores bytes content-addressed under FilesDir and returns the
+// asset. Identical bytes always get the same id.
+func (s *Service) UploadAsset(ctx context.Context, name, mime string, data []byte) (*store.Asset, error) {
+	if s.FilesDir == "" {
+		return nil, errors.New("asset storage is not configured")
+	}
+	mime = strings.ToLower(strings.TrimSpace(strings.Split(mime, ";")[0]))
+	ext, ok := AllowedMIME[mime]
+	if !ok {
+		return nil, fmt.Errorf("unsupported type %q (allowed: png, jpeg, gif, webp, avif, svg, mp4, webm)", mime)
+	}
+	if len(data) == 0 {
+		return nil, errors.New("file is empty")
+	}
+	if len(data) > MaxAssetBytes {
+		return nil, fmt.Errorf("file is %d bytes; the limit is %d", len(data), MaxAssetBytes)
+	}
+	if err := checkContent(mime, data); err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256(data)
+	hexsum := hex.EncodeToString(sum[:])
+	a := &store.Asset{ID: "f_" + hexsum[:20], Name: cleanName(name), MIME: mime, Ext: ext, Size: int64(len(data)), SHA256: hexsum}
+
+	if err := os.MkdirAll(s.FilesDir, 0o700); err != nil {
+		return nil, err
+	}
+	dst := filepath.Join(s.FilesDir, a.ID+a.Ext)
+	if _, err := os.Stat(dst); err != nil {
+		tmp, err := os.CreateTemp(s.FilesDir, ".upload-*")
+		if err != nil {
+			return nil, err
+		}
+		_, werr := tmp.Write(data)
+		cerr := tmp.Close()
+		if werr != nil || cerr != nil {
+			os.Remove(tmp.Name())
+			return nil, errors.Join(werr, cerr)
+		}
+		if err := os.Rename(tmp.Name(), dst); err != nil {
+			os.Remove(tmp.Name())
+			return nil, err
+		}
+	}
+	if err := s.store.PutAsset(ctx, a); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+// OpenAsset resolves "f_xxx" or "f_xxx.ext" to its metadata and file path.
+func (s *Service) OpenAsset(ctx context.Context, name string) (*store.Asset, string, error) {
+	id := strings.TrimSuffix(name, filepath.Ext(name))
+	if !assetIDRe.MatchString(id) {
+		return nil, "", store.ErrNotFound
+	}
+	a, err := s.store.GetAsset(ctx, id)
+	if err != nil {
+		return nil, "", err
+	}
+	return a, filepath.Join(s.FilesDir, a.ID+a.Ext), nil
+}
+
+// ReadAsset returns an asset's bytes, for export inlining.
+func (s *Service) ReadAsset(ctx context.Context, name string) (*store.Asset, []byte, error) {
+	a, path, err := s.OpenAsset(ctx, name)
+	if err != nil {
+		return nil, nil, err
+	}
+	b, err := os.ReadFile(path)
+	return a, b, err
+}
+
+// checkContent makes sure the bytes really are the declared kind of file.
+func checkContent(mime string, data []byte) error {
+	if mime == "image/svg+xml" {
+		head := bytes.ToLower(data[:min(len(data), 1024)])
+		if !bytes.Contains(head, []byte("<svg")) {
+			return errors.New("file does not look like an SVG")
+		}
+		return nil
+	}
+	sniffed := http.DetectContentType(data)
+	switch {
+	case mime == "image/avif":
+		if !bytes.Contains(data[:min(len(data), 64)], []byte("ftypavif")) {
+			return errors.New("file does not look like an AVIF image")
+		}
+	case strings.HasPrefix(mime, "video/"):
+		if !strings.HasPrefix(sniffed, "video/") && sniffed != "application/octet-stream" {
+			return fmt.Errorf("file looks like %s, not %s", sniffed, mime)
+		}
+	case sniffed != mime:
+		return fmt.Errorf("file looks like %s, not %s", sniffed, mime)
+	}
+	return nil
+}
+
+var unsafeName = regexp.MustCompile(`[^A-Za-z0-9._ -]+`)
+
+func cleanName(n string) string {
+	n = unsafeName.ReplaceAllString(filepath.Base(n), "_")
+	if len(n) > 120 {
+		n = n[:120]
+	}
+	if n == "" || n == "." {
+		n = "file"
+	}
+	return n
+}

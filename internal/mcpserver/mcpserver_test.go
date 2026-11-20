@@ -16,7 +16,7 @@ import (
 func connect(t *testing.T) *mcp.ClientSession {
 	t.Helper()
 	env := testenv.New(t)
-	srv := mcpserver.New(env.Svc, slidekick.Schema, "test")
+	srv := mcpserver.New(env.Svc, slidekick.Schema, "test", mcpserver.Options{})
 	ct, st := mcp.NewInMemoryTransports()
 	ctx := context.Background()
 	if _, err := srv.Connect(ctx, st, nil); err != nil {
@@ -53,8 +53,8 @@ func TestAgentLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 12 {
-		t.Fatalf("want 12 tools, got %d", len(tools.Tools))
+	if len(tools.Tools) != 15 {
+		t.Fatalf("want 15 tools, got %d", len(tools.Tools))
 	}
 
 	var deck map[string]any

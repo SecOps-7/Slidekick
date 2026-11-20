@@ -27,7 +27,9 @@ type Service struct {
 	Themes  *deck.ThemeSet
 	Hub     *hub.Hub
 	BaseURL string
-	mu      sync.Mutex // serialises writes inside this process
+	// FilesDir holds uploaded assets; empty disables uploads.
+	FilesDir string
+	mu       sync.Mutex // serialises writes inside this process
 }
 
 func New(st *store.Store, v *deck.Validator, cat *deck.Catalog, themes *deck.ThemeSet, h *hub.Hub, baseURL string) *Service {

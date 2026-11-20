@@ -43,6 +43,19 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   player.setDeck(deck);
   document.title = `${deck.title} · Slidekick`;
 
+  // Headless render mode (used by render_slide): no chrome, no live sync,
+  // instant motion; signals window.__skReady when the slide is fully drawn.
+  if (new URLSearchParams(location.search).has("render")) {
+    const w = window as { __skReduced?: boolean; __skReady?: boolean };
+    w.__skReduced = true;
+    document.body.classList.add("sk-render");
+    const rm = /^#(\d+)(?:\.(\d+))?$/.exec(location.hash);
+    await player.goto(rm ? Number(rm[1]) - 1 : 0, rm?.[2] ? Number(rm[2]) : 0, { animate: false });
+    await player.ready();
+    w.__skReady = true;
+    return;
+  }
+
   // ---- HUD ----
   const hud = el("div", "hud");
   const title = el("span", "hud-title", deck.title);
