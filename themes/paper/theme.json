@@ -17,9 +17,25 @@
       "body": "\"Source Sans 3\", system-ui, sans-serif",
       "mono": "\"IBM Plex Mono\", ui-monospace, monospace"
     },
-    "fontImport": "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono&family=Source+Sans+3:wght@400;600&display=swap",
-    "size": { "xs": 22, "sm": 28, "md": 34, "lg": 50, "xl": 72, "xxl": 112 },
+    "fonts": [
+      "fraunces",
+      "source-sans-3",
+      "ibm-plex-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 34,
+      "lg": 50,
+      "xl": 72,
+      "xxl": 112
+    },
     "radius": 4,
-    "motion": { "fast": 200, "base": 420, "slow": 700, "easing": "cubic-bezier(0.4, 0, 0.2, 1)" }
+    "motion": {
+      "fast": 200,
+      "base": 420,
+      "slow": 700,
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)"
+    }
   }
 }

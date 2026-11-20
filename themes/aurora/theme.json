@@ -17,9 +17,25 @@
       "body": "\"Inter\", system-ui, sans-serif",
       "mono": "\"JetBrains Mono\", ui-monospace, monospace"
     },
-    "fontImport": "https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono&family=Space+Grotesk:wght@500;700&display=swap",
-    "size": { "xs": 22, "sm": 28, "md": 36, "lg": 52, "xl": 76, "xxl": 120 },
+    "fonts": [
+      "space-grotesk",
+      "inter",
+      "jetbrains-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 36,
+      "lg": 52,
+      "xl": 76,
+      "xxl": 120
+    },
     "radius": 18,
-    "motion": { "fast": 260, "base": 520, "slow": 900, "easing": "cubic-bezier(0.22, 1, 0.36, 1)" }
+    "motion": {
+      "fast": 260,
+      "base": 520,
+      "slow": 900,
+      "easing": "cubic-bezier(0.22, 1, 0.36, 1)"
+    }
   }
 }

@@ -17,9 +17,25 @@
       "body": "\"Nunito Sans\", system-ui, sans-serif",
       "mono": "\"IBM Plex Mono\", ui-monospace, monospace"
     },
-    "fontImport": "https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Mono&family=Nunito+Sans:wght@400;700&display=swap",
-    "size": { "xs": 22, "sm": 28, "md": 35, "lg": 54, "xl": 80, "xxl": 124 },
+    "fonts": [
+      "dm-serif-display",
+      "nunito-sans",
+      "ibm-plex-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 35,
+      "lg": 54,
+      "xl": 80,
+      "xxl": 124
+    },
     "radius": 28,
-    "motion": { "fast": 300, "base": 620, "slow": 1000, "easing": "cubic-bezier(0.25, 0.1, 0.25, 1)" }
+    "motion": {
+      "fast": 300,
+      "base": 620,
+      "slow": 1000,
+      "easing": "cubic-bezier(0.25, 0.1, 0.25, 1)"
+    }
   }
 }

@@ -68,13 +68,6 @@ export function applyTheme(root: HTMLElement, theme: Theme) {
     css.href = `/themes/${encodeURIComponent(theme.name)}/theme.css`;
     themeLoads.push(linkLoaded(css));
     document.head.append(css);
-    if (t.fontImport) {
-      const f = document.createElement("link");
-      f.rel = "stylesheet";
-      f.href = t.fontImport;
-      themeLoads.push(linkLoaded(f));
-      document.head.append(f);
-    }
   }
 }
 

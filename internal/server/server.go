@@ -58,14 +58,25 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 		w.Write(b)
 	})
 	mux.HandleFunc("GET /themes/{name}/theme.css", func(w http.ResponseWriter, r *http.Request) {
-		css, ok := svc.Themes.CSS[r.PathValue("name")]
+		theme, ok := svc.Themes.Themes[r.PathValue("name")]
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
-		w.Write(css)
+		io.WriteString(w, svc.Themes.FontFaceCSS(theme, func(file string) string { return "/fonts/" + file }))
+		w.Write(svc.Themes.CSS[theme.Name])
+	})
+	mux.HandleFunc("GET /fonts/{file}", func(w http.ResponseWriter, r *http.Request) {
+		b, ok := svc.Themes.FontFile(r.PathValue("file"))
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "font/woff2")
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		w.Write(b)
 	})
 
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return mcpServer }, nil)

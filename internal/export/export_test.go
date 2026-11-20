@@ -44,7 +44,8 @@ func TestStandaloneHTML(t *testing.T) {
 		"data:image/png;base64,iVBORw==",
 		"/*lite*/",
 		`<\/SCRIPT>`,
-		"fonts.googleapis.com",
+		"data:font/woff2;base64,",
+		"@font-face{font-family:\"Fraunces\"",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("missing %q", want)
@@ -56,6 +57,9 @@ func TestStandaloneHTML(t *testing.T) {
 	}
 	if strings.Contains(s, "/files/") {
 		t.Error("uploaded file reference was not inlined")
+	}
+	if strings.Contains(s, "googleapis") || strings.Contains(s, "http://") {
+		t.Error("export must not depend on remote resources")
 	}
 }
 

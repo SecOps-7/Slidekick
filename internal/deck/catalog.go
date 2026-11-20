@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"path"
 	"sort"
+	"strings"
 )
 
 // Layout describes a layout preset and its regions. Regions maps region
@@ -116,12 +117,12 @@ type Theme struct {
 	Description string `json:"description"`
 	Dark        bool   `json:"dark"`
 	Tokens      struct {
-		Color      map[string]string `json:"color"`
-		Font       map[string]string `json:"font"`
-		FontImport string            `json:"fontImport,omitempty"`
-		Size       map[string]int    `json:"size"`
-		Radius     int               `json:"radius"`
-		Motion     struct {
+		Color  map[string]string `json:"color"`
+		Font   map[string]string `json:"font"`
+		Fonts  []string          `json:"fonts" jsonschema:"self-hosted font families (keys of themes/fonts/faces.json)"`
+		Size   map[string]int    `json:"size"`
+		Radius int               `json:"radius"`
+		Motion struct {
 			Fast   int    `json:"fast"`
 			Base   int    `json:"base"`
 			Slow   int    `json:"slow"`
@@ -130,10 +131,55 @@ type Theme struct {
 	} `json:"tokens"`
 }
 
-// ThemeSet holds every theme, keyed by name, with its CSS.
+// ThemeSet holds every theme, keyed by name, with its CSS and fonts.
 type ThemeSet struct {
 	Themes map[string]*Theme
 	CSS    map[string][]byte
+	// Faces maps a font key to its @font-face entries (themes/fonts/faces.json).
+	Faces map[string][]FontFace
+	fsys  fs.FS
+}
+
+// FontFace is one self-hosted font file and its @font-face descriptors.
+type FontFace struct {
+	Family       string `json:"family"`
+	File         string `json:"file"`
+	Style        string `json:"style"`
+	Weight       string `json:"weight"`
+	Stretch      string `json:"stretch"`
+	UnicodeRange string `json:"unicodeRange"`
+}
+
+// FontFile returns a self-hosted font file's bytes; ok is false for unknown files.
+func (t *ThemeSet) FontFile(file string) ([]byte, bool) {
+	for _, faces := range t.Faces {
+		for _, f := range faces {
+			if f.File == file {
+				b, err := fs.ReadFile(t.fsys, path.Join("themes", "fonts", file))
+				return b, err == nil
+			}
+		}
+	}
+	return nil, false
+}
+
+// FontFaceCSS returns @font-face rules for a theme's fonts; src(file) gives each file's URL.
+func (t *ThemeSet) FontFaceCSS(theme *Theme, src func(file string) string) string {
+	var b strings.Builder
+	for _, key := range theme.Tokens.Fonts {
+		for _, f := range t.Faces[key] {
+			fmt.Fprintf(&b, "@font-face{font-family:%q;font-style:%s;font-weight:%s;font-display:swap;", f.Family, f.Style, f.Weight)
+			if f.Stretch != "" {
+				fmt.Fprintf(&b, "font-stretch:%s;", f.Stretch)
+			}
+			fmt.Fprintf(&b, "src:url(%q) format(\"woff2\");", src(f.File))
+			if f.UnicodeRange != "" {
+				fmt.Fprintf(&b, "unicode-range:%s;", f.UnicodeRange)
+			}
+			b.WriteString("}\n")
+		}
+	}
+	return b.String()
 }
 
 // Names returns theme names sorted.
@@ -152,9 +198,14 @@ func LoadThemes(fsys fs.FS) (*ThemeSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	ts := &ThemeSet{Themes: map[string]*Theme{}, CSS: map[string][]byte{}}
+	ts := &ThemeSet{Themes: map[string]*Theme{}, CSS: map[string][]byte{}, Faces: map[string][]FontFace{}, fsys: fsys}
+	if raw, err := fs.ReadFile(fsys, "themes/fonts/faces.json"); err == nil {
+		if err := json.Unmarshal(raw, &ts.Faces); err != nil {
+			return nil, fmt.Errorf("themes/fonts/faces.json: %w", err)
+		}
+	}
 	for _, e := range entries {
-		if !e.IsDir() {
+		if !e.IsDir() || e.Name() == "fonts" {
 			continue
 		}
 		dir := path.Join("themes", e.Name())
@@ -172,6 +223,11 @@ func LoadThemes(fsys fs.FS) (*ThemeSet, error) {
 		for _, tok := range ColorTokens {
 			if _, ok := t.Tokens.Color[tok]; !ok {
 				return nil, fmt.Errorf("theme %s: missing colour token %q", t.Name, tok)
+			}
+		}
+		for _, key := range t.Tokens.Fonts {
+			if len(ts.Faces[key]) == 0 {
+				return nil, fmt.Errorf("theme %s: font %q is not in themes/fonts (run npm run fonts)", t.Name, key)
 			}
 		}
 		ts.Themes[t.Name] = &t

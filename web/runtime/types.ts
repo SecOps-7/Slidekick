@@ -40,7 +40,7 @@ export interface Theme {
   tokens: {
     color: Record<ColorToken, string>;
     font: { heading: string; body: string; mono: string };
-    fontImport?: string;
+    fonts: string[];
     size: Record<Size, number>;
     radius: number;
     motion: { fast: number; base: number; slow: number; easing: string };
