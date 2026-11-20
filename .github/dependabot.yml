@@ -1,0 +1,12 @@
+# Weekly update PRs for the pinned Docker base images (Dockerfile) and the
+# GitHub Actions in .github/workflows. No auto-merge: review each PR.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

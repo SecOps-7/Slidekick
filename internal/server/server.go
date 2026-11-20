@@ -4,7 +4,6 @@ package server
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,8 +11,8 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -49,20 +48,23 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok\n") })
-	mux.Handle("GET /api/decks", s.auth(http.HandlerFunc(s.listDecks))) // deck ids are share links: don't list them publicly
-	mux.HandleFunc("GET /api/decks/{id}", s.getDeck)
-	mux.HandleFunc("GET /api/decks/{id}/history", s.history)
-	mux.Handle("POST /api/decks/{id}/patch", s.auth(http.HandlerFunc(s.patchDeck)))
+	// Deck ids are share links: listing needs a token (a deck token sees only its deck).
+	mux.Handle("GET /api/decks", s.auth(http.HandlerFunc(s.listDecks)))
+	mux.HandleFunc("GET /api/decks/{id}", s.viewGate(s.getDeck))
+	mux.HandleFunc("GET /api/decks/{id}/history", s.viewGate(s.history))
+	mux.Handle("POST /api/decks/{id}/patch", s.deckAuth(http.HandlerFunc(s.patchDeck)))
 	mux.HandleFunc("GET /api/catalog", s.catalog)
-	mux.HandleFunc("GET /api/decks/{id}/export.html", s.exportHTML)
-	mux.Handle("POST /api/decks/{id}/export", s.auth(http.HandlerFunc(s.exportFile)))
-	mux.Handle("GET /api/auth", s.auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]any{"ok": true, "required": opt.Token != ""})
-	})))
-	mux.HandleFunc("GET /api/decks/{id}/comments", s.listComments)
-	mux.Handle("POST /api/decks/{id}/comments", s.auth(http.HandlerFunc(s.addComment)))
-	mux.Handle("POST /api/decks/{id}/comments/{cid}/resolve", s.auth(http.HandlerFunc(s.resolveComment)))
-	mux.Handle("POST /api/decks/{id}/restore", s.auth(http.HandlerFunc(s.restore)))
+	mux.HandleFunc("GET /api/decks/{id}/export.html", s.viewGate(s.exportHTML))
+	mux.Handle("POST /api/decks/{id}/export", s.deckAuth(http.HandlerFunc(s.exportFile)))
+	mux.Handle("GET /api/auth", s.auth(http.HandlerFunc(s.authInfo)))
+	mux.HandleFunc("GET /api/decks/{id}/comments", s.viewGate(s.listComments))
+	mux.Handle("POST /api/decks/{id}/comments", s.deckAuth(http.HandlerFunc(s.addComment)))
+	mux.Handle("POST /api/decks/{id}/comments/{cid}/resolve", s.deckAuth(http.HandlerFunc(s.resolveComment)))
+	mux.Handle("POST /api/decks/{id}/restore", s.deckAuth(http.HandlerFunc(s.restore)))
+	mux.Handle("GET /api/decks/{id}/access", s.deckAuth(http.HandlerFunc(s.getAccess)))
+	mux.Handle("POST /api/decks/{id}/access", s.deckAuth(http.HandlerFunc(s.setAccess)))
+	mux.Handle("POST /api/decks/{id}/edit-token", s.admin(http.HandlerFunc(s.issueEditToken)))
+	mux.Handle("DELETE /api/decks/{id}/edit-token", s.admin(http.HandlerFunc(s.revokeEditToken)))
 	mux.Handle("POST /api/files", s.auth(http.HandlerFunc(s.uploadFile)))
 	mux.HandleFunc("GET /files/{name}", s.serveFile)
 	mux.HandleFunc("GET /ws/decks/{id}", s.ws)
@@ -98,8 +100,8 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 		r.Body = http.MaxBytesReader(w, r.Body, 24<<20) // upload_asset carries up to 15 MB as base64
 		mcpHandler.ServeHTTP(w, r)
 	})
-	mux.Handle("/mcp", s.auth(mcpCapped))
-	mux.Handle("/mcp/", s.auth(mcpCapped))
+	mux.Handle("/mcp", s.mcpAuth(mcpCapped))
+	mux.Handle("/mcp/", s.mcpAuth(mcpCapped))
 
 	mux.Handle("/", s.spa())
 	return securityHeaders(mux)
@@ -111,30 +113,6 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("X-Frame-Options", "DENY")
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (s *server) auth(next http.Handler) http.Handler {
-	if s.opt.Token == "" {
-		return next
-	}
-	want := []byte("Bearer " + s.opt.Token)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := clientIP(r)
-		if !s.fails.allowed(ip) {
-			w.Header().Set("Retry-After", "300")
-			http.Error(w, "too many failed attempts; try again in a few minutes", http.StatusTooManyRequests)
-			return
-		}
-		got := []byte(r.Header.Get("Authorization"))
-		if subtle.ConstantTimeCompare(got, want) != 1 {
-			s.fails.fail(ip)
-			w.Header().Set("WWW-Authenticate", `Bearer realm="slidekick"`)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		s.fails.succeed(ip)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -165,6 +143,15 @@ func (s *server) listDecks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, err)
 		return
+	}
+	if p, _ := principalFrom(r.Context()); !p.admin {
+		mine := rows[:0]
+		for _, row := range rows {
+			if p.can(row.ID) {
+				mine = append(mine, row)
+			}
+		}
+		rows = mine
 	}
 	writeJSON(w, 200, map[string]any{"decks": rows})
 }
@@ -234,6 +221,10 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	key := r.URL.Query().Get("k")
+	// A private deck without its key needs an auth message (deck or server
+	// token) before anything is sent: browsers can't set headers on WebSockets.
+	keyOK := s.svc.CanView(r.Context(), id, key)
 	ip := clientIP(r)
 	if !s.conns.acquire(ip, id) {
 		http.Error(w, "too many live connections", http.StatusServiceUnavailable)
@@ -246,6 +237,33 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 	}
 	defer c.CloseNow()
 	c.SetReadLimit(8 << 10)
+	ip0 := clientIP(r)
+	authed := s.opt.Token == ""
+	tokenAuth := func(tok string) bool {
+		if !s.fails.allowed(ip0) {
+			return false
+		}
+		p, ok := s.resolveToken(r.Context(), tok)
+		if !ok {
+			s.fails.fail(ip0)
+			return false
+		}
+		s.fails.succeed(ip0)
+		return p.can(id)
+	}
+	if !keyOK && !authed {
+		actx, done := context.WithTimeout(r.Context(), 10*time.Second)
+		_, data, err := c.Read(actx)
+		done()
+		var m struct{ Type, Token string }
+		if err != nil || json.Unmarshal(data, &m) != nil || m.Type != "auth" || !tokenAuth(m.Token) {
+			c.Close(websocket.StatusPolicyViolation, "deck not found")
+			return
+		}
+		authed = true
+		reply, _ := json.Marshal(map[string]any{"type": "auth", "ok": true})
+		c.Write(r.Context(), websocket.MessageText, reply)
+	}
 	ch, cancel := s.svc.Hub.Subscribe(id)
 	defer cancel()
 	ctx, stop := context.WithCancel(r.Context())
@@ -257,9 +275,10 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var authMu sync.Mutex
+	isAuthed := func() bool { authMu.Lock(); defer authMu.Unlock(); return authed }
 	go func() {
 		defer stop()
-		authed := s.opt.Token == ""
 		for {
 			_, data, err := c.Read(ctx)
 			if err != nil {
@@ -279,24 +298,18 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 			}
 			switch m.Type {
 			case "auth":
-				if !s.fails.allowed(ip) {
-					authed = false
-				} else {
-					authed = s.opt.Token == "" || subtle.ConstantTimeCompare([]byte(m.Token), []byte(s.opt.Token)) == 1
-					if authed {
-						s.fails.succeed(ip)
-					} else {
-						s.fails.fail(ip)
-					}
-				}
-				reply, _ := json.Marshal(map[string]any{"type": "auth", "ok": authed})
+				ok := s.opt.Token == "" || tokenAuth(m.Token)
+				authMu.Lock()
+				authed = ok || (authed && !keyOK) // a key-less private viewer keeps its earlier proof
+				authMu.Unlock()
+				reply, _ := json.Marshal(map[string]any{"type": "auth", "ok": ok})
 				c.Write(ctx, websocket.MessageText, reply)
 			case "present":
-				if authed && m.Index >= 0 && m.Step >= 0 {
+				if isAuthed() && m.Index >= 0 && m.Step >= 0 {
 					s.svc.Publish(id, map[string]any{"type": "present", "index": m.Index, "step": m.Step, "from": conn})
 				}
 			case "pointer":
-				if authed {
+				if isAuthed() {
 					s.svc.Publish(id, map[string]any{"type": "pointer", "x": clamp01(m.X), "y": clamp01(m.Y), "on": m.On, "from": conn})
 				}
 			}
@@ -312,6 +325,10 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 		case msg, ok := <-ch:
 			if !ok {
 				c.Close(websocket.StatusTryAgainLater, "too slow; reconnect")
+				return
+			}
+			if string(msg) == accessChanged && !isAuthed() && !s.svc.CanView(ctx, id, key) {
+				c.Close(websocket.StatusPolicyViolation, "deck not found") // made private or key rotated
 				return
 			}
 			wctx, done := context.WithTimeout(ctx, 10*time.Second)
@@ -330,6 +347,9 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+// accessChanged is what service.SetPrivate publishes.
+const accessChanged = `{"type":"access"}`
 
 func clamp01(v float64) float64 { return max(0, min(1, v)) }
 
@@ -422,19 +442,20 @@ func (s *server) spa() http.Handler {
 // serveFile serves an uploaded asset. Uploaded SVGs could carry script, so
 // every file is served with a locked-down CSP sandbox.
 func (s *server) serveFile(w http.ResponseWriter, r *http.Request) {
-	a, path, err := s.svc.OpenAsset(r.Context(), r.PathValue("name"))
-	if err != nil {
+	a, f, err := s.svc.OpenAsset(r.Context(), r.PathValue("name"))
+	if errors.Is(err, store.ErrNotFound) {
 		http.NotFound(w, r)
 		return
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		http.NotFound(w, r)
+	} else if err != nil {
+		http.Error(w, "file storage unavailable", http.StatusBadGateway)
 		return
 	}
 	defer f.Close()
 	h := w.Header()
 	h.Set("Content-Type", a.MIME)
+	if a.SHA256 != "" {
+		h.Set("ETag", `"`+a.SHA256+`"`)
+	}
 	h.Set("Content-Security-Policy", "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; media-src 'self'; sandbox")
 	h.Set("Cache-Control", "public, max-age=31536000, immutable")
 	if a.MIME == "application/pdf" || a.MIME == "application/zip" {

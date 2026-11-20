@@ -14,6 +14,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 
+	"github.com/SecOps-7/slidekick/internal/blob"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/hub"
 	"github.com/SecOps-7/slidekick/internal/lint"
@@ -27,9 +28,12 @@ type Service struct {
 	Themes  *deck.ThemeSet
 	Hub     *hub.Hub
 	BaseURL string
-	// FilesDir holds uploaded assets; empty disables uploads.
+	// FilesDir holds uploaded assets on disk; empty disables uploads unless
+	// Blobs is set.
 	FilesDir string
-	mu       sync.Mutex // serialises writes inside this process
+	// Blobs, when set, stores file bytes instead of FilesDir (e.g. S3).
+	Blobs blob.Store
+	mu    sync.Mutex // serialises writes inside this process
 }
 
 func New(st *store.Store, v *deck.Validator, cat *deck.Catalog, themes *deck.ThemeSet, h *hub.Hub, baseURL string) *Service {
@@ -61,8 +65,12 @@ const MaxDeckBytes = 2 << 20
 // ErrNotFound is returned for unknown decks.
 var ErrNotFound = store.ErrNotFound
 
-// ShareURL is the live viewer link for a deck.
-func (s *Service) ShareURL(id string) string { return s.BaseURL + "/d/" + id }
+// ShareURL is the live viewer link for a deck, carrying the view key when
+// the deck is private.
+func (s *Service) ShareURL(id string) string {
+	a, _ := s.store.Access(context.Background(), id)
+	return s.shareURL(id, a)
+}
 
 // Get returns the parsed deck, its raw JSON and version.
 func (s *Service) Get(ctx context.Context, id string) (*deck.Deck, []byte, int, error) {

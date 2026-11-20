@@ -37,11 +37,12 @@ Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each
 
 | | |
 | --- | --- |
-| **For agents** | 19 MCP tools: create and patch decks (RFC 6902), lint, screenshots, uploads, HTML/PDF/PNG export, comments, history and undo. Plus the schema, catalogues and a design guide as resources. |
-| **Elements** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, 99 icons, shapes, embeds. 8 layouts. |
-| **Motion** | Fade, fade-up, scale-in, wipe and typewriter builds; fade, slide, push, zoom and **morph** transitions; respects `prefers-reduced-motion`. |
+| **For agents** | 20 MCP tools: create and patch decks (RFC 6902), lint, screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links. Plus the schema, catalogues and a design guide as resources. |
+| **Elements** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, 99 icons, shapes, embeds, and a sandboxed HTML escape hatch. 8 layouts. |
+| **Motion** | Fade, fade-up, scale-in, wipe, typewriter and line-drawing builds with spring physics; fade, slide, push, zoom and **morph** transitions; respects `prefers-reduced-motion`. |
+| **Sharing** | Public or private (keyed) links, and per-deck edit tokens for agents or colleagues. |
 | **Themes** | Aurora, Paper, Swiss, Ember and Meadow, with self-hosted fonts. Write your own: [docs/themes.md](docs/themes.md). |
-| **Editor** | Slide sorter, inline text editing, property panel, build timeline, undo/redo across agent and human edits. |
+| **Editor** | Follows the agent as it works; slide sorter, inline text editing, property panel, build timeline, undo/redo across agent and human edits. |
 | **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer; audience window and remote viewers follow along. |
 | **Export** | Standalone HTML that plays offline with every animation, PDF, or PNGs. |
 
@@ -60,13 +61,15 @@ Docker Compose, TLS, configuration and the security model: [docs/self-hosting.md
 | `SLIDEKICK_DATA` | `/data` | SQLite database and uploads |
 | `SLIDEKICK_ADDR` | `:7410` | Listen address |
 
+Files can live in an S3-compatible bucket instead of the data folder: see the `SLIDEKICK_S3_*` variables in [docs/self-hosting.md](docs/self-hosting.md#configuration).
+
 Two images: `-render` (with Chromium, for screenshots and PDF/PNG export) and a slim distroless one. Both for amd64 and arm64.
 
 ## Develop
 
 ```bash
 npm --prefix web ci && npm --prefix web run build
-go test ./...
+go test ./... && npm --prefix web test
 go run ./cmd/slidekick serve      # http://localhost:7410
 ```
 

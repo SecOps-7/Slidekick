@@ -72,7 +72,8 @@
     "fade-up": "Fades in while rising slightly. The default.",
     "scale-in": "Grows in from slightly smaller.",
     "wipe": "Revealed by a left-to-right wipe.",
-    "typewriter": "Text types in character by character (headings, text and quotes)."
+    "typewriter": "Text types in character by character (headings, text and quotes).",
+    "draw": "Line art draws itself stroke by stroke (icons, diagrams and other SVG); anything else wipes in."
   },
   "regionCapacityNote": "Region numbers are rough character budgets used by the overflow lint; 0 means media only.",
   "elements": {
@@ -87,7 +88,8 @@
     "diagram": "Mermaid diagram (flowchart, sequence, timeline, etc.) themed automatically. props: source, caption?.",
     "icon": "Line icon from the catalogue below. props: name, label?. Size with style.size, colour with style.color.",
     "shape": "Simple shape or divider. props: kind (rect|circle|pill|line|arrow), fill?, label?.",
-    "embed": "Iframe (https) or video (https or /files/...). props: kind, src, title (iframes), poster?, autoplay?, loop?, muted?."
+    "embed": "Iframe (https) or video (https or /files/...). props: kind, src, title (iframes), poster?, autoplay?, loop?, muted?.",
+    "html": "Escape hatch: sandboxed raw HTML/CSS (no scripts). props: html, title. Use only when no other element fits; lint warns. Theme tokens are CSS variables like var(--sk-accent)."
   },
   "icons": [
     "adjustments",

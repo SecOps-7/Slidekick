@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image"
 	"image/png"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,12 +37,20 @@ func TestUploadAsset(t *testing.T) {
 	if err != nil || b.ID != a.ID {
 		t.Fatalf("identical bytes should dedupe: %v %v", b, err)
 	}
-	_, path, err := env.Svc.OpenAsset(ctx, a.ID+a.Ext)
+	_, r, err := env.Svc.OpenAsset(ctx, a.ID+a.Ext)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := os.ReadFile(path); !bytes.Equal(got, data) {
+	got, _ := io.ReadAll(r)
+	r.Close()
+	if !bytes.Equal(got, data) {
 		t.Fatal("stored bytes differ")
+	}
+	if _, err := os.Stat(filepath.Join(env.Svc.FilesDir, a.ID+a.Ext)); err != nil {
+		t.Fatalf("disk backend should write under FilesDir: %v", err)
+	}
+	if _, b, err := env.Svc.ReadAsset(ctx, a.ID); err != nil || !bytes.Equal(b, data) {
+		t.Fatalf("ReadAsset: %v", err)
 	}
 
 	bad := map[string]struct {

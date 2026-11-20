@@ -19,6 +19,13 @@ export interface Comment {
   createdAt: string;
 }
 
+export interface Access {
+  private: boolean;
+  viewKey?: string;
+  hasEditToken: boolean;
+  shareUrl: string;
+}
+
 export interface WriteResult {
   version: number;
   changed?: string[];
@@ -38,7 +45,7 @@ export class ApiError extends Error {
 export class Api {
   constructor(
     readonly deckId: string,
-    private token: string,
+    readonly token: string,
   ) {}
 
   private async req<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
@@ -66,6 +73,11 @@ export class Api {
   addComment = (slideId: string, elementId: string, text: string) => this.req<Comment>("POST", `${this.base}/comments`, { slideId, elementId, text });
   resolve = (id: string, reply = "") => this.req<{ ok: boolean }>("POST", `${this.base}/comments/${encodeURIComponent(id)}/resolve`, { reply });
   exportFile = (format: "pdf" | "png") => this.req<{ url: string; name: string; bytes: number }>("POST", `${this.base}/export?format=${format}`);
+  whoami = () => this.req<{ scope: "admin" | "deck"; required: boolean }>("GET", "/api/auth");
+  access = () => this.req<Access>("GET", `${this.base}/access`);
+  setAccess = (priv: boolean, rotate = false) => this.req<Access>("POST", `${this.base}/access`, { private: priv, rotate });
+  issueEditToken = () => this.req<{ token: string }>("POST", `${this.base}/edit-token`);
+  revokeEditToken = () => this.req<{ ok: boolean }>("DELETE", `${this.base}/edit-token`);
   upload = (file: File) =>
     this.req<{ url: string }>("POST", `/api/files?name=${encodeURIComponent(file.name)}`, file, { "Content-Type": file.type || "application/octet-stream" });
 }

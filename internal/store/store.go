@@ -85,6 +85,13 @@ CREATE TABLE IF NOT EXISTS assets (
   sha256     TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS deck_access (
+  deck_id   TEXT PRIMARY KEY REFERENCES decks(id) ON DELETE CASCADE,
+  private   INTEGER NOT NULL DEFAULT 0,
+  view_key  TEXT NOT NULL DEFAULT '',
+  edit_hash TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS deck_access_edit ON deck_access(edit_hash);
 `
 
 // Open opens (creating if needed) the database at dir/slidekick.db.

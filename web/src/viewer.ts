@@ -4,6 +4,8 @@ import { applyPatch } from "../runtime/patch";
 import { Player, type Position } from "../runtime/player";
 import type { Catalog, Deck, LintIssue, PatchEvent } from "../runtime/types";
 import { Laser } from "./laser";
+import { storedToken } from "./auth";
+import { viewFetch } from "./key";
 import { Live, type PointerMsg, type PresentMsg } from "./sync";
 
 interface DeckResponse {
@@ -21,7 +23,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 };
 
 async function getJSON<T>(url: string): Promise<T> {
-  const r = await fetch(url, { cache: "no-store" });
+  const r = url.startsWith("/api/decks/") ? await viewFetch(url) : await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error(`${url}: ${r.status}`);
   return r.json() as Promise<T>;
 }
@@ -33,7 +35,7 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     getJSON<DeckResponse>(`/api/decks/${encodeURIComponent(deckId)}`).catch(() => null),
   ]);
   if (!initial) {
-    host.append(el("div", "app-missing", "Deck not found."));
+    host.append(el("div", "app-missing", "Deck not found. If it's private, ask for a link that includes its key."));
     return;
   }
 
@@ -250,6 +252,7 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
       if (msg.type === "hello" && msg.version !== version) await reload();
       else if (msg.type === "patch") await onPatch(msg as unknown as PatchEvent);
       else if (msg.type === "present") await followPresenter(msg as unknown as PresentMsg);
+      else if (msg.type === "denied") say("This deck is now private: ask for a new link");
       else if (msg.type === "pointer") {
         const pm = msg as unknown as PointerMsg;
         pm.on ? laser.show(pm.x, pm.y) : laser.hide();
@@ -259,5 +262,6 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
       live.textContent = state;
       live.dataset.state = state === "live" ? "on" : "off";
     },
+    storedToken() || undefined,
   );
 }

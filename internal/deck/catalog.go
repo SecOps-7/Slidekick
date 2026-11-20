@@ -127,6 +127,8 @@ type Theme struct {
 			Base   int    `json:"base"`
 			Slow   int    `json:"slow"`
 			Easing string `json:"easing"`
+			// Bounce (0..1) turns build entrances into springs (Motion); 0 keeps Easing.
+			Bounce float64 `json:"bounce,omitempty" jsonschema:"spring bounciness for build entrances; 0 means no spring"`
 		} `json:"motion"`
 	} `json:"tokens"`
 }

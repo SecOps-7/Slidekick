@@ -29,7 +29,7 @@ func NewLongID(prefix string) string {
 var elementTypes = map[string]bool{
 	"heading": true, "text": true, "bullets": true, "image": true,
 	"code": true, "stat": true, "quote": true,
-	"chart": true, "diagram": true, "icon": true, "shape": true, "embed": true,
+	"chart": true, "diagram": true, "icon": true, "shape": true, "embed": true, "html": true,
 }
 
 // AssignIDs walks a decoded JSON value and gives every slide-shaped object

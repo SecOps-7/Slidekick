@@ -11,6 +11,10 @@ claude mcp add --transport http slidekick http://<host>:7410/mcp \
 
 Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, then give me the link."*
 
+### A token for one deck
+
+To let an agent (or a colleague) work on one deck without the server token, open the deck in the editor, choose **Share → Create token**, and use that `ske_...` token instead. It can edit, present, comment on and export that deck only: other decks answer "this token can only edit deck ...", `create_deck` is refused, and `list_decks` shows just the one deck. The editor shows the token once and the exact `claude mcp add` command. Replace or revoke it from the same menu.
+
 ## Claude Desktop, Cursor and other clients (stdio)
 
 Clients that launch a local process can run Slidekick over stdio. Docker keeps it self-contained:
@@ -46,7 +50,8 @@ Clients that only speak HTTP but can't send headers can use a server without `SL
 | `export_deck` | `html` (self-contained, offline), `pdf` or `png` (zip) |
 | `list_comments`, `resolve_comment` | Requests humans pinned in the editor ("Send to agent") |
 | `get_history`, `restore_version` | Version history and undo |
-| `get_share_url` | Live link for the user |
+| `get_share_url` | Live link for the user (carries the view key when the deck is private) |
+| `set_deck_access` | Make a deck private (links need its key) or public; rotate the key |
 
 Resources: the deck JSON Schema, layout, element, icon, animation and theme catalogues, a design guide for agents, and `slidekick://decks/{id}/comments`. Prompts: `outline_to_deck`, `polish_deck`, `restyle_deck`.
 

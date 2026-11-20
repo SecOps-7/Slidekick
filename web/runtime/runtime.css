@@ -234,7 +234,7 @@
 }
 
 /* charts */
-.sk-el-chart, .sk-el-diagram, .sk-el-embed { flex: 1; min-height: 0; display: flex; }
+.sk-el-chart, .sk-el-diagram, .sk-el-embed, .sk-el-html { flex: 1; min-height: 0; display: flex; }
 .sk-chart { margin: 0; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 18px; }
 .sk-chart svg { flex: 1; min-height: 0; width: 100%; overflow: visible; }
 .sk-chart-grid line { stroke: color-mix(in oklab, var(--sk-text) 14%, transparent); stroke-width: 2; }
@@ -296,3 +296,6 @@
   transition: opacity 0.15s, left 0.05s linear, top 0.05s linear;
 }
 .sk-laser.on { opacity: 1; }
+
+/* html escape hatch */
+.sk-el-html iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: transparent; color-scheme: normal; }
