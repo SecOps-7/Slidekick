@@ -32,6 +32,10 @@ func setup(t *testing.T) (*httptest.Server, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// These tests are about public decks: new decks start private, so open it up.
+	if _, err := env.Svc.SetPrivate(context.Background(), r.DeckID, false, false); err != nil {
+		t.Fatal(err)
+	}
 	return ts, r.DeckID
 }
 

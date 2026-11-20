@@ -43,7 +43,7 @@ Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each
 | **Motion** | Fade, fade-up, scale-in, wipe, typewriter and line-drawing builds with spring physics; fade, slide, push, zoom and **morph** transitions; respects `prefers-reduced-motion`. |
 | **AI** | Built-in chat in the editor with OpenAI, Anthropic, Google or any OpenAI-compatible (local) model. It edits as you, with your permissions; Stop and Undo any time. |
 | **Accounts** | Admin, editor and viewer roles; password sign-in and single sign-on (OpenID Connect: Entra, Google, Authentik, Keycloak); personal agent tokens. |
-| **Sharing** | Public or private (keyed) links, and per-deck edit tokens for agents or colleagues. |
+| **Sharing** | New decks are private: signed-in people and private (keyed) links. Owners can make a deck public. Per-deck edit tokens for agents or colleagues. |
 | **Themes** | Aurora, Paper, Swiss, Ember and Meadow, with self-hosted fonts. Write your own: [docs/themes.md](docs/themes.md). |
 | **Editor** | Follows the agent as it works; slide sorter, inline text editing, property panel, build timeline, undo/redo across agent and human edits. |
 | **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer; audience window and remote viewers follow along. |
@@ -57,12 +57,13 @@ Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each
 
 ## Run it for real
 
-Docker Compose, TLS, configuration and the security model: [docs/self-hosting.md](docs/self-hosting.md).
+Docker Compose, TLS on the LAN, configuration and the security model: [docs/self-hosting.md](docs/self-hosting.md). Settled design decisions: [docs/decisions.md](docs/decisions.md).
 
 | Variable | Default | |
 | --- | --- | --- |
 | `SLIDEKICK_ADMIN_USERNAME`, `SLIDEKICK_ADMIN_PASSWORD` | empty | Create the first admin on first run (or use `/setup`). |
-| `SLIDEKICK_TOKEN` | empty | Optional server token with full access, for automation and recovery. At least 24 characters. |
+| `SLIDEKICK_TOKEN` | empty | Server token: an all-powerful emergency key, kept in the owner-only env file. At least 24 characters. |
+| `SLIDEKICK_TRUSTED_PROXIES` | empty | Address of your TLS proxy, so cookies are `Secure` over https. |
 | `SLIDEKICK_SECRET_KEY` | key file in the data folder | Encrypts stored SSO and AI secrets. |
 | `SLIDEKICK_BASE_URL` | `http://localhost:7410` | Public URL used in share links |
 | `SLIDEKICK_DATA` | `/data` | SQLite database and uploads |

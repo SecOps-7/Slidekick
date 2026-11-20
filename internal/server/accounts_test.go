@@ -36,6 +36,10 @@ type accEnv struct {
 // newAccServer starts a server with accounts. With serverToken "" and no
 // users it starts in open mode, like a fresh install.
 func newAccServer(t *testing.T, serverToken string) *accEnv {
+	return newAccServerWith(t, serverToken, nil)
+}
+
+func newAccServerWith(t *testing.T, serverToken string, tweak func(*server.Options)) *accEnv {
 	t.Helper()
 	env := testenv.New(t)
 	box, _, err := secret.Load("", t.TempDir())
@@ -48,8 +52,12 @@ func newAccServer(t *testing.T, serverToken string) *accEnv {
 	var h http.Handler
 	e.ts = httptest.NewUnstartedServer(http.NotFoundHandler())
 	e.ts.Start()
-	h = server.New(env.Svc, mcpSrv, server.Options{Token: serverToken, BaseURL: e.ts.URL, Accounts: acc, SchemaFS: slidekick.Schema, Log: slog.New(slog.NewTextHandler(testWriter{t}, nil)),
-		Web: fstest.MapFS{"index.html": {Data: []byte("app")}}})
+	opt := server.Options{Token: serverToken, BaseURL: e.ts.URL, Accounts: acc, SchemaFS: slidekick.Schema, Log: slog.New(slog.NewTextHandler(testWriter{t}, nil)),
+		Web: fstest.MapFS{"index.html": {Data: []byte("app")}}}
+	if tweak != nil {
+		tweak(&opt)
+	}
+	h = server.New(env.Svc, mcpSrv, opt)
 	e.ts.Config.Handler = h
 	t.Cleanup(e.ts.Close)
 	return e
@@ -168,7 +176,7 @@ func TestFirstRunSetup(t *testing.T) {
 func TestExistingInstallSetupWithServerToken(t *testing.T) {
 	e := newAccServer(t, token)
 	// Decks made before accounts existed...
-	r, _ := e.env.Svc.Create(context.Background(), "Old deck", "", "", oneSlide, "agent")
+	r := struct{ DeckID string }{legacyDeck(t, e.env, "Old deck")}
 	// ...the server token still works, and is accepted as the setup code.
 	srv := e.client(t)
 	srv.bear = token
@@ -614,6 +622,7 @@ func TestWebSocketPresentNeedsRole(t *testing.T) {
 	view := e.addUser(t, admin, "vera", "viewer")
 	_, out := admin.do("POST", "/api/decks", map[string]any{"title": "Talk", "slides": oneSlide})
 	id := out["deckId"].(string)
+	e.env.Svc.SetPrivate(context.Background(), id, false, false) // anonymous watchers need a public deck
 	ctx := context.Background()
 	wsURL := "ws" + strings.TrimPrefix(e.ts.URL, "http") + "/ws/decks/" + id
 	dial := func(c *client) *websocket.Conn {
@@ -651,4 +660,16 @@ func TestWebSocketPresentNeedsRole(t *testing.T) {
 	if m.Type != "present" || m.Index != 1 {
 		t.Fatalf("watcher got %s (anonymous presenter must be ignored, signed-in viewer relayed)", b)
 	}
+}
+
+// legacyDeck stores a deck the way releases before private-by-default did:
+// no access row at all, so it is public by link.
+func legacyDeck(t *testing.T, env *testenv.Env, title string) string {
+	t.Helper()
+	id := "d_legacy" + strings.ToLower(strings.ReplaceAll(title, " ", ""))
+	doc, _ := json.Marshal(map[string]any{"schemaVersion": 1, "id": id, "title": title, "theme": "aurora", "aspect": "16:9", "slides": []any{}})
+	if err := env.Store.Create(context.Background(), id, title, "aurora", 0, doc, "agent"); err != nil {
+		t.Fatal(err)
+	}
+	return id
 }

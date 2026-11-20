@@ -1,5 +1,6 @@
 # Slidekick stack. Install to /opt/slidekick/compose.yaml.
-# Secrets (SLIDEKICK_TOKEN) live in /opt/slidekick/slidekick.env (mode 600).
+# Secrets live in /opt/slidekick/slidekick.env (mode 600): SLIDEKICK_TOKEN, the
+# all-powerful emergency server token, and optionally SLIDEKICK_SECRET_KEY.
 services:
   slidekick:
     build:
@@ -17,6 +18,9 @@ services:
       SLIDEKICK_ADDR: ":7410"
       SLIDEKICK_DATA: /data
       SLIDEKICK_BASE_URL: ${SLIDEKICK_BASE_URL:-http://localhost:7410}
+      # The LAN address of the TLS proxy (Nginx Proxy Manager). Only it may set the
+      # client address and https headers. Empty: no proxy trusted (plain LAN http).
+      SLIDEKICK_TRUSTED_PROXIES: ${SLIDEKICK_TRUSTED_PROXIES:-}
     volumes:
       - /opt/slidekick/data:/data
     read_only: true

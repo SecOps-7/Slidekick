@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -32,10 +33,14 @@ type Options struct {
 	BaseURL  string // public URL: Secure cookies when https, SSO redirect URLs, origin checks
 	Accounts *accounts.Service
 	AI       *ai.Service // nil: no AI chat
-	SchemaFS fs.FS
-	Web      fs.FS
-	Log      *slog.Logger
-	Exporter *export.Exporter
+	// TrustedProxies are the addresses of a TLS-terminating reverse proxy.
+	// Only requests from them may set X-Real-IP / X-Forwarded-For (the client
+	// address used for lockouts) and X-Forwarded-Proto (https -> Secure cookies).
+	TrustedProxies []netip.Prefix
+	SchemaFS       fs.FS
+	Web            fs.FS
+	Log            *slog.Logger
+	Exporter       *export.Exporter
 	// Files makes a binary export (pdf or png) and stores it; see export.MakeFile.
 	Files func(ctx context.Context, deckID, format string) (*store.Asset, error)
 }
@@ -116,7 +121,7 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux.Handle("/mcp/", s.mcpAuth(mcpCapped))
 
 	mux.Handle("/", s.spa())
-	return securityHeaders(mux)
+	return s.proxyHeaders(securityHeaders(mux))
 }
 
 func securityHeaders(next http.Handler) http.Handler {

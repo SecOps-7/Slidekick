@@ -33,6 +33,7 @@ func setupTwo(t *testing.T) (*httptest.Server, *service.Service, string, string)
 		if err != nil {
 			t.Fatal(err)
 		}
+		env.Svc.SetPrivate(context.Background(), r.DeckID, false, false) // start public; tests make it private
 		return r.DeckID
 	}
 	return ts, env.Svc, mk("Mine"), mk("Other")

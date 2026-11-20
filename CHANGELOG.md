@@ -15,6 +15,12 @@ First public release.
 - Motion: build steps with six presets (including `draw`, which traces icons and other line art), spring entrances and stagger from Motion, per-item bullet builds, count-up stats, drawn-in charts, and fade, slide, push, zoom and morph transitions (View Transitions API, with a FLIP fallback in other browsers).
 - Five themes (Aurora, Paper, Swiss, Ember, Meadow) with self-hosted fonts.
 
+### Decisions of 2026-11-20 (see docs/decisions.md)
+- New decks are private by default: watching needs a sign-in or the private link. Existing decks and links are unchanged.
+- TLS on the LAN through a reverse proxy: `SLIDEKICK_TRUSTED_PROXIES` names the proxy; cookies are `Secure` on https requests; lockouts use the real client address; forwarding headers from other peers are ignored and the first such peer is logged.
+- The server token is documented as an all-powerful emergency key that stays configured as a backstop.
+- Deck ownership confirmed: one owner, everyone signed in views, owner or admin edits, no per-deck collaborators.
+
 ### Accounts and sign-in
 - User accounts with admin, editor and viewer roles, enforced on every REST route, the live WebSocket and MCP. Decks have owners; everyone signed in can view every deck, and only owners and admins change one (or every editor, with an instance setting).
 - Sign-in with username and password (argon2id), 14-day session cookies with CSRF protection, per-address and per-username lockout, sign-out. First admin from `SLIDEKICK_ADMIN_*` or `/setup` with a one-time code; `slidekick admin` resets access from the host.

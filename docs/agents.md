@@ -11,7 +11,9 @@ claude mcp add --transport http slidekick http://<host>:7410/mcp \
   --header "Authorization: Bearer skp_..."
 ```
 
-The server token (`SLIDEKICK_TOKEN`) also works and has full access; prefer a personal token so edits are attributed and limited to your role.
+The server token (`SLIDEKICK_TOKEN`) also works, but it is the all-powerful emergency key ([self-hosting](self-hosting.md#the-server-token-emergency-key)): use a personal token so edits are attributed and limited to your role.
+
+Decks an agent creates are private: the link `create_deck` and `get_share_url` return carries the view key, so pass that exact link on.
 
 Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, then give me the link."*
 
@@ -59,7 +61,7 @@ Editors and admins can also use the **✦ AI** panel in the editor, which drives
 | `list_comments`, `resolve_comment` | Requests humans pinned in the editor ("Send to agent") |
 | `get_history`, `restore_version` | Version history and undo |
 | `get_share_url` | Live link for the user (carries the view key when the deck is private) |
-| `set_deck_access` | Make a deck private (links need its key) or public; rotate the key |
+| `set_deck_access` | Make a deck public or private again (new decks start private); rotate the key |
 
 Resources: the deck JSON Schema, layout, element, icon, animation and theme catalogues, a design guide for agents, and `slidekick://decks/{id}/comments`. Prompts: `outline_to_deck`, `polish_deck`, `restyle_deck`.
 

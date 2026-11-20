@@ -251,6 +251,8 @@ func TestAIChatCannotExceedUser(t *testing.T) {
 	adminDeck := out["deckId"].(string)
 	_, out = ed.do("POST", "/api/decks", map[string]any{"title": "Mine", "slides": oneSlide})
 	mine := out["deckId"].(string)
+	accBefore, _ := e.env.Svc.GetAccess(context.Background(), mine)
+	keyBefore := accBefore.ViewKey
 
 	// Viewers can't use AI at all.
 	if code, _ := view.chat(adminDeck, "hi"); code != 403 {
@@ -264,7 +266,7 @@ func TestAIChatCannotExceedUser(t *testing.T) {
 	// the chat set, and its invalid output is rejected by validation.
 	e.llm.script(
 		callTool("patch_deck", map[string]any{"deck_id": adminDeck, "ops": []any{map[string]any{"op": "replace", "path": "/title", "value": "hijacked"}}}),
-		callTool("set_deck_access", map[string]any{"deck_id": mine, "private": true}),
+		callTool("set_deck_access", map[string]any{"deck_id": mine, "private": false}),
 		callTool("upload_asset", map[string]any{"name": "x.svg", "mime": "image/svg+xml", "data": "PHN2Zy8+"}),
 		callTool("patch_deck", map[string]any{"deck_id": mine, "ops": []any{map[string]any{"op": "add", "path": "/slides/0/regions/title/-", "value": map[string]any{"type": "script", "props": map[string]any{"src": "https://evil.example/x.js"}}}}}),
 		sayText("I couldn't do that."),
@@ -285,7 +287,7 @@ func TestAIChatCannotExceedUser(t *testing.T) {
 	if got := deckTitle(t, e, adminDeck); got != "Board deck" {
 		t.Fatalf("someone else's deck changed: %q", got)
 	}
-	if acc, _ := e.env.Svc.GetAccess(context.Background(), mine); acc.Private {
+	if acc, _ := e.env.Svc.GetAccess(context.Background(), mine); !acc.Private || acc.ViewKey != keyBefore {
 		t.Fatal("chat changed sharing")
 	}
 	d, _, _, _ := e.env.Svc.Get(context.Background(), mine)

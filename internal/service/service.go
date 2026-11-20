@@ -153,6 +153,12 @@ func (s *Service) CreateFor(ctx context.Context, owner, title, theme, aspect str
 	if err := s.store.CreateOwned(ctx, d.ID, owner, d.Title, d.Theme, len(d.Slides), raw, actor); err != nil {
 		return nil, err
 	}
+	// New decks are private (decision of 2026-11-20): watching needs a sign-in
+	// or the link with its view key. Decks created before then have no access
+	// row and stay public, with their links unchanged.
+	if err := s.store.SetAccess(ctx, d.ID, store.Access{Private: true, ViewKey: randHex(12)}); err != nil {
+		return nil, err
+	}
 	return &Result{DeckID: d.ID, Version: 1, Lint: lint.Deck(d, s.Cat, s.Themes), URL: s.ShareURL(d.ID)}, nil
 }
 

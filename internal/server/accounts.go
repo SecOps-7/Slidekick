@@ -57,15 +57,17 @@ func (s *server) requireUser(next http.HandlerFunc) http.Handler {
 	}))
 }
 
-func (s *server) secureCookies() bool { return strings.HasPrefix(s.opt.BaseURL, "https://") }
+// secureCookies: mark cookies Secure when this request reached us over https,
+// directly or through a trusted TLS proxy (see proxy.go).
+func (s *server) secureCookies(r *http.Request) bool { return isHTTPS(r) }
 
-func (s *server) setSession(w http.ResponseWriter, cookie string) {
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: cookie, Path: "/", HttpOnly: true, Secure: s.secureCookies(),
+func (s *server) setSession(w http.ResponseWriter, r *http.Request, cookie string) {
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: cookie, Path: "/", HttpOnly: true, Secure: s.secureCookies(r),
 		SameSite: http.SameSiteLaxMode, MaxAge: int(accounts.SessionTTL / time.Second)})
 }
 
-func (s *server) clearSession(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", HttpOnly: true, Secure: s.secureCookies(), SameSite: http.SameSiteLaxMode, MaxAge: -1})
+func (s *server) clearSession(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", HttpOnly: true, Secure: s.secureCookies(r), SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
 
 // safeNext keeps post-login redirects on this site.
@@ -167,7 +169,7 @@ func (s *server) startSession(w http.ResponseWriter, r *http.Request, u *store.U
 		writeErr(w, err)
 		return
 	}
-	s.setSession(w, cookie)
+	s.setSession(w, r, cookie)
 	writeJSON(w, 200, map[string]any{"signedIn": true, "user": u, "csrf": csrf})
 }
 
@@ -176,7 +178,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	if a.session != "" {
 		s.acc.EndSession(r.Context(), a.session)
 	}
-	s.clearSession(w)
+	s.clearSession(w, r)
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
@@ -462,7 +464,7 @@ func (s *server) ssoLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Binds the flow to this browser: the callback must come back with the same state.
-	http.SetCookie(w, &http.Cookie{Name: ssoCookie, Value: state, Path: "/auth/sso/", HttpOnly: true, Secure: s.secureCookies(),
+	http.SetCookie(w, &http.Cookie{Name: ssoCookie, Value: state, Path: "/auth/sso/", HttpOnly: true, Secure: s.secureCookies(r),
 		SameSite: http.SameSiteLaxMode, MaxAge: 600})
 	w.Header().Set("Cache-Control", "no-store")
 	http.Redirect(w, r, authURL, http.StatusFound)
@@ -470,7 +472,7 @@ func (s *server) ssoLogin(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("pid")
-	http.SetCookie(w, &http.Cookie{Name: ssoCookie, Value: "", Path: "/auth/sso/", HttpOnly: true, Secure: s.secureCookies(), SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: ssoCookie, Value: "", Path: "/auth/sso/", HttpOnly: true, Secure: s.secureCookies(r), SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	ip := clientIP(r)
 	if !s.fails.allowed(ip) {
 		http.Redirect(w, r, "/login?error="+url.QueryEscape("Too many failed attempts; try again in a few minutes."), http.StatusFound)
@@ -502,6 +504,6 @@ func (s *server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	s.setSession(w, cookie)
+	s.setSession(w, r, cookie)
 	http.Redirect(w, r, safeNext(next), http.StatusFound)
 }

@@ -146,6 +146,13 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 	if err != nil {
 		return err
 	}
+	trusted, err := server.ParseTrustedProxies(os.Getenv("SLIDEKICK_TRUSTED_PROXIES"))
+	if err != nil {
+		return fmt.Errorf("SLIDEKICK_TRUSTED_PROXIES: %w", err)
+	}
+	if len(trusted) > 0 {
+		log.Info("trusting forwarded headers", "from", os.Getenv("SLIDEKICK_TRUSTED_PROXIES"))
+	}
 
 	exp := &export.Exporter{Web: slidekick.Web(), Cat: cat, Themes: themes,
 		Assets: func(ctx context.Context, name string) (string, []byte, error) {
@@ -172,7 +179,7 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		}
 		return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
 	}
-	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, Accounts: acc,
+	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, Accounts: acc, TrustedProxies: trusted,
 		AI: &ai.Service{Store: st, Box: acc.Box, Accounts: acc, MCPURL: "http://127.0.0.1:" + port + "/mcp"}, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 2 * time.Minute, IdleTimeout: 2 * time.Minute}

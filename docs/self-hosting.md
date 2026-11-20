@@ -35,11 +35,12 @@ Create the token with `openssl rand -hex 24`. Slidekick refuses to start with a 
 
 | Variable | Default | |
 | --- | --- | --- |
-| `SLIDEKICK_TOKEN` | empty | Server token: full access for automation and recovery (MCP, REST API, and the setup code for the first admin). Optional once accounts exist. At least 24 characters. |
+| `SLIDEKICK_TOKEN` | empty | The server token: an all-powerful emergency key (see [The server token](#the-server-token-emergency-key)). Also accepted as the setup code for the first admin. At least 24 characters. |
+| `SLIDEKICK_TRUSTED_PROXIES` | empty | Addresses (or CIDR ranges) of your TLS reverse proxy, comma-separated. Only these peers may set the client address and `X-Forwarded-Proto`. See [TLS on the LAN](#tls-on-the-lan). |
 | `SLIDEKICK_ADMIN_USERNAME` | empty | With `SLIDEKICK_ADMIN_PASSWORD`, creates this admin on first run when no account exists yet. Ignored afterwards. |
 | `SLIDEKICK_ADMIN_PASSWORD` | empty | Password for that first admin (at least 10 characters). A secret: keep it in the `env_file`. |
 | `SLIDEKICK_SECRET_KEY` | key file | 32 bytes (`openssl rand -hex 32`) that encrypt stored secrets: SSO client secrets and AI provider keys. Without it Slidekick creates `SLIDEKICK_DATA/secret.key` (mode 600) on first run; back it up with the data, because the stored secrets can't be decrypted without it. |
-| `SLIDEKICK_BASE_URL` | `http://localhost:<port>` | Public URL used in share and download links. |
+| `SLIDEKICK_BASE_URL` | `http://localhost:<port>` | The URL people use, in share and download links and SSO redirect URLs: `https://<internal hostname>` once TLS is set up. |
 | `SLIDEKICK_ADDR` | `:7410` | Listen address. |
 | `SLIDEKICK_DATA` | `/data` | SQLite database and uploaded files. Back this folder up. |
 | `SLIDEKICK_CHROME` | auto | Path to Chromium if it isn't on `PATH`. |
@@ -63,7 +64,9 @@ Everyone signs in with a username and password or through single sign-on. Roles:
 | **editor** | Create decks; edit, share (private links, deck tokens) and export **their own** decks; upload files; use AI. View, present and comment on every deck. |
 | **viewer** | View, present and comment on every deck. |
 
-**Decks have owners.** The person (or the personal agent token) that creates a deck owns it. Signed-in people see every deck on the instance, like a shared team library, but only the owner and admins can change one. Turn on **Settings → General → Editors can edit every deck** for a team that edits everything together. Admins can hand a deck to someone else (`PUT /api/decks/<id>/owner`). Deleting a user moves their decks to the admin who deletes them.
+**Decks have one owner** (decided 2026-11-20, see [decisions](decisions.md)). The person (or the personal agent token) that creates a deck owns it. Signed-in people see every deck on the instance, like a shared team library, but only the owner and admins can change one. There are no per-deck collaborators; turn on **Settings → General → Editors can edit every deck** for a team that edits everything together. Admins can hand a deck to someone else (`PUT /api/decks/<id>/owner`). Deleting a user moves their decks to the admin who deletes them.
+
+**New decks are private** (decided 2026-11-20): watching one needs a sign-in or its private link. Decks created before that change stay public by link.
 
 These rules are enforced by the server on every request (REST, the live WebSocket and MCP); the web app only hides what you can't use.
 
@@ -75,7 +78,7 @@ These rules are enforced by the server on every request (REST, the live WebSocke
 - **Upgrading an install that used `SLIDEKICK_TOKEN`:** nothing stops working. The token keeps full access, decks keep their links, and `/setup` accepts the token as the setup code. The first admin becomes the owner of every existing deck.
 - **Locked out?** Reset or create an admin from the host: `docker exec -i slidekick slidekick admin <username>` and type the new password. It works while the server runs.
 
-Passwords are hashed with argon2id (64 MB, 3 passes). Sessions are 14-day `HttpOnly`, `SameSite=Lax` cookies (`Secure` when `SLIDEKICK_BASE_URL` is https); only their SHA-256 is stored. Every write from a browser also needs the session's CSRF token and a same-origin request. Ten failed sign-ins from one address, or against one username, within a minute lock it out for five minutes. Changing a password signs out the account's other sessions; disabling a user ends theirs immediately.
+Passwords are hashed with argon2id (64 MB, 3 passes). Sessions are 14-day `HttpOnly`, `SameSite=Lax` cookies, marked `Secure` whenever the request arrived over https (directly or through the trusted proxy); only their SHA-256 is stored. Every write from a browser also needs the session's CSRF token and a same-origin request. Ten failed sign-ins from one address, or against one username, within a minute lock it out for five minutes. Changing a password signs out the account's other sessions; disabling a user ends theirs immediately.
 
 ### Agents
 
@@ -83,7 +86,15 @@ Agents authenticate MCP with a bearer token:
 
 - **Personal agent tokens** (`skp_...`, from the **Account** page) act as you, with your role: an agent can never do more than you. Decks it creates are yours. This is the recommended way.
 - **Deck tokens** (`ske_...`, editor **Share** menu) edit one deck only. Its owner or an admin can create one.
-- **The server token** (`SLIDEKICK_TOKEN`) still works for everything. Moving agents to personal tokens is the migration: create a token on the Account page, swap it into `claude mcp add ... --header "Authorization: Bearer skp_..."`, and decks the agent creates get an owner. Then you can remove `SLIDEKICK_TOKEN` (keep it if you want a recovery path besides `slidekick admin`).
+- **The server token** (`SLIDEKICK_TOKEN`) also works, with full access; keep it for emergencies (below). Moving agents to personal tokens: create a token on the Account page, swap it into `claude mcp add ... --header "Authorization: Bearer skp_..."`, and decks the agent creates get an owner.
+
+### The server token (emergency key)
+
+`SLIDEKICK_TOKEN` is an all-powerful emergency key: whoever holds it can read, change and delete every deck, manage every user and setting, and act over MCP without any account. It stays configured as a backstop (decided 2026-11-20) for when nobody can sign in, and as the setup code for the first admin. Day-to-day agents use personal tokens instead.
+
+- **Where it lives:** only in the deployment's owner-only env file, the one named by `env_file:` in the compose file (in the reference deployment `/opt/slidekick/slidekick.env`, mode 600, folder 700). Never in the compose file, the stack's `.env`, the repository, shell history or chat.
+- **Using it without showing it:** read it from that file in the same command, e.g. ``T=$(sed -n 's/^SLIDEKICK_TOKEN=//p' /opt/slidekick/slidekick.env); curl -H "Authorization: Bearer $T" ...; unset T``. Slidekick never logs or displays it.
+- **Rotating it:** put a new value (`openssl rand -hex 24`) in that file and recreate the container; the old one stops working at once.
 
 ### Single sign-on (OpenID Connect)
 
@@ -119,25 +130,30 @@ How it stays safe:
 
 Providers bill by usage; the chat sends the design guide, the layout list and the tool definitions with each request.
 
-## TLS and reverse proxies
+## TLS on the LAN
 
-Slidekick speaks plain HTTP. Put it behind a TLS-terminating proxy (Caddy, Traefik, nginx) for anything beyond a trusted LAN, so the token never crosses the network in clear text. The proxy must pass WebSockets on `/ws/`.
+Slidekick speaks plain HTTP. Serve it over https through a TLS-terminating reverse proxy on your home network (decided 2026-11-20 for the reference deployment: the existing Nginx Proxy Manager, an internal hostname, **nothing exposed to the internet**: no public DNS record, no tunnel, no port forward).
 
-Caddy:
+1. **LAN DNS:** an internal record for the hostname (e.g. `slides.<your domain>`) pointing at the proxy's LAN address, in your LAN's DNS server only. A wildcard certificate the proxy already has covers it without any new public record.
+2. **Proxy host:** forward `https://<hostname>` to `http://<slidekick host>:7410` with WebSockets enabled, force https, and attach an access list that allows only private address ranges and denies everything else, so the name answers on the LAN only even if the proxy also serves the internet.
+3. **Slidekick:** set `SLIDEKICK_TRUSTED_PROXIES` to the proxy's LAN address (the server log names it: "ignoring forwarding headers from an untrusted peer") and `SLIDEKICK_BASE_URL` to `https://<hostname>`, then recreate the container. Single sign-on providers need their redirect URLs updated to the new base URL.
 
-```
-slides.example.com {
-  reverse_proxy slidekick:7410
-}
-```
+What Slidekick does behind the proxy:
 
-Failed sign-in and token lockouts are per client IP (and per username for sign-ins). Behind a proxy every client shares the proxy's IP, so a burst of bad tokens locks everyone out for five minutes.
+- Cookies are marked `Secure` on requests that came in over https.
+- Lockouts follow the real client address the proxy reports in `X-Real-IP` (NPM sends it by default), not the proxy's own.
+- Forwarding headers from any other peer are ignored, so nobody on the LAN can fake an address or claim https.
+
+Direct `http://<host>:7410` keeps working on the LAN, without `Secure` cookies; once https works, prefer the hostname, and optionally firewall port 7410 so only the proxy reaches it.
+
+Without `SLIDEKICK_TRUSTED_PROXIES`, every client behind a proxy shares the proxy's address, so a burst of bad sign-ins locks everyone out for five minutes.
 
 ## Security model
 
 - **Accounts and roles** decide who can list, edit, share, export and administer (see above). Signed-in people of any role can view every deck.
-- **Viewing is also by link**: anyone with a deck link (`/d/<id>`, 80-bit random id) can watch it live and download its HTML export, signed in or not. Treat links like unlisted documents, or make the deck private.
-- **Private decks** need a key in the link as well (`/d/<id>?k=<key>`, 96-bit). Without it the deck answers 404, so its id can't even be confirmed. Make a deck private from the editor's **Share** menu or with the `set_deck_access` tool; **Make a new link** rotates the key and disconnects anyone watching with the old one. Signed-in people and token holders for the deck can always view it.
+- **New decks are private** (decided 2026-11-20): only signed-in people, the deck's token holders, and anyone with its private link can watch it.
+- **Public links** still exist for decks created before that, and for any deck an owner makes public: anyone with the link (`/d/<id>`, 80-bit random id) can watch it live and download its HTML export, signed in or not. Treat them like unlisted documents.
+- **Private links** carry a key (`/d/<id>?k=<key>`, 96-bit). Without it the deck answers 404, so its id can't even be confirmed. Make a deck private from the editor's **Share** menu or with the `set_deck_access` tool; **Make a new link** rotates the key and disconnects anyone watching with the old one. Signed-in people and token holders for the deck can always view it.
 - **Everything else needs a signed-in account or a token**: editing, presenting to remote viewers, uploads, PDF/PNG export, listing decks, MCP, settings. Tokens are stored as hashes; revoking one, or disabling its user, takes effect on the next request, and an MCP session can't switch to another principal midway.
 - **Stored secrets** (SSO client secrets, AI provider keys) are encrypted with AES-256-GCM under `SLIDEKICK_SECRET_KEY` or the key file, are never sent to the browser and never logged.
 - **Rendering is sandboxed from your network**: headless Chromium reaches only public internet addresses and Slidekick itself, so deck content can't read internal services through `render_slide`.
