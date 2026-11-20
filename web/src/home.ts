@@ -77,7 +77,15 @@ export function mountHome(host: HTMLElement) {
             el("span", "deck-title", d.title),
             el("span", "deck-meta", `${d.slides} slide${d.slides === 1 ? "" : "s"} · ${d.theme} · v${d.version} · ${ago(d.updatedAt)}`),
           );
-          return a;
+          const card = el("div", "deck-card-wrap");
+          const links = el("span", "deck-links");
+          for (const [label, href] of [["Edit", `/d/${encodeURIComponent(d.id)}/edit`], ["Present", `/d/${encodeURIComponent(d.id)}/present`]]) {
+            const l = el("a", undefined, label);
+            l.href = href;
+            links.append(l);
+          }
+          card.append(a, links);
+          return card;
         }),
       );
     } catch {

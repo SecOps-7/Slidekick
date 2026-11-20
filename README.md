@@ -2,19 +2,29 @@
 
 Self-hosted slideshow app where **agents author animated decks through MCP** and humans watch them build live in the browser. One Go binary with the web app embedded, shipped as a Docker image. MIT licensed.
 
-> Status: **MVP** (phase 1). Agents can build complete, animated decks with every v1 element type, check their work with screenshots, and export them. The editor and presenter view come next (see `Slidekick Build Plan.md`).
+> Status: **editor loop** (phase 2). Agents build complete, animated decks; humans edit them alongside the agent in a live editor and present them with a speaker view. Launch work comes next (see `Slidekick Build Plan.md`).
 
 ## What works today
 
 - **Structured deck schema** (`schema/deck.schema.json`). Agents compose 12 element types inside 8 layouts and style them with theme tokens only. They never write HTML. The element types are heading, text, bullets, image, code with syntax highlighting, stat, quote, chart (bar, line or pie), Mermaid diagram, icon (99 from Tabler), shape and embed.
-- **MCP server** (official Go SDK), over streamable HTTP at `/mcp` or over stdio. It has 15 tools: `create_deck`, `get_deck`, `list_decks`, `add_slide`, `update_slide`, `delete_slide`, `move_slide`, `patch_deck` (RFC 6902), `set_theme`, `list_themes`, `lint_deck`, `render_slide`, `upload_asset`, `export_deck` and `get_share_url`. It also serves 6 resources (the schema, the layout, element and icon, animation and theme catalogues, and a design guide) and 3 prompts.
+- **MCP server** (official Go SDK), over streamable HTTP at `/mcp` or over stdio. It has 19 tools: `create_deck`, `get_deck`, `list_decks`, `add_slide`, `update_slide`, `delete_slide`, `move_slide`, `patch_deck` (RFC 6902), `set_theme`, `list_themes`, `lint_deck`, `render_slide`, `upload_asset`, `export_deck`, `list_comments`, `resolve_comment`, `get_history`, `restore_version` and `get_share_url`. It also serves 6 resources, a per-deck comments resource template (the schema, the layout, element and icon, animation and theme catalogues, and a design guide) and 3 prompts.
 - **`render_slide`** screenshots any slide at any build step in headless Chromium, using the real viewer page, so the agent sees exactly what the audience sees. It needs the `render` image target; the slim image reports that rendering is unavailable.
 - **`export_deck`** produces one self-contained HTML file with the runtime, theme and uploaded images inlined. It plays offline with every animation. Decks without diagrams use a lighter bundle (about 1.9 MB instead of 5.3 MB).
 - **`upload_asset`** stores images and videos content-addressed on the data volume. They are served from `/files/...` with a sandboxing CSP.
 - **Agent feedback loop.** Every write returns the new version and its lint findings: overflow, density, too many or too-long bullets, missing alt text or captions, contrast, chart data that doesn't line up with its labels, crowded pies, dense diagrams, untitled iframes, build gaps, and morphs with nothing to match.
 - **Optimistic concurrency.** A write that sends a stale `base_version` is rejected with a readable error. Writes are atomic: a patch either validates in full or nothing changes.
+- **Editor** at `/d/<id>/edit`:
+  - slide sorter with drag to reorder, add from any layout, and duplicate (element ids are kept, so the copy morphs)
+  - click to select; double-click text, bullets or code to edit in place
+  - property panel for content, theme-token style, build step and animation, with a JSON escape hatch for charts and the like
+  - build-order timeline; undo and redo over the shared version history, covering agent and human edits
+  - **Send to agent** comments pinned to a slide or element. Agents see an `openComments` count on every write, then read and resolve the comments over MCP.
+- **Presenter** at `/d/<id>/present`:
+  - current and next slide, speaker notes, timer, clock and build progress, plus a laser pointer
+  - **Open audience window** syncs over BroadcastChannel on the same machine; remote viewers follow over WebSocket, and only presenters with the token can drive them
 - **Live viewer** at `/d/<id>`. Edits stream over WebSocket as JSON Patch. The viewer follows the slide being edited, highlights what changed and keeps a lint panel.
 - **Motion.** Build steps with presets (fade, fade-up, scale-in, wipe, typewriter), bullets that build one item at a time, stats that count up, charts that draw in, and slide transitions (fade, slide, push, zoom, **morph** via the View Transitions API with a crossfade fallback). It respects `prefers-reduced-motion`.
+- **Self-hosted fonts** (SIL OFL, in `themes/fonts`): no Google Fonts requests anywhere, and exports inline them.
 - **Five themes**: Aurora (dark, drifting glow), Paper (light, editorial), Swiss (white, red signal, hard grid), Ember (warm dark, springy motion) and Meadow (soft sage, rounded, calm). Code colours and diagrams follow each theme's tokens.
 - **SQLite storage** (pure Go, no CGO) with the full version history.
 
@@ -37,7 +47,7 @@ A Compose file is in `deploy/compose.yaml`.
 | `SLIDEKICK_ADDR` | `:7410` | Listen address |
 | `SLIDEKICK_DATA` | `/data` in the image | SQLite location |
 | `SLIDEKICK_BASE_URL` | `http://localhost:<port>` | Public URL used in share links |
-| `SLIDEKICK_TOKEN` | (empty) | Bearer token for `/mcp` and the write API. **Set it** for anything but localhost. |
+| `SLIDEKICK_TOKEN` | (empty) | Bearer token for `/mcp`, the write API, the editor and presenter control. The editor asks for it once per browser. **Set it** for anything but localhost. |
 
 Viewing decks is open to anyone who can reach the port; writing needs the token.
 

@@ -51,6 +51,11 @@ button { font: inherit; }
 .deck-card.theme-aurora { border-left: 4px solid #5eead4; }
 .deck-card.theme-paper { border-left: 4px solid #c2410c; }
 .deck-title { font-weight: 600; font-size: 17px; }
+.deck-card-wrap { position: relative; }
+.deck-card-wrap .deck-card { height: 100%; padding-bottom: 40px; }
+.deck-links { position: absolute; left: 20px; bottom: 14px; display: flex; gap: 14px; font-size: 13px; }
+.deck-links a { color: var(--app-accent); text-decoration: none; }
+.deck-links a:hover { text-decoration: underline; }
 .deck-meta { color: var(--app-muted); font-size: 13px; }
 .empty { color: var(--app-muted); }
 .home-connect p { margin: 0 0 10px; }
@@ -186,3 +191,44 @@ button { font: inherit; }
 .help dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; }
 .help dt { font-family: ui-monospace, monospace; color: #5eead4; }
 .help dd { margin: 0; }
+
+/* ---- token prompt (shared by editor and presenter) ---- */
+.auth-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(5, 7, 14, 0.75); backdrop-filter: blur(4px); padding: 16px; }
+.auth-box { display: grid; gap: 10px; width: min(380px, 100%); padding: 22px; border-radius: 14px; background: #151a2b; color: #e7eaf4; border: 1px solid #2a3248; font: 14px/1.5 Inter, system-ui, sans-serif; }
+.auth-box h2 { margin: 0; font-size: 17px; }
+.auth-box p, .auth-box small { margin: 0; color: #8f98b3; }
+.auth-box input { padding: 9px 10px; border-radius: 8px; border: 1px solid #2a3248; background: #0e1220; color: inherit; font: inherit; }
+.auth-box button { padding: 9px; border: 0; border-radius: 8px; background: #5eead4; color: #062b26; font-weight: 600; cursor: pointer; }
+
+/* ---- presenter ---- */
+.pr-page { overflow: hidden; background: #070910; }
+.pr { position: fixed; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 30vw); gap: 16px; padding: 16px; color: #e8ebf5; font: 15px/1.5 Inter, system-ui, sans-serif; }
+.pr-current { position: relative; min-height: 0; border-radius: 10px; overflow: hidden; }
+.pr-current .sk-viewport { position: absolute; }
+.pr-current.pr-laser { cursor: crosshair; }
+.pr-side { display: grid; grid-template-rows: auto auto 1fr auto; gap: 14px; min-height: 0; }
+.pr-label { color: #8f98b3; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.pr-next-stage { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; background: #111; outline: 1px solid #262d40; }
+.pr-next-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: var(--sk-bg); }
+.pr-next-inner .sk-slide::before, .pr-next-inner .sk-slide::after { animation: none; }
+.pr-end { position: absolute; inset: 0; display: grid; place-items: center; color: #8f98b3; }
+.pr-meta { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
+.pr-pos { font-weight: 600; }
+.pr-builds { display: flex; gap: 6px; justify-self: end; color: #8f98b3; font-size: 12px; }
+.pr-builds i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #5eead4; }
+.pr-builds i.on { background: #5eead4; }
+.pr-timer { font: 600 40px/1 "JetBrains Mono", ui-monospace, monospace; color: #e8ebf5; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font-variant-numeric: tabular-nums; }
+.pr-clock { justify-self: end; color: #8f98b3; font-variant-numeric: tabular-nums; }
+.pr-notes { overflow-y: auto; padding: 14px 16px; border-radius: 10px; background: #111522; font-size: 20px; line-height: 1.5; min-height: 0; }
+.pr-notes p { margin: 0 0 12px; }
+.pr-notes .pr-none { color: #8f98b3; font-size: 15px; }
+.pr-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pr-btn { padding: 8px 12px; border-radius: 8px; border: 1px solid #262d40; background: #141927; color: inherit; font: inherit; cursor: pointer; }
+.pr-btn.primary { background: #5eead4; color: #062b26; border-color: transparent; font-weight: 600; }
+.pr-btn.on { border-color: #f43f5e; color: #fda4af; }
+.pr-status { color: #8f98b3; font-size: 13px; }
+@media (max-width: 900px) { .pr { grid-template-columns: 1fr; grid-template-rows: 55vh auto; overflow-y: auto; } }
+
+/* ---- audience window ---- */
+.sk-audience, .sk-audience .sk-viewport { cursor: none; }
+.sk-audience .hud-progress { display: none; }

@@ -3,6 +3,8 @@
 import { applyPatch } from "../runtime/patch";
 import { Player, type Position } from "../runtime/player";
 import type { Catalog, Deck, LintIssue, PatchEvent } from "../runtime/types";
+import { Laser } from "./laser";
+import { Live, type PointerMsg, type PresentMsg } from "./sync";
 
 interface DeckResponse {
   version: number;
@@ -70,7 +72,14 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   fsBtn.type = "button";
   const home = el("a", "hud-btn", "All decks");
   home.href = "/";
-  hud.append(title, pos, live, lint, followBtn, fsBtn, home);
+  const edit = el("a", "hud-btn", "Edit");
+  edit.href = `/d/${encodeURIComponent(deckId)}/edit`;
+  const present = el("a", "hud-btn", "Present");
+  present.href = `/d/${encodeURIComponent(deckId)}/present`;
+  hud.append(title, pos, live, lint, followBtn, fsBtn, edit, present, home);
+  // Audience window (opened by the presenter): no chrome, always follows.
+  const audience = new URLSearchParams(location.search).has("audience");
+  if (audience) document.body.classList.add("sk-audience", "hud-hidden");
   const progress = el("div", "hud-progress");
   const bar = el("div");
   progress.append(bar);
@@ -92,7 +101,7 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
 
   const setFollow = (on: boolean) => {
     follow = on;
-    followBtn.textContent = on ? "Following edits" : "Not following";
+    followBtn.textContent = on ? "Following" : "Not following";
     followBtn.setAttribute("aria-pressed", String(on));
   };
 
@@ -223,26 +232,32 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     refreshLint();
   };
 
-  let retry = 500;
-  const connect = () => {
-    const proto = location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${location.host}/ws/decks/${encodeURIComponent(deckId)}`);
-    ws.onopen = () => {
-      retry = 500;
-      live.textContent = "live";
-      live.dataset.state = "on";
-    };
-    ws.onmessage = async (m) => {
-      const msg = JSON.parse(m.data as string);
-      if (msg.type === "hello" && msg.version !== version) await reload();
-      else if (msg.type === "patch") await onPatch(msg as PatchEvent);
-    };
-    ws.onclose = () => {
-      live.textContent = "offline";
-      live.dataset.state = "off";
-      setTimeout(connect, retry);
-      retry = Math.min(retry * 2, 10000);
-    };
+  // Presenter: jump (with the right animation) to wherever the presenter is.
+  const laser = new Laser(player.stage);
+  const followPresenter = async (m: PresentMsg) => {
+    if (!follow && !audience) return;
+    const p = player.position;
+    if (m.index === p.index && m.step === p.step + 1) await player.next();
+    else if (m.index === p.index && m.step === p.step - 1) await player.prev();
+    else if (m.index === p.index + 1 && m.step === 0 && p.step >= p.maxStep) await player.next();
+    else if (m.index === p.index - 1 && p.step === 0) await player.goto(m.index, m.step, { direction: -1 });
+    else if (m.index !== p.index || m.step !== p.step) await player.goto(m.index, m.step, { animate: m.index !== p.index });
   };
-  connect();
+
+  new Live(
+    deckId,
+    async (msg) => {
+      if (msg.type === "hello" && msg.version !== version) await reload();
+      else if (msg.type === "patch") await onPatch(msg as unknown as PatchEvent);
+      else if (msg.type === "present") await followPresenter(msg as unknown as PresentMsg);
+      else if (msg.type === "pointer") {
+        const pm = msg as unknown as PointerMsg;
+        pm.on ? laser.show(pm.x, pm.y) : laser.hide();
+      }
+    },
+    (state) => {
+      live.textContent = state;
+      live.dataset.state = state === "live" ? "on" : "off";
+    },
+  );
 }

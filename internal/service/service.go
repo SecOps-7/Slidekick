@@ -44,6 +44,8 @@ type Result struct {
 	Changed []string     `json:"changed,omitempty" jsonschema:"ids of slides and elements touched by this write"`
 	Lint    []lint.Issue `json:"lint"`
 	URL     string       `json:"url" jsonschema:"live viewer link"`
+	// OpenComments counts notes humans pinned for the agent (see list_comments).
+	OpenComments int `json:"openComments,omitempty" jsonschema:"open notes from humans; read them with list_comments"`
 }
 
 // ConflictError means the caller's base version is stale.
@@ -275,7 +277,39 @@ func (s *Service) mutate(ctx context.Context, id string, base *int, actor string
 	if msg, err := json.Marshal(ev); err == nil {
 		s.Hub.Publish(id, msg)
 	}
-	return &Result{DeckID: id, Version: ver + 1, Changed: changed, Lint: lint.Deck(d, s.Cat, s.Themes), URL: s.ShareURL(id)}, nil
+	return &Result{DeckID: id, Version: ver + 1, Changed: changed, Lint: lint.Deck(d, s.Cat, s.Themes), URL: s.ShareURL(id),
+		OpenComments: s.store.CountOpenComments(ctx, id)}, nil
+}
+
+// Restore makes the deck look exactly as it did at an earlier version, as a
+// new version (history is never rewritten). Undo and redo are built on this.
+func (s *Service) Restore(ctx context.Context, id string, base *int, version int, actor string) (*Result, error) {
+	old, err := s.store.VersionDoc(ctx, id, version)
+	if err != nil {
+		return nil, fmt.Errorf("version %d of deck %s: %w", version, id, err)
+	}
+	old, _, err = deck.Migrate(old)
+	if err != nil {
+		return nil, err
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(old, &doc); err != nil {
+		return nil, err
+	}
+	return s.mutate(ctx, id, base, actor, func(*deck.Deck) ([]deck.Op, error) {
+		var ops []deck.Op
+		for _, k := range []string{"title", "theme", "aspect", "slides"} {
+			ops = append(ops, deck.Op{Op: "replace", Path: "/" + k, Value: doc[k]})
+		}
+		return ops, nil
+	})
+}
+
+// Publish sends an arbitrary event to a deck's open browsers.
+func (s *Service) Publish(deckID string, ev any) {
+	if msg, err := json.Marshal(ev); err == nil {
+		s.Hub.Publish(deckID, msg)
+	}
 }
 
 // normalize turns any Go value into plain JSON types (map[string]any, []any...).
