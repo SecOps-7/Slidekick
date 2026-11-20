@@ -60,6 +60,19 @@ CREATE TABLE IF NOT EXISTS versions (
   created_at TEXT NOT NULL,
   PRIMARY KEY (deck_id, version)
 );
+CREATE TABLE IF NOT EXISTS comments (
+  id          TEXT PRIMARY KEY,
+  deck_id     TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+  slide_id    TEXT NOT NULL DEFAULT '',
+  element_id  TEXT NOT NULL DEFAULT '',
+  text        TEXT NOT NULL,
+  author      TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'open',
+  reply       TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL,
+  resolved_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS comments_deck ON comments(deck_id, status);
 CREATE TABLE IF NOT EXISTS assets (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -241,4 +254,70 @@ func (s *Store) GetAsset(ctx context.Context, id string) (*Asset, error) {
 	}
 	a.CreatedAt = parseTime(ts)
 	return &a, err
+}
+
+// Comment is a note pinned to a deck, slide or element ("Send to agent").
+type Comment struct {
+	ID         string    `json:"id"`
+	DeckID     string    `json:"deckId"`
+	SlideID    string    `json:"slideId,omitempty"`
+	ElementID  string    `json:"elementId,omitempty"`
+	Text       string    `json:"text"`
+	Author     string    `json:"author"`
+	Status     string    `json:"status" jsonschema:"open or resolved"`
+	Reply      string    `json:"reply,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
+	ResolvedAt string    `json:"resolvedAt,omitempty"`
+}
+
+func (s *Store) AddComment(ctx context.Context, c *Comment) error {
+	ts := now()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO comments(id,deck_id,slide_id,element_id,text,author,status,created_at) VALUES(?,?,?,?,?,?,'open',?)`,
+		c.ID, c.DeckID, c.SlideID, c.ElementID, c.Text, c.Author, ts)
+	c.Status, c.CreatedAt = "open", parseTime(ts)
+	return err
+}
+
+// Comments lists a deck's comments, oldest first; resolved ones only when all is true.
+func (s *Store) Comments(ctx context.Context, deckID string, all bool) ([]Comment, error) {
+	q := `SELECT id,deck_id,slide_id,element_id,text,author,status,reply,created_at,resolved_at FROM comments WHERE deck_id=?`
+	if !all {
+		q += ` AND status='open'`
+	}
+	rows, err := s.db.QueryContext(ctx, q+` ORDER BY created_at`, deckID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Comment{}
+	for rows.Next() {
+		var c Comment
+		var ts string
+		if err := rows.Scan(&c.ID, &c.DeckID, &c.SlideID, &c.ElementID, &c.Text, &c.Author, &c.Status, &c.Reply, &ts, &c.ResolvedAt); err != nil {
+			return nil, err
+		}
+		c.CreatedAt = parseTime(ts)
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// ResolveComment marks a comment resolved with an optional reply.
+func (s *Store) ResolveComment(ctx context.Context, deckID, id, reply string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE comments SET status='resolved', reply=?, resolved_at=? WHERE id=? AND deck_id=?`, reply, now(), id, deckID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CountOpenComments returns how many comments on a deck are open.
+func (s *Store) CountOpenComments(ctx context.Context, deckID string) int {
+	var n int
+	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM comments WHERE deck_id=? AND status='open'`, deckID).Scan(&n)
+	return n
 }

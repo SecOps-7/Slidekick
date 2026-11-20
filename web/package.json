@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "mermaid": "^11.17.2",
+    "preact": "^10.29.8",
     "shiki": "^3.23.0"
   }
 }

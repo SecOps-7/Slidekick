@@ -223,6 +223,10 @@ func chart(i int, s *deck.Slide, e *deck.Element) []Issue {
 	if kind != "pie" && len(labels) > maxBarLabels {
 		add("warning", "chart-crowded", fmt.Sprintf("%d categories; labels will collide.", len(labels)), "Show the top items, or use a line chart.")
 	}
+	if show, _ := e.Props["showValues"].(bool); show && kind != "pie" && len(series) >= 3 {
+		add("warning", "chart-labels-overlap", fmt.Sprintf("Value labels on %d series will overlap.", len(series)),
+			"Turn off showValues, or keep value labels to two series.")
+	}
 	if e.Str("caption") == "" {
 		add("info", "chart-caption", "Chart has no caption, so screen readers get no description.",
 			"Set props.caption to the takeaway, e.g. 'Revenue doubled since 2024'.")

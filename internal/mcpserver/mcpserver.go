@@ -22,6 +22,7 @@ import (
 	"github.com/SecOps-7/slidekick/internal/lint"
 	"github.com/SecOps-7/slidekick/internal/render"
 	"github.com/SecOps-7/slidekick/internal/service"
+	"github.com/SecOps-7/slidekick/internal/store"
 )
 
 //go:embed guide.md
@@ -34,8 +35,9 @@ Workflow:
 2. create_deck with a title, theme and (optionally) all slides at once.
 3. Every write returns the new version and lint findings. Fix every "error" and most "warning" findings before you finish.
 4. For precise edits use patch_deck (RFC 6902 JSON Patch). Pass base_version to avoid overwriting a human's edits; on a conflict, call get_deck and retry.
-5. Check your work visually: render_slide returns a screenshot of any slide (when Chromium is installed).
-6. Give the user the url from get_share_url so they can watch or present. export_deck makes a standalone HTML file.
+5. If a write result shows openComments, call list_comments: humans pinned requests for you. Act on them, then resolve_comment with a short reply.
+6. Check your work visually: render_slide returns a screenshot of any slide (when Chromium is installed).
+7. Give the user the url from get_share_url so they can watch or present. export_deck makes a standalone HTML file.
 
 Never write HTML. Compose elements (heading, text, bullets, image, code, stat, quote, chart, diagram, icon, shape, embed) inside layout regions; style only with theme tokens. Upload images with upload_asset and use the returned /files/... url.`
 
@@ -161,6 +163,47 @@ type ShareOut struct {
 }
 
 type NoInput struct{}
+
+type CommentsIn struct {
+	DeckID string `json:"deck_id"`
+	All    bool   `json:"all,omitempty" jsonschema:"include resolved comments"`
+}
+
+type CommentsOut struct {
+	Comments []store.Comment `json:"comments"`
+}
+
+type ResolveIn struct {
+	DeckID    string `json:"deck_id"`
+	CommentID string `json:"comment_id"`
+	Reply     string `json:"reply,omitempty" jsonschema:"short note on what you changed, shown to the human"`
+}
+
+type OK struct {
+	OK bool `json:"ok"`
+}
+
+type HistoryIn struct {
+	DeckID string `json:"deck_id"`
+	Limit  int    `json:"limit,omitempty" jsonschema:"how many versions, newest first (default 20)"`
+}
+
+type HistoryEntry struct {
+	Version   int    `json:"version"`
+	Actor     string `json:"actor" jsonschema:"agent or human"`
+	Ops       int    `json:"ops" jsonschema:"number of patch operations in this version"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type HistoryOut struct {
+	Versions []HistoryEntry `json:"versions"`
+}
+
+type RestoreIn struct {
+	DeckID      string `json:"deck_id"`
+	BaseVersion *int   `json:"base_version,omitempty"`
+	Version     int    `json:"version" jsonschema:"version to bring back; it is applied as a new version"`
+}
 
 type UploadIn struct {
 	Filename   string `json:"filename" jsonschema:"original file name, e.g. team.jpg"`
@@ -386,6 +429,54 @@ func (h *handlers) tools(s *mcp.Server) {
 			}}, out, nil
 		})
 
+	mcp.AddTool(s, read("list_comments", "Read notes humans pinned to the deck, its slides or elements (\"Send to agent\"). Act on them, then resolve them."),
+		func(ctx context.Context, _ *mcp.CallToolRequest, in CommentsIn) (*mcp.CallToolResult, *CommentsOut, error) {
+			cs, err := h.svc.Comments(ctx, in.DeckID, in.All)
+			if err != nil {
+				return nil, nil, notFound(err, in.DeckID)
+			}
+			return nil, &CommentsOut{Comments: cs}, nil
+		})
+
+	mcp.AddTool(s, &mcp.Tool{Name: "resolve_comment", Description: "Mark a human's comment as done, with a short reply describing what you changed."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in ResolveIn) (*mcp.CallToolResult, *OK, error) {
+			if err := h.svc.ResolveComment(ctx, in.DeckID, in.CommentID, in.Reply); err != nil {
+				if errors.Is(err, store.ErrNotFound) {
+					return nil, nil, fmt.Errorf("no comment %q on deck %q", in.CommentID, in.DeckID)
+				}
+				return nil, nil, err
+			}
+			return nil, &OK{OK: true}, nil
+		})
+
+	mcp.AddTool(s, read("get_history", "List a deck's versions (who changed it and when), newest first."),
+		func(ctx context.Context, _ *mcp.CallToolRequest, in HistoryIn) (*mcp.CallToolResult, *HistoryOut, error) {
+			if _, _, _, err := h.svc.Get(ctx, in.DeckID); err != nil {
+				return nil, nil, notFound(err, in.DeckID)
+			}
+			limit := in.Limit
+			if limit <= 0 || limit > 200 {
+				limit = 20
+			}
+			vs, err := h.svc.History(ctx, in.DeckID, limit)
+			if err != nil {
+				return nil, nil, err
+			}
+			out := &HistoryOut{Versions: []HistoryEntry{}}
+			for _, v := range vs {
+				var ops []json.RawMessage
+				json.Unmarshal(v.Ops, &ops)
+				out.Versions = append(out.Versions, HistoryEntry{Version: v.Version, Actor: v.Actor, Ops: len(ops), CreatedAt: v.CreatedAt.Format(time.RFC3339)})
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(s, write("restore_version", "Bring back the deck exactly as it was at an earlier version (undo). History is kept: the restore is a new version."),
+		func(ctx context.Context, _ *mcp.CallToolRequest, in RestoreIn) (*mcp.CallToolResult, *service.Result, error) {
+			r, err := h.svc.Restore(ctx, in.DeckID, in.BaseVersion, in.Version, actor)
+			return nil, r, notFound(err, in.DeckID)
+		})
+
 	mcp.AddTool(s, read("get_share_url", "Get the live viewer link for a deck to give to the user."),
 		func(ctx context.Context, _ *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *ShareOut, error) {
 			if _, _, _, err := h.svc.Get(ctx, in.DeckID); err != nil {
@@ -481,6 +572,18 @@ func resources(s *mcp.Server, svc *service.Service, schemaFS fs.FS) {
 			b.WriteString(strings.Join(svc.Cat.Icons, ", "))
 			b.WriteString("\n")
 			return b.String(), nil
+		})
+	s.AddResourceTemplate(&mcp.ResourceTemplate{URITemplate: "slidekick://decks/{deck_id}/comments", Name: "deck-comments",
+		Description: "Open comments humans pinned to a deck for the agent.", MIMEType: "application/json"},
+		func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+			uri := req.Params.URI
+			id := strings.TrimSuffix(strings.TrimPrefix(uri, "slidekick://decks/"), "/comments")
+			cs, err := svc.Comments(ctx, id, false)
+			if err != nil {
+				return nil, mcp.ResourceNotFoundError(uri)
+			}
+			b, _ := json.MarshalIndent(cs, "", "  ")
+			return text(uri, "application/json", string(b)), nil
 		})
 	add("slidekick://guide", "design-guide", "How to make good slides with Slidekick. Read before writing a deck.", "text/markdown",
 		func() (string, error) { return designGuide, nil })

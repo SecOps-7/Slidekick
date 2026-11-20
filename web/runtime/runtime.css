@@ -276,3 +276,19 @@
 
 /* embeds */
 .sk-el-embed iframe, .sk-el-embed video { flex: 1; width: 100%; min-height: 0; border: 0; border-radius: var(--sk-radius); background: #000; }
+
+/* ---- laser pointer ---- */
+.sk-laser {
+  position: absolute;
+  z-index: 50;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 18%, #ff2d55 30%, rgba(255, 45, 85, 0.35) 60%, transparent 72%);
+  box-shadow: 0 0 30px 10px rgba(255, 45, 85, 0.45);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s, left 0.05s linear, top 0.05s linear;
+}
+.sk-laser.on { opacity: 1; }

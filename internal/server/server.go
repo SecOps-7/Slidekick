@@ -49,6 +49,13 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux.Handle("POST /api/decks/{id}/patch", s.auth(http.HandlerFunc(s.patchDeck)))
 	mux.HandleFunc("GET /api/catalog", s.catalog)
 	mux.HandleFunc("GET /api/decks/{id}/export.html", s.exportHTML)
+	mux.Handle("GET /api/auth", s.auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{"ok": true, "required": opt.Token != ""})
+	})))
+	mux.HandleFunc("GET /api/decks/{id}/comments", s.listComments)
+	mux.Handle("POST /api/decks/{id}/comments", s.auth(http.HandlerFunc(s.addComment)))
+	mux.Handle("POST /api/decks/{id}/comments/{cid}/resolve", s.auth(http.HandlerFunc(s.resolveComment)))
+	mux.Handle("POST /api/decks/{id}/restore", s.auth(http.HandlerFunc(s.restore)))
 	mux.Handle("POST /api/files", s.auth(http.HandlerFunc(s.uploadFile)))
 	mux.HandleFunc("GET /files/{name}", s.serveFile)
 	mux.HandleFunc("GET /ws/decks/{id}", s.ws)
@@ -188,12 +195,18 @@ func (s *server) catalog(w http.ResponseWriter, r *http.Request) {
 		"layouts":     layouts,
 		"transitions": s.svc.Cat.Transitions,
 		"builds":      s.svc.Cat.Builds,
+		"elements":    s.svc.Cat.Elements,
+		"icons":       s.svc.Cat.Icons,
 		"themes":      s.svc.Themes.Themes,
 	})
 }
 
 // ws streams deck change events. The first message is a hello carrying the
 // current version so the client can detect a gap and refetch.
+//
+// Clients may also send: {"type":"auth","token":...} to unlock presenting,
+// then {"type":"present","index":n,"step":k} and {"type":"pointer","x":0..1,
+// "y":0..1,"on":bool}, which are relayed to everyone watching the deck.
 func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	_, _, ver, err := s.svc.Get(r.Context(), id)
@@ -206,14 +219,55 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer c.CloseNow()
+	c.SetReadLimit(8 << 10)
 	ch, cancel := s.svc.Hub.Subscribe(id)
 	defer cancel()
-	ctx := c.CloseRead(r.Context())
+	ctx, stop := context.WithCancel(r.Context())
+	defer stop()
+	conn := deck.NewID("w")
 
-	hello, _ := json.Marshal(map[string]any{"type": "hello", "version": ver})
+	hello, _ := json.Marshal(map[string]any{"type": "hello", "version": ver, "conn": conn})
 	if err := c.Write(ctx, websocket.MessageText, hello); err != nil {
 		return
 	}
+
+	go func() {
+		defer stop()
+		authed := s.opt.Token == ""
+		for {
+			_, data, err := c.Read(ctx)
+			if err != nil {
+				return
+			}
+			var m struct {
+				Type  string  `json:"type"`
+				Token string  `json:"token"`
+				Index int     `json:"index"`
+				Step  int     `json:"step"`
+				X     float64 `json:"x"`
+				Y     float64 `json:"y"`
+				On    bool    `json:"on"`
+			}
+			if json.Unmarshal(data, &m) != nil {
+				continue
+			}
+			switch m.Type {
+			case "auth":
+				authed = s.opt.Token == "" || subtle.ConstantTimeCompare([]byte(m.Token), []byte(s.opt.Token)) == 1
+				reply, _ := json.Marshal(map[string]any{"type": "auth", "ok": authed})
+				c.Write(ctx, websocket.MessageText, reply)
+			case "present":
+				if authed && m.Index >= 0 && m.Step >= 0 {
+					s.svc.Publish(id, map[string]any{"type": "present", "index": m.Index, "step": m.Step, "from": conn})
+				}
+			case "pointer":
+				if authed {
+					s.svc.Publish(id, map[string]any{"type": "pointer", "x": clamp01(m.X), "y": clamp01(m.Y), "on": m.On, "from": conn})
+				}
+			}
+		}
+	}()
+
 	ping := time.NewTicker(25 * time.Second)
 	defer ping.Stop()
 	for {
@@ -240,6 +294,58 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+func clamp01(v float64) float64 { return max(0, min(1, v)) }
+
+func (s *server) listComments(w http.ResponseWriter, r *http.Request) {
+	cs, err := s.svc.Comments(r.Context(), r.PathValue("id"), r.URL.Query().Get("all") != "")
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"comments": cs})
+}
+
+func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
+	var body struct{ SlideID, ElementID, Text string }
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&body); err != nil {
+		writeErr(w, err)
+		return
+	}
+	c, err := s.svc.AddComment(r.Context(), r.PathValue("id"), body.SlideID, body.ElementID, body.Text, "human")
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, c)
+}
+
+func (s *server) resolveComment(w http.ResponseWriter, r *http.Request) {
+	var body struct{ Reply string }
+	json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&body)
+	if err := s.svc.ResolveComment(r.Context(), r.PathValue("id"), r.PathValue("cid"), body.Reply); err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+func (s *server) restore(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		BaseVersion *int `json:"baseVersion"`
+		Version     int  `json:"version"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
+		writeErr(w, err)
+		return
+	}
+	res, err := s.svc.Restore(r.Context(), r.PathValue("id"), body.BaseVersion, body.Version, "human")
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, res)
 }
 
 // spa serves the built web app, falling back to index.html for client routes.
