@@ -6,7 +6,9 @@ package mcpserver
 import (
 	"context"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"sort"
@@ -16,7 +18,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/SecOps-7/slidekick/internal/deck"
+	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/lint"
+	"github.com/SecOps-7/slidekick/internal/render"
 	"github.com/SecOps-7/slidekick/internal/service"
 )
 
@@ -30,22 +34,33 @@ Workflow:
 2. create_deck with a title, theme and (optionally) all slides at once.
 3. Every write returns the new version and lint findings. Fix every "error" and most "warning" findings before you finish.
 4. For precise edits use patch_deck (RFC 6902 JSON Patch). Pass base_version to avoid overwriting a human's edits; on a conflict, call get_deck and retry.
-5. Give the user the url from get_share_url so they can watch or present.
+5. Check your work visually: render_slide returns a screenshot of any slide (when Chromium is installed).
+6. Give the user the url from get_share_url so they can watch or present. export_deck makes a standalone HTML file.
 
-Never write HTML. Compose elements (heading, text, bullets, image, code, stat, quote) inside layout regions; style only with theme tokens.`
+Never write HTML. Compose elements (heading, text, bullets, image, code, stat, quote, chart, diagram, icon, shape, embed) inside layout regions; style only with theme tokens. Upload images with upload_asset and use the returned /files/... url.`
+
+// Options carries optional collaborators.
+type Options struct {
+	Renderer *render.Renderer // nil or unavailable: render_slide explains how to enable it
+	Exporter *export.Exporter
+}
 
 // New builds the MCP server around a deck service.
-func New(svc *service.Service, schemaFS fs.FS, version string) *mcp.Server {
+func New(svc *service.Service, schemaFS fs.FS, version string, opt Options) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "slidekick", Title: "Slidekick", Version: version},
 		&mcp.ServerOptions{Instructions: instructions})
-	h := &handlers{svc: svc}
+	h := &handlers{svc: svc, render: opt.Renderer, export: opt.Exporter}
 	h.tools(s)
 	resources(s, svc, schemaFS)
 	prompts(s)
 	return s
 }
 
-type handlers struct{ svc *service.Service }
+type handlers struct {
+	svc    *service.Service
+	render *render.Renderer
+	export *export.Exporter
+}
 
 const actor = "agent"
 
@@ -141,11 +156,54 @@ type LintOut struct {
 }
 
 type ShareOut struct {
-	URL     string `json:"url" jsonschema:"live viewer; press P to present, arrow keys to step through builds"`
+	URL     string `json:"url" jsonschema:"live viewer; arrow keys step through builds and slides, F for fullscreen"`
 	Viewers int    `json:"viewers" jsonschema:"browsers currently watching"`
 }
 
 type NoInput struct{}
+
+type UploadIn struct {
+	Filename   string `json:"filename" jsonschema:"original file name, e.g. team.jpg"`
+	MimeType   string `json:"mime_type" jsonschema:"image/png, image/jpeg, image/gif, image/webp, image/avif, image/svg+xml, video/mp4 or video/webm"`
+	DataBase64 string `json:"data_base64" jsonschema:"file contents, base64-encoded (max 15 MB decoded)"`
+}
+
+type UploadOut struct {
+	ID          string `json:"id"`
+	URL         string `json:"url" jsonschema:"use this as an image src, background.image or video embed src"`
+	AbsoluteURL string `json:"absoluteUrl"`
+	MIME        string `json:"mime"`
+	Size        int64  `json:"size"`
+}
+
+type ExportIn struct {
+	DeckID string `json:"deck_id"`
+	Format string `json:"format,omitempty" jsonschema:"html (default). PDF is planned for a later release."`
+}
+
+type ExportOut struct {
+	URL      string `json:"url" jsonschema:"download link for the standalone file"`
+	Filename string `json:"filename"`
+	Bytes    int    `json:"bytes"`
+	Note     string `json:"note"`
+}
+
+type RenderIn struct {
+	DeckID    string `json:"deck_id"`
+	Slide     *int   `json:"slide,omitempty" jsonschema:"zero-based slide index; use this or slide_id"`
+	SlideID   string `json:"slide_id,omitempty"`
+	BuildStep *int   `json:"build_step,omitempty" jsonschema:"show the slide after this many build steps; omit for fully built"`
+	Width     int    `json:"width,omitempty" jsonschema:"screenshot width in pixels, 640 to 1920 (default 1280)"`
+}
+
+type RenderOut struct {
+	Slide   int          `json:"slide"`
+	SlideID string       `json:"slideId"`
+	Version int          `json:"version"`
+	Width   int          `json:"width"`
+	Height  int          `json:"height"`
+	Lint    []lint.Issue `json:"lint" jsonschema:"lint findings for this slide"`
+}
 
 func (h *handlers) tools(s *mcp.Server) {
 	write := func(name, desc string) *mcp.Tool {
@@ -237,6 +295,97 @@ func (h *handlers) tools(s *mcp.Server) {
 			return nil, &LintOut{DeckID: in.DeckID, Version: ver, Summary: summarize(issues), Issues: issues}, nil
 		})
 
+	mcp.AddTool(s, &mcp.Tool{Name: "upload_asset", Description: "Upload an image or video and get a /files/... url to use in the deck. Identical files get the same url."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in UploadIn) (*mcp.CallToolResult, *UploadOut, error) {
+			data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(in.DataBase64))
+			if err != nil {
+				return nil, nil, fmt.Errorf("data_base64 is not valid base64: %w", err)
+			}
+			a, err := h.svc.UploadAsset(ctx, in.Filename, in.MimeType, data)
+			if err != nil {
+				return nil, nil, err
+			}
+			return nil, &UploadOut{ID: a.ID, URL: a.URL(), AbsoluteURL: h.svc.BaseURL + a.URL(), MIME: a.MIME, Size: a.Size}, nil
+		})
+
+	mcp.AddTool(s, read("export_deck", "Export a deck as one self-contained HTML file that plays offline with all animations. Returns a download link."),
+		func(ctx context.Context, _ *mcp.CallToolRequest, in ExportIn) (*mcp.CallToolResult, *ExportOut, error) {
+			if in.Format != "" && in.Format != "html" {
+				return nil, nil, fmt.Errorf("format %q is not supported yet; use html", in.Format)
+			}
+			if h.export == nil {
+				return nil, nil, errors.New("export is not configured on this server")
+			}
+			d, raw, _, err := h.svc.Get(ctx, in.DeckID)
+			if err != nil {
+				return nil, nil, notFound(err, in.DeckID)
+			}
+			out, err := h.export.HTML(ctx, raw)
+			if err != nil {
+				return nil, nil, err
+			}
+			name := export.Filename(d.Title)
+			return nil, &ExportOut{URL: h.svc.BaseURL + "/api/decks/" + in.DeckID + "/export.html?download=1", Filename: name, Bytes: len(out),
+				Note: "Self-contained: runtime, theme and uploaded images are inlined. Web fonts and remote images load from the internet when online."}, nil
+		})
+
+	mcp.AddTool(s, read("render_slide", "Screenshot one slide (optionally at a build step) exactly as viewers see it, to check your work visually. Returns a PNG and that slide's lint findings."),
+		func(ctx context.Context, _ *mcp.CallToolRequest, in RenderIn) (*mcp.CallToolResult, *RenderOut, error) {
+			if h.render == nil || !h.render.Available() {
+				return nil, nil, render.ErrUnavailable
+			}
+			d, _, ver, err := h.svc.Get(ctx, in.DeckID)
+			if err != nil {
+				return nil, nil, notFound(err, in.DeckID)
+			}
+			idx := 0
+			switch {
+			case in.SlideID != "":
+				if idx = d.SlideIndex(in.SlideID); idx < 0 {
+					return nil, nil, fmt.Errorf("no slide with id %q", in.SlideID)
+				}
+			case in.Slide != nil:
+				idx = *in.Slide
+			}
+			if idx < 0 || idx >= len(d.Slides) {
+				return nil, nil, fmt.Errorf("slide %d is out of range 0..%d", idx, len(d.Slides)-1)
+			}
+			w := in.Width
+			if w == 0 {
+				w = 1280
+			}
+			if w < 640 || w > 1920 {
+				return nil, nil, errors.New("width must be between 640 and 1920")
+			}
+			hgt := w * 9 / 16
+			if d.Aspect == "4:3" {
+				hgt = w * 3 / 4
+			}
+			step := -1
+			if in.BuildStep != nil {
+				step = *in.BuildStep
+			}
+			png, err := h.render.Slide(ctx, in.DeckID, idx, step, w, hgt)
+			if err != nil {
+				return nil, nil, err
+			}
+			var mine []lint.Issue
+			for _, is := range lint.Deck(d, h.svc.Cat, h.svc.Themes) {
+				if is.Slide == idx {
+					mine = append(mine, is)
+				}
+			}
+			if mine == nil {
+				mine = []lint.Issue{}
+			}
+			out := &RenderOut{Slide: idx, SlideID: d.Slides[idx].ID, Version: ver, Width: w, Height: hgt, Lint: mine}
+			summary, _ := json.Marshal(out)
+			return &mcp.CallToolResult{Content: []mcp.Content{
+				&mcp.ImageContent{Data: png, MIMEType: "image/png"},
+				&mcp.TextContent{Text: string(summary)},
+			}}, out, nil
+		})
+
 	mcp.AddTool(s, read("get_share_url", "Get the live viewer link for a deck to give to the user."),
 		func(ctx context.Context, _ *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *ShareOut, error) {
 			if _, _, _, err := h.svc.Get(ctx, in.DeckID); err != nil {
@@ -322,6 +471,16 @@ func resources(s *mcp.Server, svc *service.Service, schemaFS fs.FS) {
 		func() (string, error) {
 			b, err := json.MarshalIndent(themeInfos(svc), "", "  ")
 			return string(b), err
+		})
+	add("slidekick://catalog/elements", "elements", "Every element type with its props, plus the icon names.", "text/markdown",
+		func() (string, error) {
+			var b strings.Builder
+			b.WriteString("# Elements\n\nEach element is `{type, props, style?, build?}`; ids are optional on create.\n\n")
+			writeMap(&b, svc.Cat.Elements)
+			b.WriteString("\n## Icons\n\nUse with `{\"type\":\"icon\",\"props\":{\"name\":\"rocket\"}}`:\n\n")
+			b.WriteString(strings.Join(svc.Cat.Icons, ", "))
+			b.WriteString("\n")
+			return b.String(), nil
 		})
 	add("slidekick://guide", "design-guide", "How to make good slides with Slidekick. Read before writing a deck.", "text/markdown",
 		func() (string, error) { return designGuide, nil })

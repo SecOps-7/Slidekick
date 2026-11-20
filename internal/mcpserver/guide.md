@@ -31,7 +31,27 @@ A slide supports what the speaker says. It is not a document.
 {"type":"quote","props":{"text":"It just works.","attribution":"Beta customer"}}
 {"type":"code","props":{"code":"go run ./cmd/slidekick","language":"bash"}}
 ```
+```json
+{"type":"chart","props":{"kind":"bar","labels":["Q1","Q2","Q3"],"series":[{"name":"Revenue","values":[1.2,1.8,2.6]}],"unit":"M","showValues":true,"caption":"Revenue doubled"}}
+{"type":"diagram","props":{"source":"flowchart LR\n  A[Idea] --> B[Build] --> C[Ship]","caption":"Our delivery loop"}}
+{"type":"icon","props":{"name":"rocket"},"style":{"size":"xl"}}
+{"type":"shape","props":{"kind":"pill","fill":"accent","label":"New"}}
+{"type":"embed","props":{"kind":"iframe","src":"https://www.youtube-nocookie.com/embed/VIDEO_ID","title":"Product demo"}}
+```
+Images and videos: call `upload_asset` and use the `/files/...` url it returns.
+
 Style overrides use tokens only: `"style":{"color":"accent","size":"xl","align":"center"}`.
+
+## Data and diagrams
+- One chart per slide, and put the takeaway in the headline ("Churn halved"), not "Churn by month".
+- Bar for comparing categories, line for change over time, pie only for parts of a whole with 2 to 5 slices.
+- Always set `caption`: it is the accessible description.
+- Diagrams: keep to about 12 nodes; prefer `flowchart LR` for processes and `sequenceDiagram` for interactions.
+- Icons work best as a set: one per card in a `grid-3`, same size, building in with the card text.
+
+## Check your work
+- `render_slide` returns a screenshot of a slide exactly as the audience sees it. Look at it: is anything cramped, clipped or empty?
+- `export_deck` gives a single HTML file that plays offline.
 
 ## Checklist before you finish
 - `lint_deck` shows no errors or warnings.

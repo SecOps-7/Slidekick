@@ -2,35 +2,61 @@
   "layouts": {
     "title": {
       "description": "Opening or section slide: large centred title with an optional subtitle.",
-      "regions": { "title": 90, "subtitle": 160 }
+      "regions": {
+        "title": 90,
+        "subtitle": 160
+      }
     },
     "title-body": {
       "description": "Headline on top, one body region below. The workhorse layout.",
-      "regions": { "title": 80, "body": 420 }
+      "regions": {
+        "title": 80,
+        "body": 420
+      }
     },
     "two-column": {
       "description": "Headline plus two side-by-side regions for comparisons or text beside an image.",
-      "regions": { "title": 80, "left": 260, "right": 260 }
+      "regions": {
+        "title": 80,
+        "left": 260,
+        "right": 260
+      }
     },
     "hero-image": {
       "description": "Full-bleed image with a title and optional caption laid over it.",
-      "regions": { "image": 0, "title": 80, "caption": 160 }
+      "regions": {
+        "image": 0,
+        "title": 80,
+        "caption": 160
+      }
     },
     "big-number": {
       "description": "One headline figure (use a stat element) with a short caption.",
-      "regions": { "number": 40, "caption": 160 }
+      "regions": {
+        "number": 40,
+        "caption": 160
+      }
     },
     "quote": {
       "description": "A single pull quote with attribution.",
-      "regions": { "quote": 280 }
+      "regions": {
+        "quote": 280
+      }
     },
     "grid-3": {
       "description": "Headline plus three equal cards, e.g. three pillars or three stats.",
-      "regions": { "title": 80, "a": 160, "b": 160, "c": 160 }
+      "regions": {
+        "title": 80,
+        "a": 160,
+        "b": 160,
+        "c": 160
+      }
     },
     "full-bleed": {
       "description": "One unconstrained region covering the whole slide.",
-      "regions": { "content": 500 }
+      "regions": {
+        "content": 500
+      }
     }
   },
   "transitions": {
@@ -48,5 +74,120 @@
     "wipe": "Revealed by a left-to-right wipe.",
     "typewriter": "Text types in character by character (headings, text and quotes)."
   },
-  "regionCapacityNote": "Region numbers are rough character budgets used by the overflow lint; 0 means media only."
+  "regionCapacityNote": "Region numbers are rough character budgets used by the overflow lint; 0 means media only.",
+  "elements": {
+    "heading": "Headline. props: text, level 1-3.",
+    "text": "Paragraph of rich inline text. props: text.",
+    "bullets": "List. props: items[], ordered?, buildEach? (reveal one per step).",
+    "image": "Picture. props: src (https URL or /files/... from upload_asset), alt, decorative?, fit?, caption?.",
+    "code": "Syntax-highlighted code. props: code, language (typescript, javascript, tsx, json, bash, python, go, rust, sql, yaml, html, css, java, c, cpp, diff, markdown).",
+    "stat": "Big number that counts up. props: value, decimals?, prefix?, suffix?, label?.",
+    "quote": "Pull quote. props: text, attribution?.",
+    "chart": "Data chart drawn in the theme's colours; series draw in when shown. props: kind (bar|line|pie), labels[], series[{name?, values[], color?}], unit?, showValues?, caption?.",
+    "diagram": "Mermaid diagram (flowchart, sequence, timeline, etc.) themed automatically. props: source, caption?.",
+    "icon": "Line icon from the catalogue below. props: name, label?. Size with style.size, colour with style.color.",
+    "shape": "Simple shape or divider. props: kind (rect|circle|pill|line|arrow), fill?, label?.",
+    "embed": "Iframe (https) or video (https or /files/...). props: kind, src, title (iframes), poster?, autoplay?, loop?, muted?."
+  },
+  "icons": [
+    "adjustments",
+    "alert-triangle",
+    "arrow-down",
+    "arrow-right",
+    "arrow-up",
+    "arrows-shuffle",
+    "award",
+    "bolt",
+    "bolt-off",
+    "book",
+    "box",
+    "brain",
+    "building",
+    "building-store",
+    "bulb",
+    "calendar",
+    "camera",
+    "chart-bar",
+    "chart-dots",
+    "chart-line",
+    "chart-pie",
+    "check",
+    "circle-check",
+    "circle-x",
+    "clipboard-list",
+    "clock",
+    "cloud",
+    "code",
+    "coin",
+    "cpu",
+    "credit-card",
+    "currency-dollar",
+    "database",
+    "droplet",
+    "eye",
+    "file-text",
+    "flag",
+    "flame",
+    "gift",
+    "git-branch",
+    "globe",
+    "heart",
+    "help-circle",
+    "home",
+    "hourglass",
+    "infinity",
+    "info-circle",
+    "key",
+    "layers-subtract",
+    "leaf",
+    "link",
+    "list-check",
+    "lock",
+    "mail",
+    "map-pin",
+    "medal",
+    "message",
+    "messages",
+    "microphone",
+    "moon",
+    "music",
+    "package",
+    "pencil",
+    "phone",
+    "photo",
+    "plant",
+    "presentation",
+    "puzzle",
+    "receipt",
+    "refresh",
+    "robot",
+    "rocket",
+    "school",
+    "search",
+    "server",
+    "settings",
+    "shield",
+    "shield-check",
+    "shopping-cart",
+    "sparkles",
+    "stack-2",
+    "star",
+    "sun",
+    "target",
+    "terminal-2",
+    "thumb-up",
+    "tool",
+    "tree",
+    "trending-down",
+    "trending-up",
+    "trophy",
+    "user",
+    "user-check",
+    "users",
+    "video",
+    "wallet",
+    "wand",
+    "world",
+    "x"
+  ]
 }

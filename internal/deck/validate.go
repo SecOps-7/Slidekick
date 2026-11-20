@@ -92,6 +92,9 @@ func (v *Validator) semantic(d *Deck) []string {
 					i, r, s.Layout, r, strings.Join(v.cat.LayoutRegions(s.Layout), ", ")))
 			}
 			for k, e := range s.Regions[r] {
+				if e.Type == "icon" && !v.cat.HasIcon(e.Str("name")) {
+					p = append(p, fmt.Sprintf("/slides/%d/regions/%s/%d/props/name: unknown icon %q; see slidekick://catalog/elements for the icon list", i, r, k, e.Str("name")))
+				}
 				if elIDs[e.ID] {
 					p = append(p, fmt.Sprintf("/slides/%d/regions/%s/%d/id: %q is used twice on this slide", i, r, k, e.ID))
 				}

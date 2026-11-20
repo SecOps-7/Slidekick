@@ -1,6 +1,7 @@
 // The player owns the stage: which slide and build step are showing, how the
 // stage scales to the window, and every animation between states.
-import { applyTheme, formatStat, renderSlide, STAGE, type Rendered } from "./render";
+import { animateChart } from "./chart";
+import { applyTheme, formatStat, renderSlide, STAGE, themeReady, type Rendered } from "./render";
 import { builds, countUp, motionFor, prefersReducedMotion, transitions } from "./presets";
 import type { Catalog, Deck, Element, TransitionType } from "./types";
 
@@ -89,15 +90,31 @@ export class Player {
     }
   }
 
-  private statElements(r: Rendered, filter: (el: HTMLElement) => boolean) {
+  /** Runs "on appear" motion: stats count up, charts draw in. */
+  private appear(r: Rendered, filter: (el: HTMLElement) => boolean) {
     const byId = new Map<string, Element>();
     for (const s of this.deck.slides) for (const els of Object.values(s.regions)) for (const e of els) byId.set(e.id, e);
-    r.el.querySelectorAll<HTMLElement>(".sk-el-stat").forEach((el) => {
+    const m = { ...motionFor(document.documentElement, "slow"), reduced: prefersReducedMotion() };
+    r.el.querySelectorAll<HTMLElement>(".sk-el-stat, .sk-el-chart").forEach((el) => {
       if (!filter(el)) return;
+      if (el.classList.contains("sk-el-chart")) {
+        const fig = el.querySelector<HTMLElement>(".sk-chart");
+        if (fig) this.running.push(...animateChart(fig, motionFor(document.documentElement, "base").duration, m.easing, m.reduced));
+        return;
+      }
       const e = byId.get(el.dataset.elId ?? "");
       const v = el.querySelector<HTMLElement>(".sk-stat-value");
-      if (e && v) countUp(v, { ...motionFor(document.documentElement, "slow"), reduced: prefersReducedMotion() }, (n) => formatStat(e, n));
+      if (e && v) countUp(v, m, (n) => formatStat(e, n));
     });
+  }
+
+  /** Resolves when the current slide's fonts, images, code and diagrams are done. */
+  async ready(): Promise<void> {
+    await this.busy;
+    await themeReady(this.catalog.themes[this.deck.theme]);
+    await Promise.all(this.current?.pending ?? []);
+    if (this.current) fitCodeNow(this.current.el);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   }
 
   private emit() {
@@ -147,9 +164,10 @@ export class Player {
         from?.el.remove();
         for (const a of anims) a.cancel();
       }
+      fitCode(next);
       // Remove any stray slides (e.g. after rapid navigation).
       for (const c of [...this.stage.children]) if (c !== next.el) c.remove();
-      if (dir === 1) this.statElements(next, (el) => !el.classList.contains("sk-pending"));
+      if (dir === 1) this.appear(next, (el) => !el.classList.contains("sk-pending"));
       this.emit();
     });
   }
@@ -216,7 +234,7 @@ export class Player {
       if (i > 0 && !m.reduced) anims.forEach((a) => (a.startTime = (document.timeline.currentTime as number) + i * 90));
       this.running.push(...anims);
     });
-    this.statElements(r, (el) => units.some((u) => u.node === el));
+    this.appear(r, (el) => units.some((u) => u.node === el));
   }
 
   /** Re-renders the current slide in place (after a live edit), keeping the build step. */
@@ -234,6 +252,7 @@ export class Player {
       this.settle(r, this.step);
       this.stage.replaceChildren(r.el);
       this.current = r;
+      fitCode(r);
       this.emit();
     });
   }
@@ -256,4 +275,21 @@ function emptyState() {
   d.className = "sk-empty";
   d.innerHTML = "<p>This deck has no slides yet.</p><p>Ask your agent to add some; they will appear here live.</p>";
   return d;
+}
+
+/** Shrinks code blocks whose longest line is wider than the block, now and after highlighting. */
+function fitCode(r: Rendered) {
+  fitCodeNow(r.el);
+  Promise.all(r.pending).then(() => requestAnimationFrame(() => fitCodeNow(r.el)));
+}
+
+function fitCodeNow(root: HTMLElement) {
+  root.querySelectorAll<HTMLElement>(".sk-el-code pre").forEach((pre) => {
+    pre.style.fontSize = "";
+    let size = parseFloat(getComputedStyle(pre).fontSize);
+    for (let i = 0; i < 12 && pre.scrollWidth > pre.clientWidth + 1 && size > 16; i++) {
+      size -= 2;
+      pre.style.fontSize = `${size}px`;
+    }
+  });
 }

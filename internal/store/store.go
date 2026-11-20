@@ -60,6 +60,15 @@ CREATE TABLE IF NOT EXISTS versions (
   created_at TEXT NOT NULL,
   PRIMARY KEY (deck_id, version)
 );
+CREATE TABLE IF NOT EXISTS assets (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  mime       TEXT NOT NULL,
+  ext        TEXT NOT NULL,
+  size       INTEGER NOT NULL,
+  sha256     TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 `
 
 // Open opens (creating if needed) the database at dir/slidekick.db.
@@ -197,4 +206,39 @@ func (s *Store) VersionDoc(ctx context.Context, id string, version int) ([]byte,
 		return nil, ErrNotFound
 	}
 	return doc, err
+}
+
+// Asset is an uploaded file's metadata. The bytes live on disk.
+type Asset struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	MIME      string    `json:"mime"`
+	Ext       string    `json:"ext"`
+	Size      int64     `json:"size"`
+	SHA256    string    `json:"sha256"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// URL is the path the asset is served at.
+func (a *Asset) URL() string { return "/files/" + a.ID + a.Ext }
+
+// PutAsset records an asset; re-uploading identical bytes is a no-op.
+func (s *Store) PutAsset(ctx context.Context, a *Asset) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO assets(id,name,mime,ext,size,sha256,created_at) VALUES(?,?,?,?,?,?,?)`,
+		a.ID, a.Name, a.MIME, a.Ext, a.Size, a.SHA256, now())
+	return err
+}
+
+// GetAsset returns an asset's metadata.
+func (s *Store) GetAsset(ctx context.Context, id string) (*Asset, error) {
+	var a Asset
+	var ts string
+	err := s.db.QueryRowContext(ctx, `SELECT id,name,mime,ext,size,sha256,created_at FROM assets WHERE id=?`, id).
+		Scan(&a.ID, &a.Name, &a.MIME, &a.Ext, &a.Size, &a.SHA256, &ts)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	a.CreatedAt = parseTime(ts)
+	return &a, err
 }

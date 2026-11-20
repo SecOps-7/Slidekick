@@ -1,0 +1,25 @@
+{
+  "name": "meadow",
+  "label": "Meadow",
+  "description": "Soft and friendly. Pale sage, deep green and terracotta, a warm serif with rounded cards and calm, slow motion. Good for education, health and community updates.",
+  "dark": false,
+  "tokens": {
+    "color": {
+      "bg": "#f2f5ec",
+      "surface": "#ffffff",
+      "text": "#1d2a1f",
+      "muted": "#566555",
+      "accent": "#2b7a4b",
+      "accent2": "#b55a2f"
+    },
+    "font": {
+      "heading": "\"DM Serif Display\", Georgia, serif",
+      "body": "\"Nunito Sans\", system-ui, sans-serif",
+      "mono": "\"IBM Plex Mono\", ui-monospace, monospace"
+    },
+    "fontImport": "https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Mono&family=Nunito+Sans:wght@400;700&display=swap",
+    "size": { "xs": 22, "sm": 28, "md": 35, "lg": 54, "xl": 80, "xxl": 124 },
+    "radius": 28,
+    "motion": { "fast": 300, "base": 620, "slow": 1000, "easing": "cubic-bezier(0.25, 0.1, 0.25, 1)" }
+  }
+}

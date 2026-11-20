@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "id": "d_showcase",
+  "title": "Slidekick element showcase",
+  "theme": "ember",
+  "aspect": "16:9",
+  "slides": [
+    {
+      "id": "s_title",
+      "layout": "title",
+      "transition": { "type": "fade", "duration": "slow" },
+      "regions": {
+        "title": [
+          { "id": "i_logo", "type": "icon", "props": { "name": "rocket" }, "style": { "size": "xxl", "align": "center" } },
+          { "id": "h_title", "type": "heading", "props": { "text": "Q3 in motion", "level": 1 }, "style": { "size": "xxl" } }
+        ],
+        "subtitle": [{ "id": "t_sub", "type": "text", "props": { "text": "Charts, diagrams, code and icons, all drawn from data." }, "style": { "color": "muted" }, "build": { "step": 1 } }]
+      }
+    },
+    {
+      "id": "s_bar",
+      "layout": "title-body",
+      "transition": { "type": "push" },
+      "regions": {
+        "title": [{ "id": "h_rev", "type": "heading", "props": { "text": "Revenue **doubled** in two quarters", "level": 2 } }],
+        "body": [{
+          "id": "c_rev", "type": "chart",
+          "props": {
+            "kind": "bar",
+            "labels": ["Q4", "Q1", "Q2", "Q3"],
+            "series": [
+              { "name": "Self-serve", "values": [1.2, 1.6, 2.1, 2.6] },
+              { "name": "Enterprise", "values": [0.9, 1.0, 1.4, 1.7], "color": "accent2" }
+            ],
+            "unit": "M",
+            "showValues": true,
+            "caption": "Quarterly revenue in millions, self-serve vs enterprise"
+          },
+          "build": { "step": 1, "preset": "fade" }
+        }]
+      },
+      "notes": "Bars grow when the chart appears."
+    },
+    {
+      "id": "s_split",
+      "layout": "two-column",
+      "transition": { "type": "slide" },
+      "regions": {
+        "title": [{ "id": "h_split", "type": "heading", "props": { "text": "Where growth came from", "level": 2 } }],
+        "left": [{
+          "id": "c_mix", "type": "chart",
+          "props": { "kind": "pie", "labels": ["Self-serve", "Enterprise", "Partners"], "series": [{ "values": [55, 33, 12] }], "unit": "%", "showValues": true, "caption": "Share of new revenue by channel" }
+        }],
+        "right": [{
+          "id": "c_users", "type": "chart",
+          "props": { "kind": "line", "labels": ["Apr", "May", "Jun", "Jul", "Aug", "Sep"], "series": [{ "name": "Weekly active (k)", "values": [12, 15, 19, 24, 31, 38] }], "showValues": true, "unit": "k", "caption": "Weekly active users, thousands" },
+          "build": { "step": 1, "preset": "fade" }
+        }]
+      }
+    },
+    {
+      "id": "s_flow",
+      "layout": "title-body",
+      "transition": { "type": "fade" },
+      "regions": {
+        "title": [{ "id": "h_flow", "type": "heading", "props": { "text": "How an agent builds a deck", "level": 2 } }],
+        "body": [{
+          "id": "d_flow", "type": "diagram",
+          "props": {
+            "source": "flowchart LR\n  A[Agent] -->|create_deck| B(Deck service)\n  B --> C{Valid?}\n  C -->|yes| D[(SQLite)]\n  C -->|no| A\n  D --> E[Live viewer]\n  B -->|lint + render| A",
+            "caption": "Agent writes go through validation and lint, then stream to the live viewer"
+          }
+        }]
+      }
+    },
+    {
+      "id": "s_code",
+      "layout": "two-column",
+      "transition": { "type": "push" },
+      "regions": {
+        "title": [{ "id": "h_code", "type": "heading", "props": { "text": "One call, one slide", "level": 2 } }],
+        "left": [
+          { "id": "t_code", "type": "text", "props": { "text": "Agents describe **what** goes on the slide. The theme decides **how** it looks and moves." } },
+          { "id": "sh_arrow", "type": "shape", "props": { "kind": "arrow", "fill": "accent" } }
+        ],
+        "right": [{
+          "id": "k_code", "type": "code",
+          "props": { "language": "typescript", "code": "await mcp.call(\"add_slide\", {\n  deck_id,\n  slide: {\n    layout: \"big-number\",\n    regions: {\n      number: [{ type: \"stat\",\n        props: { value: 42, suffix: \"%\" } }],\n    },\n  },\n});" },
+          "build": { "step": 1, "preset": "wipe" }
+        }]
+      }
+    },
+    {
+      "id": "s_pillars",
+      "layout": "grid-3",
+      "transition": { "type": "zoom" },
+      "regions": {
+        "title": [{ "id": "h_pillars", "type": "heading", "props": { "text": "Next quarter", "level": 2 } }],
+        "a": [
+          { "id": "a_i", "type": "icon", "props": { "name": "target" }, "build": { "step": 1, "preset": "scale-in" } },
+          { "id": "a_h", "type": "heading", "props": { "text": "Focus", "level": 3 }, "build": { "step": 1 } },
+          { "id": "a_t", "type": "text", "props": { "text": "Three bets, not ten." }, "build": { "step": 1 } }
+        ],
+        "b": [
+          { "id": "b_i", "type": "icon", "props": { "name": "users" }, "build": { "step": 2, "preset": "scale-in" } },
+          { "id": "b_h", "type": "heading", "props": { "text": "Customers", "level": 3 }, "build": { "step": 2 } },
+          { "id": "b_t", "type": "text", "props": { "text": "Weekly calls with ten design partners." }, "build": { "step": 2 } }
+        ],
+        "c": [
+          { "id": "c_i", "type": "icon", "props": { "name": "bolt" }, "build": { "step": 3, "preset": "scale-in" } },
+          { "id": "c_h", "type": "heading", "props": { "text": "Speed", "level": 3 }, "build": { "step": 3 } },
+          { "id": "c_t", "type": "text", "props": { "text": "Ship every Tuesday." }, "build": { "step": 3 } }
+        ]
+      }
+    },
+    {
+      "id": "s_close",
+      "layout": "big-number",
+      "transition": { "type": "zoom", "duration": "slow" },
+      "regions": {
+        "number": [{ "id": "n_target", "type": "stat", "props": { "value": 10, "prefix": "$", "suffix": "M", "label": "run-rate target by year end" }, "build": { "step": 1, "preset": "scale-in" } }],
+        "caption": [{ "id": "p_ask", "type": "shape", "props": { "kind": "pill", "fill": "accent", "label": "Let's go" } }]
+      }
+    }
+  ]
+}

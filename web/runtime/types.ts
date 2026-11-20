@@ -26,7 +26,7 @@ export interface Slide {
 
 export interface Element {
   id: string;
-  type: "heading" | "text" | "bullets" | "image" | "code" | "stat" | "quote";
+  type: "heading" | "text" | "bullets" | "image" | "code" | "stat" | "quote" | "chart" | "diagram" | "icon" | "shape" | "embed";
   props: Record<string, unknown>;
   style?: { color?: ColorToken; size?: Size; align?: "start" | "center" | "end"; weight?: "regular" | "bold"; colorRaw?: string };
   build?: { step: number; preset?: BuildPreset };

@@ -28,6 +28,9 @@ const (
 	maxBulletChars  = 110
 	maxSlideWords   = 90
 	maxCodeLines    = 16
+	maxDiagramLines = 25
+	maxPieSlices    = 6
+	maxBarLabels    = 12
 	minContrast     = 4.5
 	minContrastLarg = 3.0
 )
@@ -117,6 +120,26 @@ func slide(i int, s, prev *deck.Slide, cat *deck.Catalog, theme *deck.Theme) []I
 				add("error", "missing-alt", e.ID, "Image has no alt text.",
 					"Set props.alt to a short description, or props.decorative: true if it carries no information.")
 			}
+		case "chart":
+			out = append(out, chart(i, s, &e)...)
+		case "diagram":
+			if n := strings.Count(strings.TrimSpace(e.Str("source")), "\n") + 1; n > maxDiagramLines {
+				add("warning", "dense-diagram", e.ID, fmt.Sprintf("Diagram source has %d lines; it will be too small to read.", n),
+					"Keep diagrams to about 12 nodes; split detail across slides.")
+			}
+			if e.Str("caption") == "" {
+				add("info", "diagram-caption", e.ID, "Diagram has no caption, so screen readers get no description.",
+					"Set props.caption to one sentence describing what it shows.")
+			}
+		case "embed":
+			if e.Str("kind") == "iframe" && strings.TrimSpace(e.Str("title")) == "" {
+				add("error", "embed-title", e.ID, "Iframe has no title.", "Set props.title to describe the embedded content.")
+			}
+			if auto, _ := e.Props["autoplay"].(bool); auto {
+				if muted, ok := e.Props["muted"].(bool); ok && !muted {
+					add("warning", "autoplay-sound", e.ID, "Video autoplays with sound; browsers block that.", "Set muted: true or drop autoplay.")
+				}
+			}
 		case "code":
 			if n := strings.Count(e.Str("code"), "\n") + 1; n > maxCodeLines {
 				add("warning", "long-code", e.ID, fmt.Sprintf("Code block has %d lines; more than %d won't be legible.", n, maxCodeLines),
@@ -165,8 +188,52 @@ func slide(i int, s, prev *deck.Slide, cat *deck.Catalog, theme *deck.Theme) []I
 	return out
 }
 
+// chart checks data shape and readability.
+func chart(i int, s *deck.Slide, e *deck.Element) []Issue {
+	var out []Issue
+	add := func(sev, code, msg, fix string) {
+		out = append(out, Issue{Severity: sev, Code: code, Slide: i, SlideID: s.ID, ElementID: e.ID, Message: msg, Fix: fix})
+	}
+	labels, _ := e.Props["labels"].([]any)
+	series, _ := e.Props["series"].([]any)
+	kind := e.Str("kind")
+	for k, raw := range series {
+		sm, _ := raw.(map[string]any)
+		vals, _ := sm["values"].([]any)
+		if len(vals) != len(labels) {
+			add("error", "chart-mismatch", fmt.Sprintf("Series %d has %d values but there are %d labels.", k+1, len(vals), len(labels)),
+				"Give every series exactly one value per label.")
+		}
+		if kind == "pie" {
+			for _, v := range vals {
+				if f, _ := v.(float64); f < 0 {
+					add("error", "pie-negative", "Pie charts can't show negative values.", "Use a bar chart.")
+					break
+				}
+			}
+		}
+	}
+	if kind == "pie" && len(series) > 1 {
+		add("info", "pie-series", "Pie charts only draw the first series.", "Remove the extra series or use a bar chart.")
+	}
+	if kind == "pie" && len(labels) > maxPieSlices {
+		add("warning", "pie-slices", fmt.Sprintf("%d pie slices; more than %d are hard to compare.", len(labels), maxPieSlices),
+			"Group small slices into 'Other', or use a bar chart.")
+	}
+	if kind != "pie" && len(labels) > maxBarLabels {
+		add("warning", "chart-crowded", fmt.Sprintf("%d categories; labels will collide.", len(labels)), "Show the top items, or use a line chart.")
+	}
+	if e.Str("caption") == "" {
+		add("info", "chart-caption", "Chart has no caption, so screen readers get no description.",
+			"Set props.caption to the takeaway, e.g. 'Revenue doubled since 2024'.")
+	}
+	return out
+}
+
+var noContrastCheck = map[string]bool{"image": true, "chart": true, "diagram": true, "embed": true, "shape": true}
+
 func contrast(i int, s *deck.Slide, e *deck.Element, theme *deck.Theme) []Issue {
-	if theme == nil || e.Type == "image" {
+	if theme == nil || noContrastCheck[e.Type] {
 		return nil
 	}
 	bgTok := "bg"
@@ -196,7 +263,7 @@ func contrast(i int, s *deck.Slide, e *deck.Element, theme *deck.Theme) []Issue 
 		return out
 	}
 	need := minContrast
-	if e.Type == "heading" || e.Type == "stat" || (e.Style != nil && (e.Style.Size == "lg" || e.Style.Size == "xl" || e.Style.Size == "xxl")) {
+	if e.Type == "heading" || e.Type == "stat" || e.Type == "icon" || (e.Style != nil && (e.Style.Size == "lg" || e.Style.Size == "xl" || e.Style.Size == "xxl")) {
 		need = minContrastLarg
 	}
 	if ratio < need {
@@ -261,8 +328,10 @@ func text(e *deck.Element) string {
 		return plain(strings.Join(e.Items(), " "))
 	case "stat":
 		return e.Str("label")
-	case "image":
+	case "image", "chart", "diagram":
 		return e.Str("caption")
+	case "shape":
+		return plain(e.Str("label"))
 	}
 	return ""
 }
@@ -278,10 +347,11 @@ func weight(e *deck.Element) float64 {
 		}
 	}
 	switch e.Type {
-	case "image":
+	case "image", "chart", "diagram", "embed", "icon":
 		return 0
 	case "code":
-		return float64(strings.Count(e.Str("code"), "\n")+1) * 40 * f
+		// Code height is driven by line count; ~24 body characters per line.
+		return float64(strings.Count(e.Str("code"), "\n")+1) * 24 * f
 	case "stat":
 		return 20 * f
 	case "bullets":

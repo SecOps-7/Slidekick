@@ -4,7 +4,8 @@ services:
   slidekick:
     build:
       context: /DATA/Backup/Projects/Slidekick
-    image: slidekick:local
+      target: render # includes Chromium for render_slide; drop for the slim image
+    image: slidekick:local-render
     container_name: slidekick
     restart: unless-stopped
     user: "1000:1000"
@@ -19,6 +20,9 @@ services:
     volumes:
       - /DATA/AppData/Slidekick/data:/data
     read_only: true
+    tmpfs:
+      - /tmp:size=512m # Chromium profile and scratch space
+    shm_size: 256m
     security_opt:
       - no-new-privileges:true
     cap_drop:

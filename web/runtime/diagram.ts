@@ -1,0 +1,80 @@
+// Mermaid diagrams, themed from the deck's tokens. Mermaid is large, so it
+// loads lazily the first time a deck uses a diagram. Rendered SVG is cached
+// by (source, theme) so live edits elsewhere never cause a diagram to flicker.
+
+let mermaidP: Promise<typeof import("mermaid").default> | null = null;
+let configured = "";
+const cache = new Map<string, string>();
+let seq = 0;
+
+function tokens() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (k: string) => cs.getPropertyValue(`--sk-${k}`).trim();
+  return {
+    key: ["bg", "surface", "text", "muted", "accent", "accent2", "font-body"].map(v).join("|"),
+    vars: {
+      background: v("bg"),
+      primaryColor: v("surface"),
+      primaryTextColor: v("text"),
+      primaryBorderColor: v("accent"),
+      secondaryColor: v("surface"),
+      tertiaryColor: v("bg"),
+      lineColor: v("muted"),
+      textColor: v("text"),
+      mainBkg: v("surface"),
+      nodeBorder: v("accent"),
+      clusterBkg: v("bg"),
+      clusterBorder: v("muted"),
+      edgeLabelBackground: v("bg"),
+      actorBkg: v("surface"),
+      actorBorder: v("accent"),
+      actorTextColor: v("text"),
+      signalColor: v("text"),
+      signalTextColor: v("text"),
+      noteBkgColor: v("surface"),
+      noteTextColor: v("text"),
+      fontFamily: v("font-body"),
+      fontSize: "28px",
+    },
+  };
+}
+
+async function mermaid() {
+  mermaidP ??= import("mermaid").then((m) => m.default);
+  return mermaidP;
+}
+
+function fit(host: HTMLElement) {
+  const svg = host.querySelector("svg");
+  if (!svg) return;
+  svg.style.maxWidth = "100%";
+  svg.style.width = "100%";
+  svg.style.height = "100%";
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+}
+
+/** Fills host with the rendered diagram; resolves when done (never rejects). */
+export async function renderDiagram(host: HTMLElement, source: string): Promise<void> {
+  const t = tokens();
+  const key = `${t.key}\u0000${source}`;
+  const hit = cache.get(key);
+  if (hit) {
+    host.innerHTML = hit;
+    fit(host);
+    return;
+  }
+  try {
+    const m = await mermaid();
+    if (configured !== t.key) {
+      m.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base", themeVariables: t.vars, flowchart: { htmlLabels: false } });
+      configured = t.key;
+    }
+    const { svg } = await m.render(`sk-mmd-${++seq}`, source);
+    cache.set(key, svg);
+    host.innerHTML = svg;
+    fit(host);
+  } catch (err) {
+    host.classList.add("sk-diagram-error");
+    host.textContent = `Diagram error: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`;
+  }
+}

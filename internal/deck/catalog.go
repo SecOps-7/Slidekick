@@ -20,6 +20,9 @@ type Catalog struct {
 	Layouts     map[string]Layout `json:"layouts"`
 	Transitions map[string]string `json:"transitions"`
 	Builds      map[string]string `json:"builds"`
+	Elements    map[string]string `json:"elements"`
+	Icons       []string          `json:"icons"`
+	iconSet     map[string]bool
 	// regionOrder keeps each layout's regions in file order.
 	regionOrder map[string][]string
 }
@@ -42,6 +45,10 @@ func LoadCatalog(fsys fs.FS) (*Catalog, error) {
 	}
 	if err := json.Unmarshal(raw, &ordered); err != nil {
 		return nil, err
+	}
+	c.iconSet = map[string]bool{}
+	for _, i := range c.Icons {
+		c.iconSet[i] = true
 	}
 	c.regionOrder = map[string][]string{}
 	for name, l := range ordered.Layouts {
@@ -73,6 +80,9 @@ func objectKeys(raw json.RawMessage) ([]string, error) {
 	}
 	return keys, nil
 }
+
+// HasIcon reports whether name is in the icon catalogue.
+func (c *Catalog) HasIcon(name string) bool { return c.iconSet[name] }
 
 // LayoutRegions returns a layout's region names in declaration order.
 func (c *Catalog) LayoutRegions(layout string) []string { return c.regionOrder[layout] }
