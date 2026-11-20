@@ -17,9 +17,24 @@
       "body": "\"Inter Tight\", \"Helvetica Neue\", Arial, sans-serif",
       "mono": "\"JetBrains Mono\", ui-monospace, monospace"
     },
-    "fontImport": "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;800&family=JetBrains+Mono&display=swap",
-    "size": { "xs": 22, "sm": 28, "md": 36, "lg": 56, "xl": 88, "xxl": 140 },
+    "fonts": [
+      "inter-tight",
+      "jetbrains-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 36,
+      "lg": 56,
+      "xl": 88,
+      "xxl": 140
+    },
     "radius": 0,
-    "motion": { "fast": 160, "base": 340, "slow": 620, "easing": "cubic-bezier(0.2, 0, 0, 1)" }
+    "motion": {
+      "fast": 160,
+      "base": 340,
+      "slow": 620,
+      "easing": "cubic-bezier(0.2, 0, 0, 1)"
+    }
   }
 }

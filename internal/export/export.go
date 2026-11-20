@@ -92,10 +92,12 @@ func (x *Exporter) HTML(ctx context.Context, raw []byte) ([]byte, error) {
 	b.WriteString("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
 	b.WriteString("<meta name=\"generator\" content=\"Slidekick\">\n")
 	fmt.Fprintf(&b, "<title>%s</title>\n", html.EscapeString(d.Title))
-	if theme.Tokens.FontImport != "" {
-		fmt.Fprintf(&b, "<link rel=\"stylesheet\" href=\"%s\">\n", html.EscapeString(theme.Tokens.FontImport))
-	}
 	b.WriteString("<style>\n")
+	// Theme fonts, inlined so the file needs no network at all.
+	b.WriteString(x.Themes.FontFaceCSS(theme, func(file string) string {
+		data, _ := x.Themes.FontFile(file)
+		return "data:font/woff2;base64," + base64.StdEncoding.EncodeToString(data)
+	}))
 	b.Write(safeStyle(css))
 	b.WriteString("\n</style>\n")
 	fmt.Fprintf(&b, "<style data-sk-theme=\"%s\">\n", html.EscapeString(theme.Name))
