@@ -49,6 +49,11 @@ func TestPolicy(t *testing.T) {
 		{"deck token uses AI", deckTok, UseAI, mine, false},
 		{"anonymous", anon, View, mine, false},
 		{"unknown role", Principal{Kind: KindUser, Role: "root"}, View, mine, false},
+		{"owner deletes", ed, Delete, mine, true},
+		{"other editor deletes", other, Delete, mine, false},
+		{"viewer deletes", view, Delete, mine, false},
+		{"deck token deletes", deckTok, Delete, mine, false},
+		{"admin deletes", admin, Delete, unowned, true},
 	}
 	for _, tc := range cases {
 		if got := pol.Can(tc.p, tc.a, tc.d); got != tc.want {
@@ -58,6 +63,9 @@ func TestPolicy(t *testing.T) {
 	editAll = true
 	if !pol.Can(other, Edit, mine) || pol.Can(view, Edit, mine) {
 		t.Error("editors-edit-all setting")
+	}
+	if pol.Can(other, Delete, mine) {
+		t.Error("editors-edit-all must not allow deleting others' decks")
 	}
 }
 

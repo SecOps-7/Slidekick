@@ -507,3 +507,19 @@ func (s *server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 	s.setSession(w, r, cookie)
 	http.Redirect(w, r, safeNext(next), http.StatusFound)
 }
+
+func (s *server) deleteDeck(w http.ResponseWriter, r *http.Request) {
+	a := authFrom(r.Context())
+	actor := "human"
+	if a.user != nil {
+		actor = "user:" + a.user.Username
+	}
+	if err := s.svc.Delete(r.Context(), r.PathValue("id"), actor); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if s.opt.Log != nil {
+		s.opt.Log.Info("deck removed", "deck", r.PathValue("id"), "by", actor)
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}

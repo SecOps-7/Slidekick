@@ -60,3 +60,5 @@
 
 .acc textarea { font: inherit; font-size: 14px; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--app-line); background: var(--app-panel); color: var(--app-text); resize: vertical; }
 .acc-models { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; max-height: 260px; overflow: auto; padding: 8px; border: 1px solid var(--app-line); border-radius: 8px; font-size: 13px; }
+.acc-brand { line-height: 0; color: var(--app-text); justify-self: start; }
+.acc-brand svg { height: 30px; width: auto; display: block; }

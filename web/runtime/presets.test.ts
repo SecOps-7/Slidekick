@@ -102,6 +102,169 @@ describe("transitions", () => {
   });
 });
 
+const REST_TRANSFORM = /^(none|perspective\(\d+px\) translateX\(0\) rotateY\(0deg\))$/;
+const REST_CLIP = /^(inset\(0 0 0 0\)|circle\(75% at 50% 50%\))$/;
+
+/** The values an element is left with: every animated property back at its natural state. */
+function expectAtRest(frame: Keyframe, label: string) {
+  if ("opacity" in frame) expect(frame.opacity, label).toBe(1);
+  if ("transform" in frame) expect(String(frame.transform), label).toMatch(REST_TRANSFORM);
+  if ("filter" in frame) expect(String(frame.filter), label).toMatch(/^(none|blur\(0px\)|brightness\(1\))$/);
+  if ("clipPath" in frame) expect(String(frame.clipPath), label).toMatch(REST_CLIP);
+}
+
+describe("more build presets", () => {
+  it("every preset ends with the element at rest", () => {
+    for (const [name, preset] of Object.entries(builds)) {
+      calls = [];
+      const el = div("Hello");
+      preset(el, o);
+      for (const c of calls.filter((c) => c.el === el && c.opts.fill === "both")) expectAtRest(c.frames.at(-1)!, name);
+    }
+  });
+
+  it("durations follow the theme", () => {
+    for (const [name, preset] of Object.entries(builds)) {
+      if (name === "typewriter") continue; // paced by character count
+      calls = [];
+      preset(div("Hello"), o);
+      const fast = calls.map((c) => Number(c.opts.duration));
+      calls = [];
+      preset(div("Hello"), { ...o, duration: 800 });
+      calls.forEach((c, i) => expect(Number(c.opts.duration), name).toBeCloseTo(fast[i] * 2));
+    }
+  });
+
+  it("directional entrances come from the side they name", () => {
+    const start = (name: keyof typeof builds) => {
+      calls = [];
+      builds[name](div(), o);
+      return String(calls[0].frames[0].transform);
+    };
+    expect(start("fade-down")).toBe("translateY(-36px)");
+    expect(start("fade-left")).toBe("translateX(48px)"); // moves left, so starts to the right
+    expect(start("fade-right")).toBe("translateX(-48px)");
+    expect(start("slide-up")).toMatch(/^translateY\(\d+px\)$/);
+    expect(start("slide-down")).toMatch(/^translateY\(-\d+px\)$/);
+    expect(start("slide-left")).toMatch(/^translateX\(\d+px\)$/);
+    expect(start("slide-right")).toMatch(/^translateX\(-\d+px\)$/);
+    expect(start("drop")).toMatch(/^translateY\(-\d+px\)$/);
+  });
+
+  it("pop and bounce-in overshoot with their own curve, not a second theme spring", () => {
+    for (const name of ["pop", "bounce-in"] as const) {
+      calls = [];
+      builds[name](div(), { ...o, easing: "linear(0, 1.2, 1)" });
+      const scales = calls[0].frames.map((f) => /scale\(([\d.]+)\)/.exec(String(f.transform))?.[1]).filter(Boolean).map(Number);
+      expect(Math.max(...scales), name).toBeGreaterThan(1);
+      expect(calls[0].opts.easing, name).toBe("linear");
+      const offsets = calls[0].frames.map((f) => f.offset).filter((x) => x !== undefined) as number[];
+      expect([...offsets].sort(), name).toEqual(offsets); // keyframes in order
+    }
+  });
+
+  it("swing hinges on its top edge", () => {
+    builds.swing(div(), o);
+    for (const f of calls[0].frames) expect(f.transformOrigin).toBe("50% 0");
+  });
+
+  it("highlight's marker sweeps away and leaves no trace", () => {
+    const el = div("Key line");
+    builds.highlight(el, o);
+    const marker = calls.find((c) => c.frames.some((f) => "backgroundSize" in f))!;
+    expect(marker.opts.fill).toBe("none");
+    expect(marker.frames[0].backgroundSize).toBe("0% 100%");
+    expect(marker.frames.at(-1)!.backgroundSize).toBe("0% 100%");
+    expect(marker.frames.some((f) => f.backgroundSize === "100% 100%")).toBe(true);
+  });
+
+  it("clip reveals start fully hidden", () => {
+    const first = (name: keyof typeof builds) => {
+      calls = [];
+      builds[name](div(), o);
+      return calls[0].frames[0].clipPath;
+    };
+    expect(first("reveal")).toBe("inset(100% 0 0 0)");
+    expect(first("wipe-down")).toBe("inset(0 0 100% 0)");
+    expect(first("iris")).toBe("circle(0% at 50% 50%)");
+  });
+
+  it("reduced motion also drops stagger delays", () => {
+    for (const preset of Object.values(builds)) {
+      calls = [];
+      preset(div("Hello"), { ...o, reduced: true });
+      for (const c of calls) expect(c.opts.delay ?? 0).toBe(0);
+    }
+  });
+});
+
+describe("more transitions", () => {
+  const MOVING = ["zoom-out", "cover", "uncover", "push-up", "wipe", "split", "iris", "flip", "cube", "swap"] as const;
+  const ALL = [...MOVING, "fade-through", "blur"] as const;
+
+  const record = (name: keyof typeof transitions, from: HTMLElement | null, to: HTMLElement, opts: MotionOpts) => {
+    calls = [];
+    transitions[name](from, to, opts);
+    return calls.map((c) => ({ who: c.el === to ? "to" : "from", frames: c.frames, opts: c.opts }));
+  };
+
+  it("every transition animates and leaves the new slide at rest", () => {
+    for (const name of ALL) {
+      for (const d of [1, -1] as const) {
+        const to = div();
+        const anims = record(name, div(), to, { ...o, direction: d });
+        expect(anims.length, name).toBeGreaterThan(0);
+        for (const a of anims.filter((a) => a.who === "to")) expectAtRest(a.frames.at(-1)!, `${name} ${d}`);
+        for (const a of anims) expect(Number(a.opts.duration), name).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("going back plays the mirror image", () => {
+    for (const name of MOVING) {
+      const fwd = JSON.stringify(record(name, div(), div(), { ...o, direction: 1 }));
+      const back = JSON.stringify(record(name, div(), div(), { ...o, direction: -1 }));
+      expect(back, name).not.toBe(fwd);
+    }
+    expect(record("cover", div(), div(), { ...o, direction: -1 })[0].frames[0].transform).toBe("translateX(-100%)");
+    expect(record("push-up", div(), div(), { ...o, direction: 1 })[0].frames[0].transform).toBe("translateY(100%)");
+    expect(record("wipe", div(), div(), { ...o, direction: -1 })[0].frames[0].clipPath).toBe("inset(0 0 0 100%)");
+  });
+
+  it("uncover and the backward iris and split keep the old slide on top", () => {
+    for (const [name, d] of [["uncover", 1], ["iris", -1], ["split", -1]] as const) {
+      const from = record(name, div(), div(), { ...o, direction: d }).filter((a) => a.who === "from");
+      expect(from.length, name).toBe(1);
+      for (const f of from[0].frames) expect(f.zIndex, name).toBe(2);
+    }
+  });
+
+  it("flip turns the new slide in only after the old one is edge-on", () => {
+    const [to, from] = record("flip", div(), div(), o);
+    expect(from.frames.at(-1)!.transform).toBe("perspective(2400px) rotateY(90deg)");
+    expect(to.frames[0].transform).toBe("perspective(2400px) rotateY(-90deg)");
+    expect(to.opts.delay).toBe(from.opts.duration);
+  });
+
+  it("reduced motion falls back to an instant crossfade", () => {
+    for (const name of ALL) {
+      const anims = record(name, div(), div(), { ...o, reduced: true, direction: -1 });
+      for (const a of anims) {
+        expect(a.opts.duration, name).toBe(0);
+        for (const f of a.frames) expect(Object.keys(f), name).toEqual(["opacity"]);
+      }
+    }
+  });
+
+  it("the first slide gets no outgoing animation", () => {
+    for (const name of ALL) {
+      const anims = record(name, null, div(), { ...o, direction: -1 });
+      expect(anims.every((a) => a.who === "to"), name).toBe(true);
+      expect(anims.length, name).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("morph fallback (FLIP)", () => {
   it("maps the new box back onto the old one", () => {
     const first = new DOMRect(100, 50, 200, 100);

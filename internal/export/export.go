@@ -92,6 +92,9 @@ func (x *Exporter) HTML(ctx context.Context, raw []byte) ([]byte, error) {
 	b.WriteString("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
 	b.WriteString("<meta name=\"generator\" content=\"Slidekick\">\n")
 	fmt.Fprintf(&b, "<title>%s</title>\n", html.EscapeString(d.Title))
+	if icon, err := fs.ReadFile(x.Web, "favicon.svg"); err == nil {
+		fmt.Fprintf(&b, "<link rel=\"icon\" type=\"image/svg+xml\" href=\"data:image/svg+xml;base64,%s\">\n", base64.StdEncoding.EncodeToString(icon))
+	}
 	b.WriteString("<style>\n")
 	// Theme fonts, inlined so the file needs no network at all.
 	b.WriteString(x.Themes.FontFaceCSS(theme, func(file string) string {

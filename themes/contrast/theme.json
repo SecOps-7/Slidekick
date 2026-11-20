@@ -1,0 +1,40 @@
+{
+  "name": "contrast",
+  "label": "High Contrast",
+  "description": "Accessibility first. Pure black with white text, yellow and cyan accents at AAA contrast, Atkinson Hyperlegible type at larger sizes, clear outlines and no ambient motion. Good for accessible presentations, large rooms and low-vision audiences.",
+  "dark": true,
+  "tokens": {
+    "color": {
+      "bg": "#000000",
+      "surface": "#151515",
+      "text": "#ffffff",
+      "muted": "#d6d6d6",
+      "accent": "#ffd60a",
+      "accent2": "#62e3ff"
+    },
+    "font": {
+      "heading": "\"Atkinson Hyperlegible Next\", system-ui, sans-serif",
+      "body": "\"Atkinson Hyperlegible Next\", system-ui, sans-serif",
+      "mono": "\"JetBrains Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "atkinson-hyperlegible-next",
+      "jetbrains-mono"
+    ],
+    "size": {
+      "xs": 26,
+      "sm": 32,
+      "md": 40,
+      "lg": 58,
+      "xl": 84,
+      "xxl": 128
+    },
+    "radius": 10,
+    "motion": {
+      "fast": 150,
+      "base": 300,
+      "slow": 500,
+      "easing": "cubic-bezier(0, 0, 0.2, 1)"
+    }
+  }
+}

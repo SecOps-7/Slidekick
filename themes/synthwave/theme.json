@@ -1,0 +1,42 @@
+{
+  "name": "synthwave",
+  "label": "Synthwave",
+  "description": "Neon retro. Deep violet night, hot magenta and cyan glow, a wide display face and a glowing grid horizon. Punchy, springy motion. Good for gaming, music, hackathons and bold product reveals.",
+  "dark": true,
+  "tokens": {
+    "color": {
+      "bg": "#14082b",
+      "surface": "#221242",
+      "text": "#fdf4ff",
+      "muted": "#c9b8f0",
+      "accent": "#ff4fd8",
+      "accent2": "#36e2f5"
+    },
+    "font": {
+      "heading": "\"Unbounded\", \"Space Grotesk\", system-ui, sans-serif",
+      "body": "\"Space Grotesk\", \"Inter\", system-ui, sans-serif",
+      "mono": "\"JetBrains Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "unbounded",
+      "space-grotesk",
+      "jetbrains-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 34,
+      "lg": 48,
+      "xl": 70,
+      "xxl": 112
+    },
+    "radius": 14,
+    "motion": {
+      "fast": 200,
+      "base": 440,
+      "slow": 760,
+      "easing": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "bounce": 0.25
+    }
+  }
+}

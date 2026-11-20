@@ -1,0 +1,70 @@
+/* Sorbet: pastel blobs and confetti float in the corners; cards are soft and bubbly. */
+.sk-theme-sorbet .sk-slide {
+  background-image:
+    radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--sk-accent) 45%, transparent) 0 7px, transparent 8px),
+    radial-gradient(circle at 88% 14%, color-mix(in oklab, var(--sk-accent2) 50%, transparent) 0 9px, transparent 10px),
+    radial-gradient(circle at 93% 82%, color-mix(in oklab, #8b6cf0 55%, transparent) 0 6px, transparent 7px),
+    radial-gradient(circle at 6% 88%, color-mix(in oklab, #f5a524 60%, transparent) 0 8px, transparent 9px),
+    radial-gradient(circle at 50% 6%, color-mix(in oklab, #8b6cf0 40%, transparent) 0 5px, transparent 6px);
+}
+.sk-theme-sorbet .sk-slide[data-bg-image] { background-size: cover; }
+.sk-theme-sorbet .sk-slide::before,
+.sk-theme-sorbet .sk-slide::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+}
+.sk-theme-sorbet .sk-slide::before {
+  width: 560px;
+  height: 560px;
+  right: -200px;
+  top: -240px;
+  background: radial-gradient(circle at 40% 60%, #ffd6e4, #ffc2d6 60%, transparent 61%), radial-gradient(circle at 70% 30%, #d9f2ec 0 40%, transparent 41%);
+  opacity: 0.85;
+  animation: sk-sorbet-float 14s ease-in-out infinite alternate;
+}
+.sk-theme-sorbet .sk-slide::after {
+  width: 520px;
+  height: 520px;
+  left: -220px;
+  bottom: -260px;
+  background: radial-gradient(circle at 60% 40%, #e6defd 0 60%, transparent 61%), radial-gradient(circle at 25% 25%, #ffe6bf 0 35%, transparent 36%);
+  opacity: 0.85;
+  animation: sk-sorbet-float 18s ease-in-out infinite alternate-reverse;
+}
+@keyframes sk-sorbet-float {
+  from { transform: translate3d(0, 0, 0) rotate(0deg); }
+  to   { transform: translate3d(-24px, 30px, 0) rotate(20deg); }
+}
+.sk-theme-sorbet .sk-slide[data-bg-image]::before,
+.sk-theme-sorbet .sk-slide[data-bg-image]::after,
+.sk-theme-sorbet .sk-layout-hero-image::before,
+.sk-theme-sorbet .sk-layout-hero-image::after { display: none; }
+.sk-theme-sorbet .sk-el-heading h1,
+.sk-theme-sorbet .sk-el-heading h2,
+.sk-theme-sorbet .sk-el-heading h3 { font-weight: 600; letter-spacing: -0.01em; line-height: 1.04; }
+.sk-theme-sorbet .sk-layout-title .sk-region-title .sk-el-heading h1 { font-weight: 700; }
+.sk-theme-sorbet .sk-layout-title .sk-region-title::after {
+  content: "";
+  display: block;
+  width: 180px;
+  height: 14px;
+  margin: 36px auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--sk-accent) 0 33%, #8b6cf0 33% 66%, var(--sk-accent2) 66%);
+}
+.sk-theme-sorbet .sk-card { background: var(--sk-surface); box-shadow: 0 22px 44px -26px rgba(45, 33, 64, 0.35); border: 3px solid color-mix(in oklab, var(--sk-accent) 18%, var(--sk-surface)); }
+.sk-theme-sorbet .sk-region-b.sk-card { border-color: color-mix(in oklab, #8b6cf0 26%, var(--sk-surface)); }
+.sk-theme-sorbet .sk-region-c.sk-card { border-color: color-mix(in oklab, var(--sk-accent2) 26%, var(--sk-surface)); }
+.sk-theme-sorbet .sk-el-bullets li::marker { content: "\25CF  "; color: var(--sk-accent); }
+.sk-theme-sorbet .sk-el-bullets li:nth-child(3n+2)::marker { color: #7c5ce6; }
+.sk-theme-sorbet .sk-el-bullets li:nth-child(3n)::marker { color: var(--sk-accent2); }
+.sk-theme-sorbet .sk-stat-value { font-weight: 700; color: var(--sk-accent); }
+.sk-theme-sorbet .sk-el-quote blockquote p { font-weight: 500; }
+.sk-theme-sorbet .sk-el-code pre { background: var(--sk-surface); border: 3px solid color-mix(in oklab, var(--sk-accent2) 20%, var(--sk-surface)); }
+@media (prefers-reduced-motion: reduce) {
+  .sk-theme-sorbet .sk-slide::before,
+  .sk-theme-sorbet .sk-slide::after { animation: none; }
+}

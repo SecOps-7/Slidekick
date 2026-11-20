@@ -1,0 +1,39 @@
+{
+  "name": "terminal",
+  "label": "Terminal",
+  "description": "Hacker console. Black screen, phosphor-green monospace everywhere, scanlines, prompt markers and a blinking cursor. Quick, clipped motion. Good for developer talks, security briefings and CLI demos.",
+  "dark": true,
+  "tokens": {
+    "color": {
+      "bg": "#070b08",
+      "surface": "#0f1811",
+      "text": "#c8facc",
+      "muted": "#7fb58a",
+      "accent": "#3dff8b",
+      "accent2": "#ffb000"
+    },
+    "font": {
+      "heading": "\"JetBrains Mono\", ui-monospace, monospace",
+      "body": "\"JetBrains Mono\", ui-monospace, monospace",
+      "mono": "\"JetBrains Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "jetbrains-mono"
+    ],
+    "size": {
+      "xs": 20,
+      "sm": 26,
+      "md": 31,
+      "lg": 44,
+      "xl": 64,
+      "xxl": 100
+    },
+    "radius": 0,
+    "motion": {
+      "fast": 120,
+      "base": 260,
+      "slow": 480,
+      "easing": "cubic-bezier(0.2, 0, 0, 1)"
+    }
+  }
+}

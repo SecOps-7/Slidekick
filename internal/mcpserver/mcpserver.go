@@ -40,6 +40,7 @@ Workflow:
 5. If a write result shows openComments, call list_comments: humans pinned requests for you. Act on them, then resolve_comment with a short reply.
 6. Check your work visually: render_slide returns a screenshot of any slide (when Chromium is installed).
 7. Give the user the url from get_share_url so they can watch or present. export_deck makes a standalone HTML file.
+8. Work where the user can see it: when the user names a slide ("slide 4") or you move on to another slide, call focus_slide first, so their editor and viewer show that slide while you change it. Edits move the view too.
 
 Don't write HTML: compose elements (heading, text, bullets, image, code, stat, quote, chart, diagram, icon, shape, embed) inside layout regions. The sandboxed html element is a last resort for something no element can express; lint warns on it; style only with theme tokens. Upload images with upload_asset and use the returned /files/... url.`
 
@@ -529,6 +530,27 @@ func (h *handlers) tools(s *mcp.Server) {
 			}
 			return nil, &ShareOut{URL: h.svc.ShareURL(in.DeckID), Viewers: h.svc.Hub.Count(in.DeckID)}, nil
 		})
+
+	mcp.AddTool(s, write("focus_slide", "Bring a slide into view for everyone watching the deck (editor and live viewers that follow along). Call it before you work on a slide, and whenever the user mentions one (\"slide 4\"), so they see the slide you're changing. Edits also move the view on their own; this is for reading, explaining or starting work on a slide."),
+		func(ctx context.Context, req *mcp.CallToolRequest, in FocusIn) (*mcp.CallToolResult, *FocusOut, error) {
+			out, err := h.svc.Focus(ctx, in.DeckID, in.Slide, in.SlideID, actorOf(req))
+			if err != nil {
+				return nil, nil, notFound(err, in.DeckID)
+			}
+			return nil, &FocusOut{SlideID: out.SlideID, Slide: out.Index + 1, Watching: h.svc.Hub.Count(in.DeckID)}, nil
+		})
+}
+
+type FocusIn struct {
+	DeckID  string `json:"deck_id"`
+	Slide   int    `json:"slide,omitempty" jsonschema:"slide number as people count them, starting at 1"`
+	SlideID string `json:"slide_id,omitempty" jsonschema:"slide id, instead of slide"`
+}
+
+type FocusOut struct {
+	SlideID  string `json:"slideId"`
+	Slide    int    `json:"slide" jsonschema:"slide number, starting at 1"`
+	Watching int    `json:"watching" jsonschema:"browsers watching the deck"`
 }
 
 func notFound(err error, id string) error {

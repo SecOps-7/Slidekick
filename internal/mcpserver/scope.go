@@ -65,6 +65,7 @@ var toolActions = map[string]authz.Action{
 	"get_history":     authz.View,
 	"restore_version": authz.Edit,
 	"set_deck_access": authz.Share,
+	"focus_slide":     authz.Edit, // moves everyone's view, so only for people who may change the deck
 	"get_share_url":   authz.View,
 }
 

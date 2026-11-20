@@ -85,6 +85,7 @@ const (
 	Export         Action = "export"
 	Share          Action = "share"      // private toggle and view key
 	MintDeckToken  Action = "deck-token" // create or revoke a deck's edit token
+	Delete         Action = "delete"     // remove a deck for good
 	Create         Action = "create"
 	Upload         Action = "upload"
 	UseAI          Action = "ai"
@@ -138,6 +139,9 @@ func (pol Policy) Can(p Principal, a Action, d *Deck) bool {
 				return false
 			}
 			return (d.Owner != "" && d.Owner == p.UserID) || (pol.EditorsEditAll != nil && pol.EditorsEditAll())
+		case Delete:
+			// Only the owner: "editors can edit every deck" doesn't extend to deleting.
+			return d != nil && d.Owner != "" && d.Owner == p.UserID
 		}
 	case RoleViewer:
 		switch a {

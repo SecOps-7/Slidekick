@@ -1,0 +1,41 @@
+{
+  "name": "boardroom",
+  "label": "Boardroom",
+  "description": "Light and corporate. Cool white, deep navy type, a confident blue and a touch of gold, with a navy header rule. Good for board updates, quarterly reviews and client proposals.",
+  "dark": false,
+  "tokens": {
+    "color": {
+      "bg": "#f4f6fa",
+      "surface": "#ffffff",
+      "text": "#0f1f3d",
+      "muted": "#4a5872",
+      "accent": "#1d4ed8",
+      "accent2": "#a86b12"
+    },
+    "font": {
+      "heading": "\"Inter Tight\", \"Inter\", system-ui, sans-serif",
+      "body": "\"Source Sans 3\", system-ui, sans-serif",
+      "mono": "\"JetBrains Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "inter-tight",
+      "source-sans-3",
+      "jetbrains-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 34,
+      "lg": 52,
+      "xl": 78,
+      "xxl": 120
+    },
+    "radius": 8,
+    "motion": {
+      "fast": 200,
+      "base": 420,
+      "slow": 700,
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)"
+    }
+  }
+}

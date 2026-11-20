@@ -1,0 +1,67 @@
+/* Blueprint: a drafting grid, corner registration marks and dashed outlines. */
+.sk-theme-blueprint .sk-slide {
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--sk-text) 14%, transparent) 2px, transparent 2px),
+    linear-gradient(90deg, color-mix(in oklab, var(--sk-text) 14%, transparent) 2px, transparent 2px),
+    linear-gradient(color-mix(in oklab, var(--sk-text) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--sk-text) 6%, transparent) 1px, transparent 1px);
+  background-size: 200px 200px, 200px 200px, 40px 40px, 40px 40px;
+  background-position: -2px -2px;
+}
+.sk-theme-blueprint .sk-slide[data-bg-image] { background-size: cover; background-position: center; }
+.sk-theme-blueprint .sk-slide::before {
+  content: "";
+  position: absolute;
+  inset: 40px;
+  z-index: 0;
+  pointer-events: none;
+  border: 2px solid color-mix(in oklab, var(--sk-text) 45%, transparent);
+  background:
+    linear-gradient(var(--sk-text), var(--sk-text)) 0 0 / 60px 6px no-repeat,
+    linear-gradient(var(--sk-text), var(--sk-text)) 0 0 / 6px 60px no-repeat,
+    linear-gradient(var(--sk-text), var(--sk-text)) 100% 100% / 60px 6px no-repeat,
+    linear-gradient(var(--sk-text), var(--sk-text)) 100% 100% / 6px 60px no-repeat;
+  opacity: 0.8;
+}
+.sk-theme-blueprint .sk-slide::after {
+  content: "";
+  position: absolute;
+  right: 40px;
+  bottom: 40px;
+  width: 380px;
+  height: 90px;
+  z-index: 0;
+  pointer-events: none;
+  border-left: 2px solid color-mix(in oklab, var(--sk-text) 45%, transparent);
+  border-top: 2px solid color-mix(in oklab, var(--sk-text) 45%, transparent);
+  background:
+    linear-gradient(90deg, transparent 0 63%, color-mix(in oklab, var(--sk-text) 45%, transparent) 63% calc(63% + 2px), transparent 0),
+    linear-gradient(transparent 0 49%, color-mix(in oklab, var(--sk-text) 30%, transparent) 49% calc(49% + 2px), transparent 0);
+}
+.sk-theme-blueprint .sk-slide[data-bg-image]::before,
+.sk-theme-blueprint .sk-slide[data-bg-image]::after,
+.sk-theme-blueprint .sk-layout-hero-image::before,
+.sk-theme-blueprint .sk-layout-hero-image::after,
+.sk-theme-blueprint .sk-layout-full-bleed::after { display: none; }
+.sk-theme-blueprint .sk-el-heading h1,
+.sk-theme-blueprint .sk-el-heading h2,
+.sk-theme-blueprint .sk-el-heading h3 { font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.02; }
+.sk-theme-blueprint .sk-layout-title-body .sk-region-title,
+.sk-theme-blueprint .sk-layout-two-column .sk-region-title,
+.sk-theme-blueprint .sk-layout-grid-3 .sk-region-title {
+  border-bottom: 2px dashed color-mix(in oklab, var(--sk-text) 55%, transparent);
+  padding-bottom: 20px;
+}
+.sk-theme-blueprint .sk-layout-title .sk-region-title .sk-el-heading h1 { letter-spacing: 0.06em; }
+.sk-theme-blueprint .sk-layout-title .sk-region-subtitle .sk-el-text p { font-family: var(--sk-font-mono); font-size: var(--sk-size-md); letter-spacing: 0.02em; }
+.sk-theme-blueprint .sk-card {
+  background: color-mix(in oklab, var(--sk-bg) 70%, transparent);
+  border: 2px dashed color-mix(in oklab, var(--sk-text) 60%, transparent);
+  border-radius: 2px;
+}
+.sk-theme-blueprint .sk-el-bullets li::marker { content: "+  "; color: var(--sk-accent); font-family: var(--sk-font-mono); }
+.sk-theme-blueprint .sk-stat-value { color: var(--sk-accent); font-weight: 500; letter-spacing: 0; }
+.sk-theme-blueprint .sk-card .sk-stat-label { font-family: var(--sk-font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
+.sk-theme-blueprint .sk-el-quote blockquote { border-left: 4px solid var(--sk-accent); padding-left: 56px; }
+.sk-theme-blueprint .sk-el-quote blockquote p { text-transform: none; font-weight: 400; }
+.sk-theme-blueprint .sk-el-code pre { background: color-mix(in oklab, var(--sk-surface) 85%, transparent); border: 2px solid color-mix(in oklab, var(--sk-text) 35%, transparent); }

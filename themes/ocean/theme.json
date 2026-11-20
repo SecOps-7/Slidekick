@@ -1,0 +1,42 @@
+{
+  "name": "ocean",
+  "label": "Ocean",
+  "description": "Fresh and coastal. Pale sea-glass background, deep-sea navy type, teal and coral accents and slow rolling waves along the bottom edge. Good for sustainability, travel, health and calm explainers.",
+  "dark": false,
+  "tokens": {
+    "color": {
+      "bg": "#edf6f8",
+      "surface": "#ffffff",
+      "text": "#0a2a3b",
+      "muted": "#456476",
+      "accent": "#0b6e87",
+      "accent2": "#c4542a"
+    },
+    "font": {
+      "heading": "\"Space Grotesk\", \"Inter\", system-ui, sans-serif",
+      "body": "\"Nunito Sans\", system-ui, sans-serif",
+      "mono": "\"JetBrains Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "space-grotesk",
+      "nunito-sans",
+      "jetbrains-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 35,
+      "lg": 54,
+      "xl": 80,
+      "xxl": 124
+    },
+    "radius": 22,
+    "motion": {
+      "fast": 280,
+      "base": 560,
+      "slow": 940,
+      "easing": "cubic-bezier(0.37, 0, 0.63, 1)",
+      "bounce": 0.15
+    }
+  }
+}

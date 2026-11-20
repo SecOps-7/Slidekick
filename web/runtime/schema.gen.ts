@@ -103,7 +103,35 @@ export interface Style {
  */
 export interface Build {
   step: number;
-  preset?: "fade" | "fade-up" | "scale-in" | "wipe" | "typewriter" | "draw";
+  preset?:
+    | "fade"
+    | "fade-up"
+    | "scale-in"
+    | "wipe"
+    | "typewriter"
+    | "draw"
+    | "fade-down"
+    | "fade-left"
+    | "fade-right"
+    | "slide-up"
+    | "slide-down"
+    | "slide-left"
+    | "slide-right"
+    | "zoom-in"
+    | "zoom-out"
+    | "pop"
+    | "drop"
+    | "bounce-in"
+    | "flip-x"
+    | "flip-y"
+    | "rotate-in"
+    | "swing"
+    | "blur-in"
+    | "reveal"
+    | "wipe-down"
+    | "iris"
+    | "stretch"
+    | "highlight";
 }
 /**
  * This interface was referenced by `SlidekickDeck`'s JSON-Schema
@@ -113,7 +141,25 @@ export interface Transition {
   /**
    * How this slide enters. 'morph' animates elements that share an id with the previous slide.
    */
-  type: "none" | "fade" | "slide" | "zoom" | "push" | "morph";
+  type:
+    | "none"
+    | "fade"
+    | "slide"
+    | "zoom"
+    | "push"
+    | "zoom-out"
+    | "fade-through"
+    | "cover"
+    | "uncover"
+    | "push-up"
+    | "wipe"
+    | "split"
+    | "iris"
+    | "blur"
+    | "flip"
+    | "cube"
+    | "swap"
+    | "morph";
   duration?: "fast" | "base" | "slow";
 }
 /**

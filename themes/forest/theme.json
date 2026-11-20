@@ -1,0 +1,41 @@
+{
+  "name": "forest",
+  "label": "Forest",
+  "description": "Deep woodland. Pine-dark green, moss and amber accents, a soft Fraunces serif and layered tree silhouettes in the mist. Slow, grounded motion. Good for nature, sustainability and reflective keynotes.",
+  "dark": true,
+  "tokens": {
+    "color": {
+      "bg": "#0f1a14",
+      "surface": "#182820",
+      "text": "#eef3e8",
+      "muted": "#a9b8a4",
+      "accent": "#a3d16f",
+      "accent2": "#e2b86a"
+    },
+    "font": {
+      "heading": "\"Fraunces\", Georgia, serif",
+      "body": "\"Source Sans 3\", system-ui, sans-serif",
+      "mono": "\"IBM Plex Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "fraunces",
+      "source-sans-3",
+      "ibm-plex-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 35,
+      "lg": 54,
+      "xl": 80,
+      "xxl": 124
+    },
+    "radius": 14,
+    "motion": {
+      "fast": 320,
+      "base": 640,
+      "slow": 1060,
+      "easing": "cubic-bezier(0.45, 0, 0.2, 1)"
+    }
+  }
+}

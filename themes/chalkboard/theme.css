@@ -1,0 +1,64 @@
+/* Chalkboard: chalk-dust smudges on a slate board, a wooden tray and dashed chalk boxes. */
+.sk-theme-chalkboard .sk-slide {
+  background-image:
+    radial-gradient(38% 30% at 22% 28%, color-mix(in oklab, var(--sk-text) 6%, transparent), transparent 70%),
+    radial-gradient(30% 26% at 78% 70%, color-mix(in oklab, var(--sk-text) 5%, transparent), transparent 70%),
+    radial-gradient(50% 18% at 60% 12%, color-mix(in oklab, var(--sk-text) 4%, transparent), transparent 70%),
+    radial-gradient(color-mix(in oklab, var(--sk-text) 5%, transparent) 1px, transparent 1.5px);
+  background-size: auto, auto, auto, 7px 9px;
+  box-shadow: inset 0 0 160px rgba(0, 0, 0, 0.45);
+}
+.sk-theme-chalkboard .sk-slide[data-bg-image] { background-size: cover; box-shadow: none; }
+.sk-theme-chalkboard .sk-slide::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, #6b4a2d, #4a311c);
+  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.35);
+}
+.sk-theme-chalkboard .sk-slide::before {
+  content: "";
+  position: absolute;
+  left: 180px;
+  bottom: 22px;
+  width: 90px;
+  height: 14px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(90deg, #f6f3ea 0 60%, transparent 60% 70%, var(--sk-accent) 70%);
+  opacity: 0.85;
+}
+.sk-theme-chalkboard .sk-slide[data-bg-image]::before,
+.sk-theme-chalkboard .sk-slide[data-bg-image]::after,
+.sk-theme-chalkboard .sk-layout-hero-image::before,
+.sk-theme-chalkboard .sk-layout-hero-image::after { display: none; }
+.sk-theme-chalkboard .sk-el-heading h1,
+.sk-theme-chalkboard .sk-el-heading h2,
+.sk-theme-chalkboard .sk-el-heading h3 { font-weight: 700; letter-spacing: 0.005em; line-height: 0.98; }
+/* Caveat has a small x-height: set headings larger so they match the body's weight. */
+.sk-theme-chalkboard .sk-el-heading h1 { font-size: calc(var(--sk-fs, var(--sk-size-xl)) * 1.3); }
+.sk-theme-chalkboard .sk-el-heading h2 { font-size: calc(var(--sk-fs, var(--sk-size-lg)) * 1.3); }
+.sk-theme-chalkboard .sk-el-heading h3 { font-size: calc(var(--sk-fs, var(--sk-size-md)) * 1.25); }
+.sk-theme-chalkboard .sk-layout-title-body .sk-region-title .sk-el-heading h2,
+.sk-theme-chalkboard .sk-layout-two-column .sk-region-title .sk-el-heading h2,
+.sk-theme-chalkboard .sk-layout-grid-3 .sk-region-title .sk-el-heading h2 {
+  text-decoration: underline wavy color-mix(in oklab, var(--sk-accent) 70%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+}
+.sk-theme-chalkboard .sk-el { text-shadow: 0 0 1px color-mix(in oklab, var(--sk-text) 40%, transparent); }
+.sk-theme-chalkboard .sk-card {
+  background: color-mix(in oklab, var(--sk-surface) 60%, transparent);
+  border: 3px dashed color-mix(in oklab, var(--sk-text) 45%, transparent);
+  border-radius: 18px 26px 14px 30px;
+}
+.sk-theme-chalkboard .sk-el-bullets li::marker { content: "\2713  "; color: var(--sk-accent); }
+.sk-theme-chalkboard .sk-stat-value { color: var(--sk-accent); font-family: var(--sk-font-heading); letter-spacing: 0; }
+.sk-theme-chalkboard .sk-el-quote blockquote p { font-size: calc(var(--sk-fs, var(--sk-size-lg)) * 1.2); line-height: 1.1; }
+.sk-theme-chalkboard .sk-el-code pre { background: color-mix(in oklab, var(--sk-surface) 70%, transparent); border: 2px dashed color-mix(in oklab, var(--sk-text) 35%, transparent); }

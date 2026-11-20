@@ -1,0 +1,56 @@
+/* Noir: a gold hairline frame, a soft vignette and film grain. */
+.sk-theme-noir .sk-slide {
+  background-image:
+    radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55)),
+    radial-gradient(color-mix(in oklab, var(--sk-text) 4%, transparent) 1px, transparent 1.4px);
+  background-size: auto, 5px 5px;
+}
+.sk-theme-noir .sk-slide[data-bg-image] { background-size: cover; }
+.sk-theme-noir .sk-slide::before {
+  content: "";
+  position: absolute;
+  inset: 44px;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px solid color-mix(in oklab, var(--sk-accent) 55%, transparent);
+}
+.sk-theme-noir .sk-slide::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(30% 30% at 50% 50%, color-mix(in oklab, var(--sk-accent) 9%, transparent), transparent 70%);
+  animation: sk-noir-spot 30s ease-in-out infinite alternate;
+}
+@keyframes sk-noir-spot {
+  from { transform: translate3d(-12%, -8%, 0); }
+  to   { transform: translate3d(12%, 6%, 0); }
+}
+.sk-theme-noir .sk-slide[data-bg-image]::before,
+.sk-theme-noir .sk-slide[data-bg-image]::after,
+.sk-theme-noir .sk-layout-hero-image::before,
+.sk-theme-noir .sk-layout-hero-image::after,
+.sk-theme-noir .sk-layout-full-bleed::after { display: none; }
+.sk-theme-noir .sk-el-heading h1,
+.sk-theme-noir .sk-el-heading h2 { font-weight: 600; letter-spacing: -0.01em; line-height: 1.04; }
+.sk-theme-noir .sk-el-heading h3 { font-weight: 600; }
+.sk-theme-noir .sk-layout-title .sk-region-title .sk-el-heading h1 { font-weight: 500; font-style: italic; }
+.sk-theme-noir .sk-layout-title .sk-region-title::after {
+  content: "";
+  display: block;
+  width: 120px;
+  height: 2px;
+  margin-top: 40px;
+  background: var(--sk-accent);
+}
+.sk-theme-noir .sk-el-text p, .sk-theme-noir .sk-el-bullets { font-weight: 300; }
+.sk-theme-noir .sk-el-bullets li::marker { content: "\2014  "; color: var(--sk-accent); }
+.sk-theme-noir .sk-el-quote blockquote p { font-style: italic; font-weight: 500; }
+.sk-theme-noir .sk-el-quote cite { color: var(--sk-accent); letter-spacing: 0.18em; text-transform: uppercase; font-size: var(--sk-size-xs); }
+.sk-theme-noir .sk-stat-value { color: var(--sk-accent); font-weight: 500; font-style: italic; letter-spacing: -0.02em; }
+.sk-theme-noir .sk-card { background: color-mix(in oklab, var(--sk-surface) 85%, transparent); border: 1px solid color-mix(in oklab, var(--sk-accent) 30%, transparent); }
+.sk-theme-noir .sk-el-code pre { border-color: color-mix(in oklab, var(--sk-accent) 30%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  .sk-theme-noir .sk-slide::after { animation: none; }
+}

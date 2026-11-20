@@ -1,0 +1,43 @@
+/* Brutalist: a heavy frame, hard offset shadows, condensed caps and no softness. */
+.sk-theme-brutalist .sk-slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border: 14px solid var(--sk-text);
+}
+.sk-theme-brutalist .sk-slide::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 140px;
+  height: 140px;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--sk-accent);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.sk-theme-brutalist .sk-slide[data-bg-image]::after,
+.sk-theme-brutalist .sk-layout-hero-image::after,
+.sk-theme-brutalist .sk-layout-full-bleed::after { display: none; }
+.sk-theme-brutalist .sk-el-heading h1,
+.sk-theme-brutalist .sk-el-heading h2,
+.sk-theme-brutalist .sk-el-heading h3 { font-weight: 700; text-transform: uppercase; letter-spacing: -0.005em; line-height: 0.95; }
+.sk-theme-brutalist .sk-layout-title { justify-items: start; text-align: left; grid-template: "." 1fr "title" auto "subtitle" auto "." 0.5fr / 1fr; }
+.sk-theme-brutalist .sk-layout-title .sk-region { align-items: flex-start; }
+.sk-theme-brutalist .sk-layout-title .sk-region-title .sk-el-heading h1 { font-size: calc(var(--sk-fs, var(--sk-size-xl)) * 1.3); }
+.sk-theme-brutalist .sk-layout-title .sk-region-subtitle { border: 5px solid var(--sk-text); background: var(--sk-surface); padding: 20px 32px; box-shadow: 10px 10px 0 var(--sk-text); }
+.sk-theme-brutalist .sk-layout-title-body .sk-region-title,
+.sk-theme-brutalist .sk-layout-two-column .sk-region-title,
+.sk-theme-brutalist .sk-layout-grid-3 .sk-region-title { border-bottom: 8px solid var(--sk-text); padding-bottom: 18px; }
+.sk-theme-brutalist .sk-card { background: var(--sk-surface); border: 5px solid var(--sk-text); border-radius: 0; box-shadow: 14px 14px 0 var(--sk-text); }
+.sk-theme-brutalist .sk-region-b.sk-card { box-shadow: 14px 14px 0 var(--sk-accent); }
+.sk-theme-brutalist .sk-el-bullets li::marker { content: "\2192  "; color: var(--sk-accent); font-weight: 700; }
+.sk-theme-brutalist .sk-stat-value { color: var(--sk-text); font-weight: 700; letter-spacing: -0.02em; -webkit-text-stroke: 0; text-shadow: 10px 10px 0 var(--sk-accent); }
+.sk-theme-brutalist .sk-el-quote blockquote { border-left: 18px solid var(--sk-accent); padding-left: 48px; }
+.sk-theme-brutalist .sk-el-quote blockquote p { text-transform: uppercase; font-weight: 700; line-height: 1; }
+.sk-theme-brutalist .sk-el-code pre { background: var(--sk-surface); border: 5px solid var(--sk-text); box-shadow: 12px 12px 0 var(--sk-text); }
+.sk-theme-brutalist .sk-el :not(pre) > code { background: var(--sk-text); color: var(--sk-bg); border-radius: 0; }
+.sk-theme-brutalist .sk-el a { text-decoration-thickness: 4px; }

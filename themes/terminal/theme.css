@@ -1,0 +1,61 @@
+/* Terminal: CRT scanlines, a phosphor glow, prompt markers and a blinking cursor. */
+.sk-theme-terminal .sk-slide {
+  text-shadow: 0 0 10px color-mix(in oklab, var(--sk-text) 30%, transparent);
+}
+.sk-theme-terminal .sk-slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 5px);
+  mix-blend-mode: multiply;
+}
+.sk-theme-terminal .sk-slide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(110% 100% at 50% 50%, color-mix(in oklab, var(--sk-accent) 7%, transparent), transparent 60%, rgba(0, 0, 0, 0.6));
+}
+.sk-theme-terminal .sk-slide[data-bg-image]::after,
+.sk-theme-terminal .sk-layout-hero-image::after { display: none; }
+.sk-theme-terminal .sk-el-heading h1,
+.sk-theme-terminal .sk-el-heading h2,
+.sk-theme-terminal .sk-el-heading h3 { font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
+.sk-theme-terminal .sk-el-heading h2::before { content: "> "; color: var(--sk-accent); }
+.sk-theme-terminal .sk-el-heading h3::before { content: "# "; color: var(--sk-muted); }
+.sk-theme-terminal .sk-layout-title { justify-items: start; text-align: left; }
+.sk-theme-terminal .sk-layout-title .sk-region { align-items: flex-start; }
+.sk-theme-terminal .sk-layout-title .sk-region-title .sk-el-heading h1::before { content: "$ "; color: var(--sk-accent); }
+.sk-theme-terminal .sk-layout-title .sk-region-title .sk-el-heading h1::after {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 0.9em;
+  margin-left: 0.15em;
+  vertical-align: -0.08em;
+  background: var(--sk-accent);
+  box-shadow: 0 0 16px var(--sk-accent);
+  animation: sk-terminal-blink 1.1s steps(1, end) infinite;
+}
+@keyframes sk-terminal-blink {
+  50% { opacity: 0; }
+}
+.sk-theme-terminal .sk-el-bullets ul { list-style: none; padding-left: 0; }
+.sk-theme-terminal .sk-el-bullets ul > li::before { content: "- "; color: var(--sk-accent); }
+.sk-theme-terminal .sk-el-bullets li::marker { color: var(--sk-accent); }
+.sk-theme-terminal .sk-card,
+.sk-theme-terminal .sk-el-code pre {
+  background: color-mix(in oklab, var(--sk-surface) 90%, transparent);
+  border: 2px solid color-mix(in oklab, var(--sk-accent) 40%, transparent);
+  border-radius: 0;
+}
+.sk-theme-terminal .sk-card .sk-el-text { color: var(--sk-muted); }
+.sk-theme-terminal .sk-stat-value { color: var(--sk-accent); text-shadow: 0 0 40px color-mix(in oklab, var(--sk-accent) 55%, transparent); letter-spacing: -0.04em; }
+.sk-theme-terminal .sk-el-quote blockquote p::before { content: "// "; color: var(--sk-muted); }
+.sk-theme-terminal .sk-el-quote cite::before { content: "-- "; }
+@media (prefers-reduced-motion: reduce) {
+  .sk-theme-terminal .sk-layout-title .sk-region-title .sk-el-heading h1::after { animation: none; }
+}

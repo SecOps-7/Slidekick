@@ -1,0 +1,42 @@
+{
+  "name": "magazine",
+  "label": "Magazine",
+  "description": "Editorial magazine. Crisp white page, black Playfair display headlines, italic pull quotes, double masthead rules and a crimson accent. Good for thought leadership, research and long-form storytelling.",
+  "dark": false,
+  "tokens": {
+    "color": {
+      "bg": "#fbfaf7",
+      "surface": "#f0ede6",
+      "text": "#121212",
+      "muted": "#57534d",
+      "accent": "#b0123b",
+      "accent2": "#1f5568"
+    },
+    "font": {
+      "heading": "\"Playfair Display\", Georgia, serif",
+      "body": "\"Source Sans 3\", system-ui, sans-serif",
+      "mono": "\"IBM Plex Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "playfair-display",
+      "playfair-display-italic",
+      "source-sans-3",
+      "ibm-plex-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 34,
+      "lg": 54,
+      "xl": 84,
+      "xxl": 132
+    },
+    "radius": 0,
+    "motion": {
+      "fast": 220,
+      "base": 460,
+      "slow": 760,
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)"
+    }
+  }
+}

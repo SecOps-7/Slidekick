@@ -1,0 +1,42 @@
+{
+  "name": "sorbet",
+  "label": "Sorbet",
+  "description": "Pastel and playful. Cream with raspberry, teal and lavender, rounded Fredoka headings, floating confetti and bubbly cards. Bouncy motion. Good for kick-offs, celebrations, kids and community events.",
+  "dark": false,
+  "tokens": {
+    "color": {
+      "bg": "#fff5ec",
+      "surface": "#ffffff",
+      "text": "#2d2140",
+      "muted": "#665a78",
+      "accent": "#c92a63",
+      "accent2": "#23807a"
+    },
+    "font": {
+      "heading": "\"Fredoka\", \"Nunito Sans\", system-ui, sans-serif",
+      "body": "\"Nunito Sans\", system-ui, sans-serif",
+      "mono": "\"IBM Plex Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "fredoka",
+      "nunito-sans",
+      "ibm-plex-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 35,
+      "lg": 54,
+      "xl": 82,
+      "xxl": 128
+    },
+    "radius": 32,
+    "motion": {
+      "fast": 240,
+      "base": 480,
+      "slow": 820,
+      "easing": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "bounce": 0.4
+    }
+  }
+}

@@ -41,6 +41,10 @@ A slide supports what the speaker says. It is not a document.
 ```
 The `html` element is an escape hatch, not a shortcut: it runs in a sandbox with no scripts, skips most lint checks and always gets a warning. Use it only for something no other element can express, keep it small, and style it with the theme's CSS variables (`var(--sk-accent)`, `var(--sk-font-body)`, `var(--sk-size-lg)`).
 
+Pick a theme by mood: boardroom (corporate), magazine or paper (editorial), noir (premium), synthwave or ember (bold launches), blueprint or terminal (technical), chalkboard (teaching), sorbet or meadow (friendly), ocean, forest or sunset (calm storytelling), aurora or swiss (modern product), brutalist (provocative), contrast (accessibility, large rooms). The animation catalog lists every build and transition: prefer fade-up or reveal for text, pop, iris or draw for icons and stats, and highlight for one key line at most. Keep 3D transitions (flip, cube) for section changes, and one transition style per section.
+
+Work where the user can see it: they usually watch the editor or viewer while you work. Edits move their view to the changed slide; call `focus_slide` before you start on a slide, and whenever the user names one ("slide 4"), so it's on screen before you change it.
+
 Images and videos: call `upload_asset` and use the `/files/...` url it returns.
 
 Style overrides use tokens only: `"style":{"color":"accent","size":"xl","align":"center"}`.

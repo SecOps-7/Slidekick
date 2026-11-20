@@ -1,0 +1,42 @@
+{
+  "name": "chalkboard",
+  "label": "Chalkboard",
+  "description": "Classroom slate. Green-black board, chalk-white text, handwritten Caveat headings, chalk-dust smudges and dashed chalk boxes. Calm motion. Good for teaching, workshops and explainers.",
+  "dark": true,
+  "tokens": {
+    "color": {
+      "bg": "#22322a",
+      "surface": "#2b3d33",
+      "text": "#f4f1e8",
+      "muted": "#bccab8",
+      "accent": "#ffe38a",
+      "accent2": "#a6d8ff"
+    },
+    "font": {
+      "heading": "\"Caveat\", \"Nunito Sans\", cursive",
+      "body": "\"Nunito Sans\", system-ui, sans-serif",
+      "mono": "\"IBM Plex Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "caveat",
+      "nunito-sans",
+      "ibm-plex-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 35,
+      "lg": 60,
+      "xl": 92,
+      "xxl": 140
+    },
+    "radius": 10,
+    "motion": {
+      "fast": 260,
+      "base": 540,
+      "slow": 900,
+      "easing": "cubic-bezier(0.33, 1, 0.68, 1)",
+      "bounce": 0.1
+    }
+  }
+}

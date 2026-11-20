@@ -1,0 +1,41 @@
+/* Forest: two ridges of pines fade into the dark along the bottom edge; moonlight from above. */
+.sk-theme-forest .sk-slide {
+  background-image: radial-gradient(80% 60% at 70% 0%, color-mix(in oklab, var(--sk-accent) 9%, transparent), transparent 70%);
+}
+.sk-theme-forest .sk-slide[data-bg-image] { background-size: cover; }
+.sk-theme-forest .sk-slide::before,
+.sk-theme-forest .sk-slide::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.sk-theme-forest .sk-slide::before {
+  height: 230px;
+  background: color-mix(in oklab, var(--sk-accent) 10%, transparent);
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 230'><path d='M0 230V150L40 70L80 150L70 150L120 40L170 150L160 150L200 90L240 150L280 20L330 150L320 150L370 80L410 150L460 50L510 150L500 150L540 100L580 150L600 120V230Z'/></svg>") 0 100% / 600px 100% repeat-x;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 230'><path d='M0 230V150L40 70L80 150L70 150L120 40L170 150L160 150L200 90L240 150L280 20L330 150L320 150L370 80L410 150L460 50L510 150L500 150L540 100L580 150L600 120V230Z'/></svg>") 0 100% / 600px 100% repeat-x;
+}
+.sk-theme-forest .sk-slide::after {
+  height: 150px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--sk-accent) 16%, var(--sk-bg)), var(--sk-bg));
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 150'><path d='M0 150V110L30 60L60 110L55 110L95 30L135 110L130 110L165 70L200 110L240 40L280 110L275 110L310 80L345 110L390 50L435 110L430 110L460 85L480 100V150Z'/></svg>") 120px 100% / 480px 100% repeat-x;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 150'><path d='M0 150V110L30 60L60 110L55 110L95 30L135 110L130 110L165 70L200 110L240 40L280 110L275 110L310 80L345 110L390 50L435 110L430 110L460 85L480 100V150Z'/></svg>") 120px 100% / 480px 100% repeat-x;
+}
+.sk-theme-forest .sk-layout-title::before { height: 300px; }
+.sk-theme-forest .sk-slide[data-bg-image]::before,
+.sk-theme-forest .sk-slide[data-bg-image]::after,
+.sk-theme-forest .sk-layout-hero-image::before,
+.sk-theme-forest .sk-layout-hero-image::after { display: none; }
+.sk-theme-forest .sk-el-heading h1,
+.sk-theme-forest .sk-el-heading h2,
+.sk-theme-forest .sk-el-heading h3 { font-weight: 600; letter-spacing: 0; }
+.sk-theme-forest .sk-layout-title .sk-region-title .sk-el-heading h1 { font-weight: 500; }
+.sk-theme-forest .sk-card { background: color-mix(in oklab, var(--sk-surface) 88%, transparent); border: 1px solid color-mix(in oklab, var(--sk-accent) 20%, transparent); box-shadow: 0 24px 50px -30px rgba(0, 0, 0, 0.7); }
+.sk-theme-forest .sk-el-bullets li::marker { content: "\2767  "; color: var(--sk-accent); }
+.sk-theme-forest .sk-stat-value { color: var(--sk-accent); font-weight: 500; }
+.sk-theme-forest .sk-el-quote blockquote p { font-style: italic; font-weight: 400; }
+.sk-theme-forest .sk-el-quote cite { color: var(--sk-accent2); }

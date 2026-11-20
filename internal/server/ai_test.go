@@ -373,3 +373,61 @@ func (w lockedWriter) Write(p []byte) (int, error) {
 func newLockedLogger(b *bytes.Buffer, mu *sync.Mutex) *slog.Logger {
 	return slog.New(slog.NewTextHandler(lockedWriter{mu, b}, nil))
 }
+
+func TestAIChatStaysOnOpenDeckAndFocuses(t *testing.T) {
+	e := newAIServer(t)
+	admin := e.withAdmin(t)
+	e.setupProvider(t, admin)
+	ed := e.addUser(t, admin, "edna", "editor")
+	_, out := ed.do("POST", "/api/decks", map[string]any{"title": "Open deck", "slides": threeSlides})
+	open := out["deckId"].(string)
+	_, out = ed.do("POST", "/api/decks", map[string]any{"title": "Another of mine", "slides": oneSlide})
+	elsewhere := out["deckId"].(string)
+	ch, cancel := e.env.Svc.Hub.Subscribe(open)
+	defer cancel()
+
+	e.llm.script(
+		callTool("create_deck", map[string]any{"title": "Out of view"}),
+		callTool("patch_deck", map[string]any{"deck_id": elsewhere, "ops": []any{map[string]any{"op": "replace", "path": "/title", "value": "moved"}}}),
+		callTool("focus_slide", map[string]any{"slide": 2}),
+		sayText("Focused."),
+	)
+	_, evs := ed.chat(open, "Make slide 3 punchier")
+	// Slide 3 came into view before the model did anything.
+	if f := nextEvent(t, ch, "focus"); f["index"] != float64(2) {
+		t.Fatalf("auto focus %v", f)
+	}
+	var steps []string
+	for _, ev := range evs {
+		if ev.Type == "tool_result" {
+			steps = append(steps, fmt.Sprintf("%s:%v", ev.Tool, ev.OK))
+		}
+	}
+	want := "focus_slide:true create_deck:false patch_deck:false focus_slide:true"
+	if strings.Join(steps, " ") != want {
+		t.Fatalf("steps %v, want %s", steps, want)
+	}
+	if f := nextEvent(t, ch, "focus"); f["index"] != float64(1) {
+		t.Fatalf("model focus %v", f)
+	}
+	if deckTitle(t, e, elsewhere) != "Another of mine" {
+		t.Fatal("chat changed another deck")
+	}
+	if _, list := ed.do("GET", "/api/decks", nil); strings.Contains(toJSON(list), "Out of view") {
+		t.Fatal("chat created a deck")
+	}
+	// The model is never offered create_deck, and is told which deck is open.
+	first := toJSON(e.llm.seen[0])
+	if strings.Contains(first, `"name":"create_deck"`) || !strings.Contains(first, `"name":"focus_slide"`) || !strings.Contains(first, open) {
+		t.Fatalf("tools/prompt sent to the model: %.400s", first)
+	}
+}
+
+func TestMentionedSlide(t *testing.T) {
+	cases := map[string]int{"make slide 4 punchier": 4, "Slide #2 needs a chart": 2, "on slides 3 and 5": 3, "slide no. 7": 7, "add a slide": 0, "slideshow 9": 0}
+	for msg, want := range cases {
+		if got := ai.MentionedSlide(msg); got != want {
+			t.Errorf("%q: %d, want %d", msg, got, want)
+		}
+	}
+}

@@ -11,6 +11,7 @@ import { Live } from "../sync";
 import { withKey } from "../key";
 import { Api, ApiError, type Access, type Comment } from "./api";
 import { Canvas } from "./canvas";
+import { markSVG } from "../brand/brand";
 import { ChatPanel } from "./chat";
 import { checkPatch } from "./check";
 import { elPath, findEl, slidePath, slideTemplate, stripIds } from "./ops";
@@ -117,6 +118,16 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
       async (m) => {
         if (m.type === "hello" && m.version !== versionRef.current) await reload();
         if (m.type === "comments") loadComments();
+        if (m.type === "deleted") {
+          say("This deck was deleted. Returning to all decks…");
+          setTimeout(() => location.assign("/"), 2500);
+          return;
+        }
+        // An agent or the AI chat brings the slide it's working on into view.
+        if (m.type === "focus") {
+          if (followRef.current && typeof m.slideId === "string" && deckRef.current.slides.some((s) => s.id === m.slideId)) setSlideId(m.slideId);
+          return;
+        }
         if (m.type === "access") api.access().then(setAccess, () => {});
         if (m.type !== "patch") return;
         const ev = m as unknown as PatchEvent;
@@ -255,7 +266,7 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
     <div class="ed">
       <header class="ed-top">
         <a class="ed-home" href="/" title="All decks">
-          ◆
+          <span class="ed-mark" dangerouslySetInnerHTML={{ __html: markSVG() }} />
         </a>
         <TitleInput title={deck.title} onCommit={(v) => commit([{ op: "replace", path: "/title", value: v }], "Rename")} />
         <label class="ed-theme">

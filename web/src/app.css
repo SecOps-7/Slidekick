@@ -244,3 +244,11 @@ button { font: inherit; }
 .home-decks-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .home-decks-head h2 { margin: 0 0 14px; }
 .new-deck { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--app-accent); background: var(--app-accent); color: #04221f; font-weight: 600; cursor: pointer; }
+
+/* ---- brand ---- */
+.home-logo { margin: 0; line-height: 0; color: var(--app-text); }
+.home-logo svg { height: 52px; width: auto; display: block; }
+.hud-home { display: inline-grid; place-items: center; padding: 3px !important; }
+.hud-home svg { width: 22px; height: 22px; display: block; }
+.deck-delete { font: inherit; font-size: inherit; border: 0; background: none; padding: 0; color: var(--app-err); cursor: pointer; text-decoration: none; }
+.deck-delete:hover { text-decoration: underline; }

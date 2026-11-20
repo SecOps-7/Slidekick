@@ -1,0 +1,42 @@
+{
+  "name": "sunset",
+  "label": "Sunset",
+  "description": "Warm dusk gradient. Plum sky melting into a coral and gold horizon glow, elegant DM Serif headlines and soft, unhurried motion. Good for vision talks, retrospectives and storytelling.",
+  "dark": true,
+  "tokens": {
+    "color": {
+      "bg": "#1e1030",
+      "surface": "#2c1944",
+      "text": "#fff3e6",
+      "muted": "#dcc1bd",
+      "accent": "#ff8f61",
+      "accent2": "#ffc857"
+    },
+    "font": {
+      "heading": "\"DM Serif Display\", Georgia, serif",
+      "body": "\"Inter\", system-ui, sans-serif",
+      "mono": "\"JetBrains Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "dm-serif-display",
+      "inter",
+      "jetbrains-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 35,
+      "lg": 54,
+      "xl": 82,
+      "xxl": 128
+    },
+    "radius": 20,
+    "motion": {
+      "fast": 300,
+      "base": 620,
+      "slow": 1000,
+      "easing": "cubic-bezier(0.25, 0.1, 0.25, 1)",
+      "bounce": 0.12
+    }
+  }
+}

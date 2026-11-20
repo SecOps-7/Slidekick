@@ -250,3 +250,5 @@
 .ed-chat-msg .ed-btn { justify-self: start; font-size: 12px; }
 .ed-chat-input { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 10px; border-top: 1px solid var(--ed-line); align-items: end; }
 .ed-chat-input textarea { font: inherit; font-size: 14px; resize: none; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--ed-line); background: var(--ed-bg); color: var(--ed-text); }
+.ed-mark { display: block; line-height: 0; }
+.ed-mark svg { width: 26px; height: 26px; display: block; }

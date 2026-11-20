@@ -1,0 +1,21 @@
+/* High Contrast: no decoration, no ambient motion; strong outlines and focus on legibility. */
+.sk-theme-contrast .sk-slide { line-height: 1.45; letter-spacing: 0.01em; }
+.sk-theme-contrast .sk-el-heading h1,
+.sk-theme-contrast .sk-el-heading h2,
+.sk-theme-contrast .sk-el-heading h3 { font-weight: 800; letter-spacing: 0; line-height: 1.1; }
+.sk-theme-contrast .sk-layout-title-body .sk-region-title,
+.sk-theme-contrast .sk-layout-two-column .sk-region-title,
+.sk-theme-contrast .sk-layout-grid-3 .sk-region-title { border-bottom: 6px solid var(--sk-accent); padding-bottom: 20px; }
+.sk-theme-contrast .sk-el-text p { max-width: 30em; }
+.sk-theme-contrast .sk-el strong { color: var(--sk-accent); font-weight: 800; }
+.sk-theme-contrast .sk-el a { color: var(--sk-accent2); text-decoration-thickness: 3px; }
+.sk-theme-contrast .sk-el-bullets li::marker { content: "\25A0  "; color: var(--sk-accent); }
+.sk-theme-contrast .sk-card { background: var(--sk-surface); border: 3px solid var(--sk-text); }
+.sk-theme-contrast .sk-card .sk-el-text { color: var(--sk-text); }
+.sk-theme-contrast .sk-stat-value { color: var(--sk-accent); font-weight: 800; letter-spacing: -0.01em; }
+.sk-theme-contrast .sk-stat-label { color: var(--sk-text); }
+.sk-theme-contrast .sk-el-quote blockquote { border-left: 12px solid var(--sk-accent); padding-left: 48px; }
+.sk-theme-contrast .sk-el-quote cite { color: var(--sk-text); }
+.sk-theme-contrast .sk-el-code pre { background: var(--sk-surface); border: 3px solid var(--sk-muted); }
+.sk-theme-contrast .sk-chart-grid line { stroke: color-mix(in oklab, var(--sk-text) 30%, transparent); }
+.sk-theme-contrast .sk-chart-axis { fill: var(--sk-text); }

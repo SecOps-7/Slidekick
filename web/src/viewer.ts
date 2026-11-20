@@ -3,6 +3,7 @@
 import { applyPatch } from "../runtime/patch";
 import { Player, type Position } from "../runtime/player";
 import type { Catalog, Deck, LintIssue, PatchEvent } from "../runtime/types";
+import { markSVG } from "./brand/brand";
 import { Laser } from "./laser";
 import { viewFetch } from "./key";
 import { Live, type PointerMsg, type PresentMsg } from "./sync";
@@ -71,8 +72,11 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   followBtn.setAttribute("aria-pressed", "true");
   const fsBtn = el("button", "hud-btn", "Fullscreen");
   fsBtn.type = "button";
-  const home = el("a", "hud-btn", "All decks");
+  const home = el("a", "hud-btn hud-home");
   home.href = "/";
+  home.title = "All decks";
+  home.setAttribute("aria-label", "All decks");
+  home.innerHTML = markSVG();
   const edit = el("a", "hud-btn", "Edit");
   edit.href = `/d/${encodeURIComponent(deckId)}/edit`;
   const present = el("a", "hud-btn", "Present");
@@ -252,6 +256,14 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
       else if (msg.type === "patch") await onPatch(msg as unknown as PatchEvent);
       else if (msg.type === "present") await followPresenter(msg as unknown as PresentMsg);
       else if (msg.type === "denied") say("This deck is now private: ask for a new link");
+      else if (msg.type === "deleted") {
+        say("This deck was deleted");
+        host.replaceChildren(el("div", "app-missing", "This deck was deleted."));
+      } else if (msg.type === "focus" && follow && !audience) {
+        // An agent is working on this slide: show it (unless following a presenter).
+        const i = deck.slides.findIndex((s) => s.id === msg.slideId);
+        if (i >= 0 && i !== player.position.index) await player.goto(i, Infinity);
+      }
       else if (msg.type === "pointer") {
         const pm = msg as unknown as PointerMsg;
         pm.on ? laser.show(pm.x, pm.y) : laser.hide();

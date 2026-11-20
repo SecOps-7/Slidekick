@@ -1,0 +1,70 @@
+/* Sunset: a plum sky melting into a coral horizon glow; title slides get a setting sun. */
+.sk-theme-sunset .sk-slide {
+  background-image: linear-gradient(180deg, var(--sk-bg) 0%, var(--sk-bg) 45%, color-mix(in oklab, var(--sk-bg) 78%, #b23a5a) 100%);
+}
+.sk-theme-sunset .sk-slide[data-bg-image] { background-size: cover; }
+.sk-theme-sunset .sk-slide::before {
+  content: "";
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  bottom: -55%;
+  height: 90%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(50% 50% at 50% 50%, color-mix(in oklab, var(--sk-accent) 42%, transparent), color-mix(in oklab, var(--sk-accent2) 10%, transparent) 55%, transparent 72%);
+  filter: blur(20px);
+  animation: sk-sunset-glow 16s ease-in-out infinite alternate;
+}
+@keyframes sk-sunset-glow {
+  from { opacity: 0.7; transform: translateY(2%); }
+  to   { opacity: 1; transform: translateY(-2%); }
+}
+.sk-theme-sunset .sk-layout-title::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -250px;
+  width: 440px;
+  height: 440px;
+  margin-left: -220px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, var(--sk-accent2), var(--sk-accent) 70%);
+  opacity: 0.32;
+  filter: blur(2px);
+}
+.sk-theme-sunset .sk-slide[data-bg-image]::before,
+.sk-theme-sunset .sk-slide[data-bg-image]::after { display: none; }
+.sk-theme-sunset .sk-el-heading h1,
+.sk-theme-sunset .sk-el-heading h2,
+.sk-theme-sunset .sk-el-heading h3 { font-weight: 400; letter-spacing: -0.005em; line-height: 1.04; }
+.sk-theme-sunset .sk-layout-title .sk-region-title .sk-el-heading {
+  background: linear-gradient(180deg, var(--sk-text) 35%, var(--sk-accent2) 75%, var(--sk-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.sk-theme-sunset .sk-stat-value {
+  font-weight: 400;
+  background: linear-gradient(180deg, var(--sk-accent2), var(--sk-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.sk-theme-sunset .sk-el-bullets li::marker { content: "\2726  "; color: var(--sk-accent2); }
+.sk-theme-sunset .sk-card { background: color-mix(in oklab, var(--sk-surface) 78%, transparent); border: 1px solid color-mix(in oklab, var(--sk-accent) 28%, transparent); backdrop-filter: blur(8px); }
+.sk-theme-sunset .sk-el-quote blockquote p { font-style: normal; }
+.sk-theme-sunset .sk-el-quote blockquote::before {
+  content: "";
+  display: block;
+  width: 90px;
+  height: 4px;
+  margin-bottom: 40px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--sk-accent2), var(--sk-accent));
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk-theme-sunset .sk-slide::before { animation: none; }
+}

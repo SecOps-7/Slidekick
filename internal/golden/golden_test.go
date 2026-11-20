@@ -47,6 +47,8 @@ func shots() []shot {
 		out = append(out, shot{"gallery", "paper", i})
 	}
 	out = append(out, shot{"launch", "swiss", 0}, shot{"showcase", "meadow", 2}, shot{"showcase", "swiss", 4}, shot{"gallery", "meadow", 1})
+	// A sample of the themes added later (each is also contrast-linted in every theme by internal/lint).
+	out = append(out, shot{"showcase", "synthwave", 1}, shot{"launch", "magazine", 0}, shot{"gallery", "contrast", 1}, shot{"showcase", "blueprint", 3})
 	return out
 }
 

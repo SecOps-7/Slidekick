@@ -1,5 +1,6 @@
 // Deck list plus "connect your agent" instructions.
 import { accountMenu, authHeaders, goSignIn, me } from "./auth";
+import { wordmarkSVG } from "./brand/brand";
 
 interface Summary {
   id: string;
@@ -9,6 +10,8 @@ interface Summary {
   slides: number;
   updatedAt: string;
   ownerName?: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
@@ -34,7 +37,9 @@ export async function mountHome(host: HTMLElement) {
   const page = el("main", "home");
   const head = el("header", "home-head");
   const top = el("div", "home-top");
-  top.append(el("h1", undefined, "Slidekick"), accountMenu(who));
+  const h1 = el("h1", "home-logo");
+  h1.innerHTML = wordmarkSVG(); // the SVG carries the accessible name "Slidekick"
+  top.append(h1, accountMenu(who));
   head.append(top, el("p", undefined, "Agents write the deck. You watch it move."));
 
   const decks = el("section", "home-decks");
@@ -105,10 +110,28 @@ export async function mountHome(host: HTMLElement) {
           );
           const card = el("div", "deck-card-wrap");
           const links = el("span", "deck-links");
-          for (const [label, href] of [["Edit", `/d/${encodeURIComponent(d.id)}/edit`], ["Present", `/d/${encodeURIComponent(d.id)}/present`]]) {
+          const actions: [string, string][] = [["Present", `/d/${encodeURIComponent(d.id)}/present`]];
+          if (d.canEdit) actions.unshift(["Edit", `/d/${encodeURIComponent(d.id)}/edit`]);
+          for (const [label, href] of actions) {
             const l = el("a", undefined, label);
             l.href = href;
             links.append(l);
+          }
+          if (d.canDelete) {
+            const del = el("button", "deck-delete", "Delete");
+            del.type = "button";
+            del.title = `Delete "${d.title}"`;
+            del.onclick = async () => {
+              if (!confirm(`Delete "${d.title}" for good?\n\nIts slides, history, comments and links are removed and can't be restored. Anyone watching it is told it's gone.`)) return;
+              del.disabled = true;
+              const r = await fetch(`/api/decks/${encodeURIComponent(d.id)}`, { method: "DELETE", headers: authHeaders() });
+              if (r.ok) card.remove();
+              else {
+                del.disabled = false;
+                alert((await r.json().catch(() => ({}))).error ?? "Couldn't delete the deck");
+              }
+            };
+            links.append(del);
           }
           card.append(a, links);
           return card;

@@ -80,6 +80,7 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux.Handle("POST /api/decks/{id}/edit-token", s.require(authz.MintDeckToken, true, s.issueEditToken))
 	mux.Handle("DELETE /api/decks/{id}/edit-token", s.require(authz.MintDeckToken, true, s.revokeEditToken))
 	mux.Handle("PUT /api/decks/{id}/owner", s.require(authz.ManageUsers, true, s.setDeckOwner))
+	mux.Handle("DELETE /api/decks/{id}", s.require(authz.Delete, true, s.deleteDeck))
 	mux.Handle("POST /api/files", s.require(authz.Upload, false, s.uploadFile))
 	s.accountRoutes(mux)
 	s.aiRoutes(mux)
@@ -161,7 +162,8 @@ func (s *server) listDecks(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if p := authFrom(r.Context()).p; p.Kind == authz.KindDeck {
+	p := authFrom(r.Context()).p
+	if p.Kind == authz.KindDeck {
 		mine := rows[:0]
 		for _, row := range rows {
 			if row.ID == p.Deck {
@@ -170,7 +172,19 @@ func (s *server) listDecks(w http.ResponseWriter, r *http.Request) {
 		}
 		rows = mine
 	}
-	writeJSON(w, 200, map[string]any{"decks": rows})
+	// Tell the UI what this caller may do with each deck (the server checks again on use).
+	type listed struct {
+		store.Summary
+		CanEdit   bool `json:"canEdit"`
+		CanDelete bool `json:"canDelete"`
+	}
+	pol := s.policy()
+	out := make([]listed, 0, len(rows))
+	for _, row := range rows {
+		d := &authz.Deck{ID: row.ID, Owner: row.Owner}
+		out = append(out, listed{row, pol.Can(p, authz.Edit, d), pol.Can(p, authz.Delete, d)})
+	}
+	writeJSON(w, 200, map[string]any{"decks": out})
 }
 
 func (s *server) getDeck(w http.ResponseWriter, r *http.Request) {

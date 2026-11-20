@@ -11,7 +11,9 @@ import { fileURLToPath } from "node:url";
 const web = join(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(web, "..", "themes", "fonts");
 
-// key -> package, css file (axis set), family name used in theme tokens
+// key -> package, css file (axis set), family name used in theme tokens.
+// prefix: the package's file-name prefix when it differs from the key (an
+// italic face kept under its own key, so only themes that ask for it ship it).
 const FONTS = {
   "inter": { pkg: "@fontsource-variable/inter", css: "wght.css", family: "Inter" },
   "inter-tight": { pkg: "@fontsource-variable/inter-tight", css: "wght.css", family: "Inter Tight" },
@@ -23,6 +25,13 @@ const FONTS = {
   "nunito-sans": { pkg: "@fontsource-variable/nunito-sans", css: "wght.css", family: "Nunito Sans" },
   "ibm-plex-mono": { pkg: "@fontsource/ibm-plex-mono", css: "400.css", family: "IBM Plex Mono" },
   "dm-serif-display": { pkg: "@fontsource/dm-serif-display", css: "400.css", family: "DM Serif Display" },
+  "playfair-display": { pkg: "@fontsource-variable/playfair-display", css: "wght.css", family: "Playfair Display" },
+  "playfair-display-italic": { pkg: "@fontsource-variable/playfair-display", css: "wght-italic.css", family: "Playfair Display", prefix: "playfair-display" },
+  "fredoka": { pkg: "@fontsource-variable/fredoka", css: "wght.css", family: "Fredoka" },
+  "oswald": { pkg: "@fontsource-variable/oswald", css: "wght.css", family: "Oswald" },
+  "caveat": { pkg: "@fontsource-variable/caveat", css: "wght.css", family: "Caveat" },
+  "atkinson-hyperlegible-next": { pkg: "@fontsource-variable/atkinson-hyperlegible-next", css: "wght.css", family: "Atkinson Hyperlegible Next" },
+  "unbounded": { pkg: "@fontsource-variable/unbounded", css: "wght.css", family: "Unbounded" },
 };
 const SUBSETS = ["latin", "latin-ext"];
 
@@ -36,9 +45,10 @@ for (const [key, f] of Object.entries(FONTS)) {
   faces[key] = [];
   for (const block of css.match(/\/\*[^*]*\*\/\s*@font-face\s*{[^}]*}/g) ?? []) {
     const file = /url\(\.\/files\/([^)]+\.woff2)\)/.exec(block)?.[1];
-    if (!file || !file.startsWith(`${key}-`)) continue;
-    // "<key>-<subset>-<axis|weight>-<style>.woff2" -> subset
-    const subset = file.slice(key.length + 1).replace(/\.woff2$/, "").split("-").slice(0, -2).join("-");
+    const prefix = f.prefix ?? key;
+    if (!file || !file.startsWith(`${prefix}-`)) continue;
+    // "<prefix>-<subset>-<axis|weight>-<style>.woff2" -> subset
+    const subset = file.slice(prefix.length + 1).replace(/\.woff2$/, "").split("-").slice(0, -2).join("-");
     if (!SUBSETS.includes(subset)) continue;
     const prop = (name) => new RegExp(`${name}:\\s*([^;]+);`).exec(block)?.[1].trim() ?? "";
     copyFileSync(join(dir, "files", file), join(out, file));

@@ -61,9 +61,14 @@ Editors and admins can also use the **✦ AI** panel in the editor, which drives
 | `list_comments`, `resolve_comment` | Requests humans pinned in the editor ("Send to agent") |
 | `get_history`, `restore_version` | Version history and undo |
 | `get_share_url` | Live link for the user (carries the view key when the deck is private) |
+| `focus_slide` | Bring a slide into view in the user's editor and viewer; call it before working on a slide or when the user names one |
 | `set_deck_access` | Make a deck public or private again (new decks start private); rotate the key |
 
 Resources: the deck JSON Schema, layout, element, icon, animation and theme catalogues, a design guide for agents, and `slidekick://decks/{id}/comments`. Prompts: `outline_to_deck`, `polish_deck`, `restyle_deck`.
+
+## Working where the user can see it
+
+People usually watch an agent work in the editor or the live viewer. Every edit moves their view to the slide it changed (with **Follow agent** on, the default). Call `focus_slide` before you start on a slide, or when the user mentions one ("fix slide 4"), so they see it before the change lands. Viewers following a presenter aren't moved.
 
 ## The loop that works well
 

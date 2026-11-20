@@ -1,4 +1,9 @@
-# Slidekick
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-on-dark.svg">
+    <img src="docs/brand/wordmark-on-light.svg" alt="Slidekick" height="64">
+  </picture>
+</h1>
 
 **Agents write the deck. You watch it move.**
 
@@ -40,14 +45,16 @@ Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each
 | --- | --- |
 | **For agents** | 20 MCP tools: create and patch decks (RFC 6902), lint, screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links. Plus the schema, catalogues and a design guide as resources. |
 | **Elements** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, 99 icons, shapes, embeds, and a sandboxed HTML escape hatch. 8 layouts. |
-| **Motion** | Fade, fade-up, scale-in, wipe, typewriter and line-drawing builds with spring physics; fade, slide, push, zoom and **morph** transitions; respects `prefers-reduced-motion`. |
+| **Motion** | 28 build presets (fades and slides from any side, zoom, pop, drop, bounce, 3D flips, swing, blur, reveal, iris, highlight, typewriter, line drawing…) with spring physics, and 18 transitions (fade, slide, push, zoom, cover, uncover, wipe, split, iris, blur, 3D flip and cube, swap and **morph**); respects `prefers-reduced-motion`. |
 | **AI** | Built-in chat in the editor with OpenAI, Anthropic, Google or any OpenAI-compatible (local) model. It edits as you, with your permissions; Stop and Undo any time. |
 | **Accounts** | Admin, editor and viewer roles; password sign-in and single sign-on (OpenID Connect: Entra, Google, Authentik, Keycloak); personal agent tokens. |
 | **Sharing** | New decks are private: signed-in people and private (keyed) links. Owners can make a deck public. Per-deck edit tokens for agents or colleagues. |
-| **Themes** | Aurora, Paper, Swiss, Ember and Meadow, with self-hosted fonts. Write your own: [docs/themes.md](docs/themes.md). |
+| **Themes** | 18 themes, from corporate Boardroom and editorial Magazine to Synthwave, Terminal, Chalkboard and an accessibility-first High Contrast theme, all with self-hosted OFL fonts. Write your own: [docs/themes.md](docs/themes.md). |
 | **Editor** | Follows the agent as it works; slide sorter, inline text editing, property panel, build timeline, undo/redo across agent and human edits. |
 | **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer; audience window and remote viewers follow along. |
 | **Export** | Standalone HTML that plays offline with every animation, PDF, or PNGs. |
+
+![The 13 newest themes, four slides each](docs/img/themes.jpg)
 
 ![The editor: slide sorter, canvas, property panel and build timeline](docs/img/editor.png)
 

@@ -1,0 +1,42 @@
+{
+  "name": "noir",
+  "label": "Noir",
+  "description": "Midnight luxury. Near-black with ivory type, a gold hairline frame and high-contrast Playfair serif headlines. Slow, cinematic motion. Good for brand stories, premium launches and award decks.",
+  "dark": true,
+  "tokens": {
+    "color": {
+      "bg": "#0b0b0d",
+      "surface": "#17171b",
+      "text": "#f2efe9",
+      "muted": "#a39e93",
+      "accent": "#d4af6a",
+      "accent2": "#8fa3bf"
+    },
+    "font": {
+      "heading": "\"Playfair Display\", Georgia, serif",
+      "body": "\"Inter\", system-ui, sans-serif",
+      "mono": "\"JetBrains Mono\", ui-monospace, monospace"
+    },
+    "fonts": [
+      "playfair-display",
+      "playfair-display-italic",
+      "inter",
+      "jetbrains-mono"
+    ],
+    "size": {
+      "xs": 22,
+      "sm": 28,
+      "md": 35,
+      "lg": 54,
+      "xl": 82,
+      "xxl": 128
+    },
+    "radius": 2,
+    "motion": {
+      "fast": 280,
+      "base": 620,
+      "slow": 1040,
+      "easing": "cubic-bezier(0.65, 0, 0.35, 1)"
+    }
+  }
+}

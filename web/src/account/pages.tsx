@@ -2,6 +2,7 @@
 import { render, type ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { authHeaders, me, signOut, type Me, type User } from "../auth";
+import { wordmarkSVG } from "../brand/brand";
 import "./account.css";
 
 export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -24,9 +25,7 @@ const nextURL = () => {
 function Shell({ title, children, wide }: { title: string; children: ComponentChildren; wide?: boolean }) {
   return (
     <main class={`acc ${wide ? "acc-wide" : ""}`}>
-      <a class="acc-brand" href="/">
-        ◆ Slidekick
-      </a>
+      <a class="acc-brand" href="/" aria-label="Slidekick home" dangerouslySetInnerHTML={{ __html: wordmarkSVG() }} />
       <h1>{title}</h1>
       {children}
     </main>

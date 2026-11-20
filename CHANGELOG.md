@@ -15,6 +15,14 @@ First public release.
 - Motion: build steps with six presets (including `draw`, which traces icons and other line art), spring entrances and stagger from Motion, per-item bullet builds, count-up stats, drawn-in charts, and fade, slide, push, zoom and morph transitions (View Transitions API, with a FLIP fallback in other browsers).
 - Five themes (Aurora, Paper, Swiss, Ember, Meadow) with self-hosted fonts.
 
+### Brand, deletion and working in view
+- 13 more themes (18 in all): boardroom, noir, synthwave, blueprint, terminal, chalkboard, sorbet, sunset, ocean, forest, magazine, brutalist and contrast (High Contrast), with 6 more self-hosted OFL font families (Playfair Display with italic, Fredoka, Oswald, Caveat, Atkinson Hyperlegible Next, Unbounded). Tests lint the example decks in every theme and enforce token contrast.
+- 22 more build presets (fade-down/left/right, slide-up/down/left/right, zoom-in, zoom-out, pop, drop, bounce-in, flip-x, flip-y, rotate-in, swing, blur-in, reveal, wipe-down, iris, stretch, highlight) and 12 more transitions (zoom-out, fade-through, cover, uncover, push-up, wipe, split, iris, blur, flip, cube, swap), all reduced-motion safe.
+- A logo (a slide kicked into motion) and a wordmark, used as the favicon, Apple touch icon, in the app header, editor, sign-in pages, viewer and standalone exports.
+- Delete decks from the home page: owners and admins only, with confirmation; watchers are told the deck is gone.
+- `focus_slide` MCP tool: agents bring the slide they're working on into the user's view; edits already move the view to the changed slide.
+- The AI chat works only on the open deck (no creating decks out of view, every call pinned to it) and brings slides into view as it works; naming a slide in a message ("slide 4") focuses it at once.
+
 ### Decisions of 2026-11-20 (see docs/decisions.md)
 - New decks are private by default: watching needs a sign-in or the private link. Existing decks and links are unchanged.
 - TLS on the LAN through a reverse proxy: `SLIDEKICK_TRUSTED_PROXIES` names the proxy; cookies are `Secure` on https requests; lockouts use the real client address; forwarding headers from other peers are ignored and the first such peer is logged.
