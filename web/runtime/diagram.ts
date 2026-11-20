@@ -6,6 +6,7 @@ let mermaidP: Promise<typeof import("mermaid").default> | null = null;
 let configured = "";
 const cache = new Map<string, string>();
 let seq = 0;
+let queue: Promise<string> = Promise.resolve("");
 
 function tokens() {
   const cs = getComputedStyle(document.documentElement);
@@ -55,7 +56,12 @@ function fit(host: HTMLElement) {
 
 /** Fills host with the rendered diagram; resolves when done (never rejects). */
 export async function renderDiagram(host: HTMLElement, source: string): Promise<void> {
-  const t = tokens();
+  // Theme tokens may land a frame or two after the first render; wait briefly.
+  let t = tokens();
+  for (let i = 0; i < 60 && !t.vars.background; i++) {
+    await new Promise((r) => requestAnimationFrame(r));
+    t = tokens();
+  }
   const key = `${t.key}\u0000${source}`;
   const hit = cache.get(key);
   if (hit) {
@@ -63,7 +69,11 @@ export async function renderDiagram(host: HTMLElement, source: string): Promise<
     fit(host);
     return;
   }
-  try {
+  // Mermaid's render is not safe to run concurrently (shared global state):
+  // queue renders one at a time, and re-check the cache once it's our turn.
+  const turn = queue.then(async () => {
+    const done = cache.get(key);
+    if (done) return done;
     const m = await mermaid();
     if (configured !== t.key) {
       m.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base", themeVariables: t.vars, flowchart: { htmlLabels: false } });
@@ -71,7 +81,11 @@ export async function renderDiagram(host: HTMLElement, source: string): Promise<
     }
     const { svg } = await m.render(`sk-mmd-${++seq}`, source);
     cache.set(key, svg);
-    host.innerHTML = svg;
+    return svg;
+  });
+  queue = turn.catch(() => "");
+  try {
+    host.innerHTML = await turn;
     fit(host);
   } catch (err) {
     host.classList.add("sk-diagram-error");

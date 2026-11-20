@@ -1,74 +1,77 @@
 # Slidekick
 
-Self-hosted slideshow app where **agents author animated decks through MCP** and humans watch them build live in the browser. One Go binary with the web app embedded, shipped as a Docker image. MIT licensed.
+**Agents write the deck. You watch it move.**
 
-> Status: **editor loop** (phase 2). Agents build complete, animated decks; humans edit them alongside the agent in a live editor and present them with a speaker view. Launch work comes next (see `Slidekick Build Plan.md`).
+Slidekick is a self-hosted slideshow app for the age of agents. Your AI agent builds animated, on-brand decks through [MCP](https://modelcontextprotocol.io); you watch them come together live in the browser, edit alongside it, and present. One Go binary, one Docker image, MIT licensed.
 
-## What works today
+![Slides made by an agent in five themes](docs/img/slides.png)
 
-- **Structured deck schema** (`schema/deck.schema.json`). Agents compose 12 element types inside 8 layouts and style them with theme tokens only. They never write HTML. The element types are heading, text, bullets, image, code with syntax highlighting, stat, quote, chart (bar, line or pie), Mermaid diagram, icon (99 from Tabler), shape and embed.
-- **MCP server** (official Go SDK), over streamable HTTP at `/mcp` or over stdio. It has 19 tools: `create_deck`, `get_deck`, `list_decks`, `add_slide`, `update_slide`, `delete_slide`, `move_slide`, `patch_deck` (RFC 6902), `set_theme`, `list_themes`, `lint_deck`, `render_slide`, `upload_asset`, `export_deck`, `list_comments`, `resolve_comment`, `get_history`, `restore_version` and `get_share_url`. It also serves 6 resources, a per-deck comments resource template (the schema, the layout, element and icon, animation and theme catalogues, and a design guide) and 3 prompts.
-- **`render_slide`** screenshots any slide at any build step in headless Chromium, using the real viewer page, so the agent sees exactly what the audience sees. It needs the `render` image target; the slim image reports that rendering is unavailable.
-- **`export_deck`** produces one self-contained HTML file with the runtime, theme and uploaded images inlined. It plays offline with every animation. Decks without diagrams use a lighter bundle (about 1.9 MB instead of 5.3 MB).
-- **`upload_asset`** stores images and videos content-addressed on the data volume. They are served from `/files/...` with a sandboxing CSP.
-- **Agent feedback loop.** Every write returns the new version and its lint findings: overflow, density, too many or too-long bullets, missing alt text or captions, contrast, chart data that doesn't line up with its labels, crowded pies, dense diagrams, untitled iframes, build gaps, and morphs with nothing to match.
-- **Optimistic concurrency.** A write that sends a stale `base_version` is rejected with a readable error. Writes are atomic: a patch either validates in full or nothing changes.
-- **Editor** at `/d/<id>/edit`:
-  - slide sorter with drag to reorder, add from any layout, and duplicate (element ids are kept, so the copy morphs)
-  - click to select; double-click text, bullets or code to edit in place
-  - property panel for content, theme-token style, build step and animation, with a JSON escape hatch for charts and the like
-  - build-order timeline; undo and redo over the shared version history, covering agent and human edits
-  - **Send to agent** comments pinned to a slide or element. Agents see an `openComments` count on every write, then read and resolve the comments over MCP.
-- **Presenter** at `/d/<id>/present`:
-  - current and next slide, speaker notes, timer, clock and build progress, plus a laser pointer
-  - **Open audience window** syncs over BroadcastChannel on the same machine; remote viewers follow over WebSocket, and only presenters with the token can drive them
-- **Live viewer** at `/d/<id>`. Edits stream over WebSocket as JSON Patch. The viewer follows the slide being edited, highlights what changed and keeps a lint panel.
-- **Motion.** Build steps with presets (fade, fade-up, scale-in, wipe, typewriter), bullets that build one item at a time, stats that count up, charts that draw in, and slide transitions (fade, slide, push, zoom, **morph** via the View Transitions API with a crossfade fallback). It respects `prefers-reduced-motion`.
-- **Self-hosted fonts** (SIL OFL, in `themes/fonts`): no Google Fonts requests anywhere, and exports inline them.
-- **Five themes**: Aurora (dark, drifting glow), Paper (light, editorial), Swiss (white, red signal, hard grid), Ember (warm dark, springy motion) and Meadow (soft sage, rounded, calm). Code colours and diagrams follow each theme's tokens.
-- **SQLite storage** (pure Go, no CGO) with the full version history.
+## Why
 
-## Run it (Docker)
+AI slide tools today either wrap Markdown (flat slides) or export PPTX and walk away. Slidekick is different:
+
+- **Structured, not freeform.** Agents compose elements inside layouts against a JSON Schema. They never write HTML, so the output is always valid and always looks designed.
+- **Motion is built in.** Build steps, morph transitions between slides, count-up stats, charts that draw themselves.
+- **Live and shared.** Every agent edit streams into your open browser. You can edit the same deck, undo the agent, or pin a request for it ("Send to agent").
+- **The agent can see its work.** Every write comes back with lint findings, and `render_slide` returns a screenshot, so agents fix problems before you notice them.
+
+## Quick start
 
 ```bash
-docker build --target render -t slidekick:local-render .   # with Chromium for render_slide
-docker build -t slidekick:local .                           # slim distroless image
-docker run -d --name slidekick -p 7410:7410 \
-  -e SLIDEKICK_TOKEN=change-me -e SLIDEKICK_BASE_URL=http://<host>:7410 \
-  -v slidekick-data:/data slidekick:local
+TOKEN=$(openssl rand -hex 24); echo "your token: $TOKEN"
+docker run -d --name slidekick -p 7410:7410 -e SLIDEKICK_TOKEN="$TOKEN" \
+  -v slidekick-data:/data --tmpfs /tmp --shm-size 256m \
+  ghcr.io/secops-7/slidekick:latest-render
 ```
 
-The render image needs a writable `/tmp` for Chromium. When you run it with a read-only root filesystem, add `--tmpfs /tmp --shm-size 256m`.
+Connect Claude Code (other clients: [docs/agents.md](docs/agents.md)):
 
-A Compose file is in `deploy/compose.yaml`.
+```bash
+claude mcp add --transport http slidekick http://localhost:7410/mcp \
+  --header "Authorization: Bearer $TOKEN"
+```
 
-| Variable | Default | Purpose |
+Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each slide with render_slide, and give me the link."*
+
+## What you get
+
+| | |
+| --- | --- |
+| **For agents** | 19 MCP tools: create and patch decks (RFC 6902), lint, screenshots, uploads, HTML/PDF/PNG export, comments, history and undo. Plus the schema, catalogues and a design guide as resources. |
+| **Elements** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, 99 icons, shapes, embeds. 8 layouts. |
+| **Motion** | Fade, fade-up, scale-in, wipe and typewriter builds; fade, slide, push, zoom and **morph** transitions; respects `prefers-reduced-motion`. |
+| **Themes** | Aurora, Paper, Swiss, Ember and Meadow, with self-hosted fonts. Write your own: [docs/themes.md](docs/themes.md). |
+| **Editor** | Slide sorter, inline text editing, property panel, build timeline, undo/redo across agent and human edits. |
+| **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer; audience window and remote viewers follow along. |
+| **Export** | Standalone HTML that plays offline with every animation, PDF, or PNGs. |
+
+![The editor: slide sorter, canvas, property panel and build timeline](docs/img/editor.png)
+
+![Presenter view with next slide, notes, timer and laser pointer](docs/img/presenter.png)
+
+## Run it for real
+
+Docker Compose, TLS, configuration and the security model: [docs/self-hosting.md](docs/self-hosting.md).
+
+| Variable | Default | |
 | --- | --- | --- |
+| `SLIDEKICK_TOKEN` | empty | Required for every write. At least 24 characters. |
+| `SLIDEKICK_BASE_URL` | `http://localhost:7410` | Public URL used in share links |
+| `SLIDEKICK_DATA` | `/data` | SQLite database and uploads |
 | `SLIDEKICK_ADDR` | `:7410` | Listen address |
-| `SLIDEKICK_DATA` | `/data` in the image | SQLite location |
-| `SLIDEKICK_BASE_URL` | `http://localhost:<port>` | Public URL used in share links |
-| `SLIDEKICK_TOKEN` | (empty) | Bearer token for `/mcp`, the write API, the editor and presenter control. The editor asks for it once per browser. **Set it** for anything but localhost. |
 
-Viewing decks is open to anyone who can reach the port; writing needs the token.
-
-## Connect an agent
-
-```bash
-claude mcp add --transport http slidekick http://<host>:7410/mcp \
-  --header "Authorization: Bearer $SLIDEKICK_TOKEN"
-```
-
-For local stdio use, run `slidekick stdio`. It also serves the viewer on `127.0.0.1:7410`.
-
-Then ask your agent for a deck, and open the link it returns.
+Two images: `-render` (with Chromium, for screenshots and PDF/PNG export) and a slim distroless one. Both for amd64 and arm64.
 
 ## Develop
 
 ```bash
-cd web && npm install && npm run build   # builds web/dist (embedded by go:embed)
-go test ./...                             # schema, service, lint, MCP end-to-end
-go run ./cmd/slidekick serve              # http://localhost:7410
-cd web && npm run dev                     # Vite dev server proxying to :7410
+npm --prefix web ci && npm --prefix web run build
+go test ./...
+go run ./cmd/slidekick serve      # http://localhost:7410
 ```
 
-Layout: `cmd/slidekick` (entry point), `internal/deck` (model, catalogue, validation, ids, migrations), `internal/service` (the single write path), `internal/store` (SQLite), `internal/lint`, `internal/mcpserver`, `internal/server` (HTTP, WebSocket), `internal/hub` (fan-out), `schema/`, `themes/`, `web/runtime` (renderer, presets, player, patch), `web/src` (app pages) and `examples/` (golden decks used in tests).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues privately: [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT. Fonts are SIL Open Font License (see `themes/fonts/licenses`); icons are [Tabler Icons](https://tabler.io/icons) (MIT).

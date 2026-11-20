@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build web app (typecheck, icons, bundles)
+        run: |
+          npm --prefix web ci --no-fund --no-audit
+          npm --prefix web run build
+      - name: Go vet and format
+        run: |
+          go vet ./...
+          test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - name: Go tests
+        run: go test -race ./...
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build slim and render images (no push)
+        run: |
+          docker buildx build --target render -t slidekick:ci-render .
+          docker buildx build -t slidekick:ci .

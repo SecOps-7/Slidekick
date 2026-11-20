@@ -1,0 +1,60 @@
+# Connecting an agent
+
+Slidekick is an MCP server. Any MCP client can create and edit decks; the human watches at the share link.
+
+## Claude Code (HTTP)
+
+```bash
+claude mcp add --transport http slidekick http://<host>:7410/mcp \
+  --header "Authorization: Bearer $SLIDEKICK_TOKEN"
+```
+
+Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, then give me the link."*
+
+## Claude Desktop, Cursor and other clients (stdio)
+
+Clients that launch a local process can run Slidekick over stdio. Docker keeps it self-contained:
+
+```json
+{
+  "mcpServers": {
+    "slidekick": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-p", "127.0.0.1:7410:7410", "-v", "slidekick-data:/data",
+               "ghcr.io/secops-7/slidekick:latest", "stdio", "--addr", ":7410"]
+    }
+  }
+}
+```
+
+In stdio mode the viewer also runs at http://localhost:7410, so you can watch while the agent works. Without Docker, use the binary: `"command": "slidekick", "args": ["stdio"]`.
+
+Clients that only speak HTTP but can't send headers can use a server without `SLIDEKICK_TOKEN`, bound to localhost only.
+
+## What the agent gets
+
+| Tool | Use |
+| --- | --- |
+| `create_deck` | New deck, optionally with every slide in one call |
+| `get_deck`, `list_decks` | Read |
+| `add_slide`, `update_slide`, `delete_slide`, `move_slide` | Slide edits |
+| `patch_deck` | RFC 6902 JSON Patch for precise element edits |
+| `set_theme`, `list_themes` | Look and feel |
+| `lint_deck` | Overflow, density, contrast, alt text, chart and animation checks |
+| `render_slide` | PNG of a slide at any build step (needs the `-render` image) |
+| `upload_asset` | Store an image or video, get a `/files/...` url |
+| `export_deck` | `html` (self-contained, offline), `pdf` or `png` (zip) |
+| `list_comments`, `resolve_comment` | Requests humans pinned in the editor ("Send to agent") |
+| `get_history`, `restore_version` | Version history and undo |
+| `get_share_url` | Live link for the user |
+
+Resources: the deck JSON Schema, layout, element, icon, animation and theme catalogues, a design guide for agents, and `slidekick://decks/{id}/comments`. Prompts: `outline_to_deck`, `polish_deck`, `restyle_deck`.
+
+## The loop that works well
+
+1. Read `slidekick://guide` and `slidekick://catalog/layouts` once.
+2. `create_deck` with every slide.
+3. Fix lint errors and warnings returned by each write.
+4. `render_slide` the slides that matter and look at them.
+5. Pass `base_version` on writes when a human may be editing; on a conflict, re-read and retry.
+6. If a write result shows `openComments`, call `list_comments`, act, and `resolve_comment` with a short reply.

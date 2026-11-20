@@ -1,0 +1,73 @@
+name: release
+
+# Runs only when a version tag (v1.2.3) is pushed. Publishes a draft GitHub
+# release with binaries and pushes multi-arch images to GHCR:
+#   ghcr.io/<owner>/slidekick:<version>          slim (no Chromium)
+#   ghcr.io/<owner>/slidekick:<version>-render   with Chromium (render_slide, PDF/PNG)
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: render
+            suffix: -render
+          - target: ""
+            suffix: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=auto
+            suffix=${{ matrix.suffix }},onlatest=true
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.target || 'slim' }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target || 'slim' }}
