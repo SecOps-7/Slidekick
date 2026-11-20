@@ -22,6 +22,12 @@ First public release.
 - Personal agent tokens (`skp_...`) let agents act as a user with that user's role. The server token and deck tokens keep working; existing decks keep their links and pass to the first admin.
 - Stored secrets are encrypted with AES-256-GCM (`SLIDEKICK_SECRET_KEY` or a generated key file).
 
+### AI
+- Admins connect AI providers (OpenAI, Anthropic, Google, any OpenAI-compatible endpoint including local models) with base URL, encrypted key and allowed models.
+- Editor chat panel for editors and admins: streamed replies, each step shown, the editor follows the changes, Stop cancels, Undo restores the deck to before the run.
+- The chat edits through Slidekick's own MCP tools as the signed-in user (short-lived token), so roles, ownership, validation, lint and sanitising all apply; sharing, uploads, exports and settings aren't available to it.
+- Outbound calls only reach the provider's configured host and port; keys never reach the browser or logs.
+
 ### People
 - Live viewer: follows agent edits, highlights changes, lint panel.
 - Private decks: links carry a view key; rotating it disconnects old viewers.

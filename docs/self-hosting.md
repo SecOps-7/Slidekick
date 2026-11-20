@@ -101,6 +101,24 @@ Slidekick uses discovery, the authorization code flow with PKCE, and checks stat
 - **Roles:** rules map a group (from the groups claim) or an email or email domain to a role. The first matching rule wins and is applied at every sign-in, so removing someone from the group in your directory demotes them at their next sign-in. Group claims need the provider configured to send them (Entra: token configuration → groups claim; Keycloak: a group mapper; Authentik: the default `groups` scope).
 - Provider notes: Entra issuer `https://login.microsoftonline.com/<tenant id>/v2.0` (multi-tenant `common` isn't supported); Google `https://accounts.google.com`; Authentik `https://<host>/application/o/<slug>/`; Keycloak `https://<host>/realms/<realm>`. Providers on your LAN work: only an admin can add them.
 
+## AI providers and the chat panel
+
+Admins connect AI providers under **Settings → AI providers**: OpenAI, Anthropic, Google Gemini, or any OpenAI-compatible endpoint (Ollama, LM Studio, vLLM, LiteLLM and other local or self-hosted models). Each has a base URL, an API key (optional for local servers) and the list of models people may use; **Save and fetch models** asks the provider for its list.
+
+Editors and admins then get an **✦ AI** button in the editor. They pick a provider and model and ask for changes ("add a slide with our 42% growth as one big number", "restyle this for a board meeting"). Replies stream in, each step is listed (✓ added a slide, ✗ refused...), the editor follows along as the changes land, **Stop** cancels the run, and **Undo these changes** restores the deck to the version from before the run (as a new version, so history keeps everything). Viewers can't use AI.
+
+![The AI assistant in the editor](img/ai-chat.png)
+
+How it stays safe:
+
+- **The AI acts as the person asking.** The server runs the model and applies its changes through Slidekick's own MCP tools with a token that acts as the signed-in user, lives only for that request and is revoked when it ends. Every call goes through the same role and ownership checks as any agent, so an editor's AI can't change someone else's deck, and nobody's AI can change sharing, upload files, export or reach settings (those tools aren't offered to the chat at all).
+- **Its output is untrusted.** Changes go through schema validation, sanitising and lint like any agent's: invalid elements are refused and the model is told why. The `html` element stays sandboxed. The model is told to treat deck content as data, never as instructions.
+- **Keys stay on the server.** They're stored encrypted (AES-256-GCM, see `SLIDEKICK_SECRET_KEY`), never sent to the browser, and removed from any provider error before it's shown or logged. Google's key goes in a header, never in a URL.
+- **Outbound calls go only to the configured provider.** Each provider's HTTP client can connect only to the host and port of its base URL (checked after DNS), ignores proxy settings and refuses redirects. A provider on your home network works because an admin set it; nobody else can add a URL. Nothing is exposed to the internet: Slidekick only makes outgoing requests.
+- **Limits:** two chats per person at once, 24 model turns and 10 minutes per message, 8,000 characters per message.
+
+Providers bill by usage; the chat sends the design guide, the layout list and the tool definitions with each request.
+
 ## TLS and reverse proxies
 
 Slidekick speaks plain HTTP. Put it behind a TLS-terminating proxy (Caddy, Traefik, nginx) for anything beyond a trusted LAN, so the token never crosses the network in clear text. The proxy must pass WebSockets on `/ws/`.

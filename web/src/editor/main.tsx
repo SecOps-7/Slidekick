@@ -11,6 +11,7 @@ import { Live } from "../sync";
 import { withKey } from "../key";
 import { Api, ApiError, type Access, type Comment } from "./api";
 import { Canvas } from "./canvas";
+import { ChatPanel } from "./chat";
 import { checkPatch } from "./check";
 import { elPath, findEl, slidePath, slideTemplate, stripIds } from "./ops";
 import { Panel } from "./panel";
@@ -37,11 +38,16 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
   const [followAgent, setFollowAgent] = useState(true);
   const [access, setAccess] = useState<Access | null>(null);
   const [admin, setAdmin] = useState(false);
+  const [canAI, setCanAI] = useState(false);
+  const [chat, setChat] = useState(false);
   const followRef = useRef(followAgent);
   followRef.current = followAgent;
   useEffect(() => {
     api.access().then(setAccess, () => {});
-    api.me().then((m) => setAdmin(Boolean(m.can["deck:deck-token"])), () => {});
+    api.me().then((m) => {
+      setAdmin(Boolean(m.can["deck:deck-token"]));
+      setCanAI(Boolean(m.can.ai));
+    }, () => {});
   }, []);
   const key = access?.private ? access.viewKey : "";
 
@@ -280,6 +286,11 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
         <a class="ed-btn" href={withKey(`/d/${api.deckId}#${slideIndex + 1}`, key)} target="_blank" rel="noopener">
           View
         </a>
+        {canAI && (
+          <button type="button" class={`ed-btn${chat ? " on" : ""}`} aria-pressed={chat} onClick={() => setChat(!chat)} title="Ask an AI to change this deck">
+            ✦ AI
+          </button>
+        )}
         <ShareMenu api={api} access={access} admin={admin} onChange={setAccess} say={say} />
         <ExportMenu api={api} say={say} viewKey={key ?? ""} />
         <a class="ed-btn primary" href={`/d/${api.deckId}/present#${slideIndex + 1}`} target="_blank" rel="noopener">
@@ -340,6 +351,7 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
         }}
         select={select}
       />
+      {chat && <ChatPanel api={api} version={() => versionRef.current} onClose={() => setChat(false)} say={say} />}
       <div class={`ed-toast${toast ? " show" : ""}`} role="status">
         {toast}
       </div>

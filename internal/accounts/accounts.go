@@ -51,6 +51,39 @@ type Service struct {
 
 	mu        sync.Mutex
 	setupCode string // one-time code for /setup while no user exists
+	chat      map[string]chatToken
+}
+
+// chatToken is a short-lived, in-memory token that lets the AI chat act as
+// one user through the MCP endpoint, for the length of one request.
+type chatToken struct {
+	user string
+	exp  time.Time
+}
+
+const ChatTokenPrefix = "skc_"
+
+// ChatToken mints a token acting as userID for at most ttl; revoke ends it early.
+func (s *Service) ChatToken(userID string, ttl time.Duration) (string, func()) {
+	tok := ChatTokenPrefix + randToken(30)
+	h := Hash(tok)
+	s.mu.Lock()
+	if s.chat == nil {
+		s.chat = map[string]chatToken{}
+	}
+	now := time.Now()
+	for k, v := range s.chat {
+		if now.After(v.exp) {
+			delete(s.chat, k)
+		}
+	}
+	s.chat[h] = chatToken{user: userID, exp: now.Add(ttl)}
+	s.mu.Unlock()
+	return tok, func() {
+		s.mu.Lock()
+		delete(s.chat, h)
+		s.mu.Unlock()
+	}
 }
 
 func New(st *store.Store, box *secret.Box, om *oidc.Manager) *Service {
@@ -197,11 +230,25 @@ func (s *Service) CreateAPIToken(ctx context.Context, userID, name string) (stri
 
 // APITokenUser resolves a personal token to an enabled user.
 func (s *Service) APITokenUser(ctx context.Context, tok string) (*store.User, bool) {
-	if !strings.HasPrefix(tok, APITokenPrefix) || len(tok) > 200 {
+	if len(tok) > 200 {
 		return nil, false
 	}
-	uid, err := s.Store.UserForAPIToken(ctx, Hash(tok))
-	if err != nil {
+	var uid string
+	switch {
+	case strings.HasPrefix(tok, ChatTokenPrefix):
+		s.mu.Lock()
+		ct, ok := s.chat[Hash(tok)]
+		s.mu.Unlock()
+		if !ok || time.Now().After(ct.exp) {
+			return nil, false
+		}
+		uid = ct.user
+	case strings.HasPrefix(tok, APITokenPrefix):
+		var err error
+		if uid, err = s.Store.UserForAPIToken(ctx, Hash(tok)); err != nil {
+			return nil, false
+		}
+	default:
 		return nil, false
 	}
 	u, err := s.Store.GetUser(ctx, uid)

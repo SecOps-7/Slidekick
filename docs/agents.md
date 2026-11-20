@@ -39,6 +39,10 @@ In stdio mode the viewer also runs at http://localhost:7410, so you can watch wh
 
 Clients that only speak HTTP but can't send headers can use a server without `SLIDEKICK_TOKEN`, bound to localhost only.
 
+## The built-in AI chat
+
+Editors and admins can also use the **✦ AI** panel in the editor, which drives these same tools with a model an admin connected (see [self-hosting](self-hosting.md#ai-providers-and-the-chat-panel)).
+
 ## What the agent gets
 
 | Tool | Use |

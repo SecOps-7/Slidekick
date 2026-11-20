@@ -19,6 +19,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/SecOps-7/slidekick/internal/accounts"
+	"github.com/SecOps-7/slidekick/internal/ai"
 	"github.com/SecOps-7/slidekick/internal/authz"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
@@ -30,6 +31,7 @@ type Options struct {
 	Token    string // server token (SLIDEKICK_TOKEN): full access for automation and recovery
 	BaseURL  string // public URL: Secure cookies when https, SSO redirect URLs, origin checks
 	Accounts *accounts.Service
+	AI       *ai.Service // nil: no AI chat
 	SchemaFS fs.FS
 	Web      fs.FS
 	Log      *slog.Logger
@@ -75,6 +77,7 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux.Handle("PUT /api/decks/{id}/owner", s.require(authz.ManageUsers, true, s.setDeckOwner))
 	mux.Handle("POST /api/files", s.require(authz.Upload, false, s.uploadFile))
 	s.accountRoutes(mux)
+	s.aiRoutes(mux)
 	mux.HandleFunc("GET /files/{name}", s.serveFile)
 	mux.HandleFunc("GET /ws/decks/{id}", s.ws)
 	mux.HandleFunc("GET /schema/deck.schema.json", func(w http.ResponseWriter, r *http.Request) {

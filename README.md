@@ -41,6 +41,7 @@ Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each
 | **For agents** | 20 MCP tools: create and patch decks (RFC 6902), lint, screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links. Plus the schema, catalogues and a design guide as resources. |
 | **Elements** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, 99 icons, shapes, embeds, and a sandboxed HTML escape hatch. 8 layouts. |
 | **Motion** | Fade, fade-up, scale-in, wipe, typewriter and line-drawing builds with spring physics; fade, slide, push, zoom and **morph** transitions; respects `prefers-reduced-motion`. |
+| **AI** | Built-in chat in the editor with OpenAI, Anthropic, Google or any OpenAI-compatible (local) model. It edits as you, with your permissions; Stop and Undo any time. |
 | **Accounts** | Admin, editor and viewer roles; password sign-in and single sign-on (OpenID Connect: Entra, Google, Authentik, Keycloak); personal agent tokens. |
 | **Sharing** | Public or private (keyed) links, and per-deck edit tokens for agents or colleagues. |
 | **Themes** | Aurora, Paper, Swiss, Ember and Meadow, with self-hosted fonts. Write your own: [docs/themes.md](docs/themes.md). |
@@ -51,6 +52,8 @@ Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each
 ![The editor: slide sorter, canvas, property panel and build timeline](docs/img/editor.png)
 
 ![Presenter view with next slide, notes, timer and laser pointer](docs/img/presenter.png)
+
+![The AI assistant adding a slide in the editor](docs/img/ai-chat.png)
 
 ## Run it for real
 

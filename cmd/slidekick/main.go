@@ -24,6 +24,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/SecOps-7/slidekick"
+	"github.com/SecOps-7/slidekick/internal/ai"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/hub"
@@ -171,7 +172,8 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		}
 		return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
 	}
-	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, Accounts: acc, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
+	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, Accounts: acc,
+		AI: &ai.Service{Store: st, Box: acc.Box, Accounts: acc, MCPURL: "http://127.0.0.1:" + port + "/mcp"}, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 2 * time.Minute, IdleTimeout: 2 * time.Minute}
 	httpErr := make(chan error, 1)

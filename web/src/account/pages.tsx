@@ -674,5 +674,6 @@ export async function mountAccountPage(host: HTMLElement, page: "login" | "setup
     );
     return;
   }
+  if (page === "settings") await import("./ai-settings");
   render(page === "account" ? <Account m={m} /> : <Settings m={m} />, host);
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/SecOps-7/slidekick/internal/oidc"
 	"github.com/SecOps-7/slidekick/internal/secret"
@@ -125,5 +126,23 @@ func TestProviderSecretsEncrypted(t *testing.T) {
 	}
 	if _, err := s.SaveProvider(ctx, ProviderInput{ID: "x", Name: "x", Issuer: "https://x", ClientID: "c", DefaultRole: "root"}); err == nil {
 		t.Fatal("bad role accepted")
+	}
+}
+
+func TestChatTokens(t *testing.T) {
+	s := newSvc(t)
+	ctx := context.Background()
+	u, _ := s.CreateFirstAdmin(ctx, "boss", "correct horse battery")
+	tok, revoke := s.ChatToken(u.ID, time.Minute)
+	if got, ok := s.APITokenUser(ctx, tok); !ok || got.ID != u.ID {
+		t.Fatal("chat token")
+	}
+	revoke()
+	if _, ok := s.APITokenUser(ctx, tok); ok {
+		t.Fatal("revoked chat token still works")
+	}
+	old, _ := s.ChatToken(u.ID, -time.Second)
+	if _, ok := s.APITokenUser(ctx, old); ok {
+		t.Fatal("expired chat token works")
 	}
 }
