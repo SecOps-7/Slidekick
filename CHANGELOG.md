@@ -27,4 +27,5 @@ First public release.
 - Security: token lockout, egress-filtered rendering, strict CSP, sandboxed uploads, size and connection limits.
 - Tests: Go unit and integration tests, Vitest for animation presets and the editor's schema check, and golden screenshots of every example deck compared in CI.
 - Shared contract: TypeScript types and the editor's validator are generated from the JSON Schema.
+- Mermaid 12 for diagrams, pinned to its classic look and dagre layout so existing diagrams keep their shape; the full standalone export grows to about 7 MB because Mermaid now bundles the ELK layout engine (the lite export, used for decks without diagrams, is unchanged).
 - Build: Docker base images pinned by multi-arch digest, GitHub Actions on Node 24 majors, Dependabot keeps both current weekly.

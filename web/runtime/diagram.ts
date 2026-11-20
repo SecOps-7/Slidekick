@@ -76,7 +76,23 @@ export async function renderDiagram(host: HTMLElement, source: string): Promise<
     if (done) return done;
     const m = await mermaid();
     if (configured !== t.key) {
-      m.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base", themeVariables: t.vars, flowchart: { htmlLabels: false } });
+      // Mermaid 12 defaults to ELK layout and the "neo" look; keep dagre and the
+      // classic look so diagrams match the themes (and existing decks don't re-lay out).
+      m.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        theme: "base",
+        look: "classic",
+        layout: "dagre",
+        themeVariables: t.vars,
+        // SVG text labels, not HTML in foreignObject: HTML labels are measured before
+        // the slide's theme font applies and then wrap. Mermaid 12 reads the top-level
+        // setting; flowchart.htmlLabels is kept for older diagram types.
+        htmlLabels: false,
+        // Mermaid 12 wraps flowchart labels at 120px and widens every node to 120px;
+        // slide text is large, so wrap later and let small nodes stay small.
+        flowchart: { htmlLabels: false, wrappingWidth: 360, minNodeWidth: 0 },
+      });
       configured = t.key;
     }
     const { svg } = await m.render(`sk-mmd-${++seq}`, source);
