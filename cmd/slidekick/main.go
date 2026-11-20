@@ -95,6 +95,10 @@ func main() {
 		*baseURL = "http://localhost:" + port
 	}
 	token := os.Getenv("SLIDEKICK_TOKEN")
+	if token != "" && len(token) < 24 {
+		fmt.Fprintln(os.Stderr, "SLIDEKICK_TOKEN is too short: use at least 24 random characters, e.g. `openssl rand -hex 24`")
+		os.Exit(2)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -140,10 +144,20 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 	defer rnd.Close()
 	log.Info("slide rendering", "available", rnd.Available())
 
-	mcpSrv := mcpserver.New(svc, slidekick.Schema, version, mcpserver.Options{Renderer: rnd, Exporter: exp})
-	handler := server.New(svc, mcpSrv, server.Options{Token: token, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp})
+	mcpSrv := mcpserver.New(svc, slidekick.Schema, version, mcpserver.Options{Renderer: rnd, Exporter: exp,
+		Files: func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error) {
+			return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
+		}})
+	files := func(ctx context.Context, deckID, format string) (*store.Asset, error) {
+		d, _, _, err := svc.Get(ctx, deckID)
+		if err != nil {
+			return nil, err
+		}
+		return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
+	}
+	handler := server.New(svc, mcpSrv, server.Options{Token: token, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
 
-	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 2 * time.Minute, IdleTimeout: 2 * time.Minute}
 	httpErr := make(chan error, 1)
 	go func() {
 		log.Info("slidekick listening", "addr", addr, "url", baseURL, "data", data, "auth", token != "")

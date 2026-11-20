@@ -60,6 +60,10 @@
 
 .sk-layout-hero-image { padding: 0; grid-template: "title" 1fr / 1fr; }
 .sk-layout-hero-image .sk-region-image { position: absolute; inset: 0; z-index: 0; }
+/* Overlay regions are positioned against the slide, not a grid area. Chromium's
+   print layout drops absolutely positioned grid items with a grid-area (the
+   hero title vanished from PDFs), so clear it. */
+.sk-layout-hero-image > .sk-region { grid-area: auto !important; }
 .sk-layout-hero-image .sk-region-image::after {
   content: "";
   position: absolute;

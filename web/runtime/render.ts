@@ -183,7 +183,7 @@ function renderElement(e: Element, units: BuildUnit[], pending: Promise<unknown>
       break;
     }
     case "icon": {
-      const body = ICONS[str(e, "name")];
+      const body = Object.hasOwn(ICONS, str(e, "name")) ? ICONS[str(e, "name")] : undefined;
       if (!body) break;
       const label = str(e, "label");
       const svg = `<svg ${SVG_ATTRS} ${label ? `role="img" aria-label="${label.replace(/[&"<>]/g, "")}"` : 'aria-hidden="true"'}>${body}</svg>`;
@@ -206,7 +206,8 @@ function renderElement(e: Element, units: BuildUnit[], pending: Promise<unknown>
     }
     case "embed": {
       const src = str(e, "src");
-      if (!/^(https:\/\/|\/files\/|data:)/.test(src)) break;
+      const uploaded = /^\/files\/f_[0-9a-f]{20}\.[a-z0-9]+$/.test(src);
+      if (!uploaded && !/^https:\/\//.test(src) && !src.startsWith("data:")) break;
       if (str(e, "kind") === "video") {
         const v = h("video");
         v.src = src;
@@ -226,7 +227,8 @@ function renderElement(e: Element, units: BuildUnit[], pending: Promise<unknown>
         f.loading = "eager";
         f.allow = "autoplay; fullscreen; picture-in-picture; encrypted-media";
         f.referrerPolicy = "strict-origin-when-cross-origin";
-        f.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups");
+        // Third-party pages keep their own origin; our own files never get same-origin powers.
+        f.setAttribute("sandbox", uploaded ? "allow-presentation" : "allow-scripts allow-same-origin allow-presentation allow-popups");
         wrap.append(f);
       }
       break;

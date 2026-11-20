@@ -14,6 +14,9 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// KeepVersions is how many recent versions of each deck are kept for undo and history.
+const KeepVersions = 500
+
 // ErrNotFound is returned when a deck does not exist.
 var ErrNotFound = errors.New("deck not found")
 
@@ -164,6 +167,10 @@ func (s *Store) Update(ctx context.Context, id string, base int, title, theme st
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO versions(deck_id,version,actor,ops,doc,created_at) VALUES(?,?,?,?,?,?)`,
 		id, base+1, actor, ops, doc, ts); err != nil {
+		return err
+	}
+	// Keep the most recent KeepVersions versions (plus version 1) per deck.
+	if _, err := tx.ExecContext(ctx, "DELETE FROM versions WHERE deck_id=? AND version>1 AND version<=?", id, base+1-KeepVersions); err != nil {
 		return err
 	}
 	return tx.Commit()

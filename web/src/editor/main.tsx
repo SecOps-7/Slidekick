@@ -257,9 +257,7 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
         <a class="ed-btn" href={`/d/${api.deckId}#${slideIndex + 1}`} target="_blank" rel="noopener">
           View
         </a>
-        <a class="ed-btn" href={`/api/decks/${api.deckId}/export.html?download=1`}>
-          Export
-        </a>
+        <ExportMenu api={api} say={say} />
         <a class="ed-btn primary" href={`/d/${api.deckId}/present#${slideIndex + 1}`} target="_blank" rel="noopener">
           ▶ Present
         </a>
@@ -321,6 +319,43 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
       <div class={`ed-toast${toast ? " show" : ""}`} role="status">
         {toast}
       </div>
+    </div>
+  );
+}
+
+function ExportMenu({ api, say }: { api: Api; say: (m: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState("");
+  const make = async (format: "pdf" | "png") => {
+    setOpen(false);
+    setBusy(format);
+    try {
+      const { url } = await api.exportFile(format);
+      location.href = url;
+    } catch (err) {
+      say(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy("");
+    }
+  };
+  return (
+    <div class="ed-export">
+      <button type="button" class="ed-btn" aria-expanded={open} onClick={() => setOpen(!open)} disabled={Boolean(busy)}>
+        {busy ? `Exporting ${busy.toUpperCase()}…` : "Export ▾"}
+      </button>
+      {open && (
+        <div class="ed-export-menu" role="menu">
+          <a role="menuitem" href={`/api/decks/${api.deckId}/export.html?download=1`} onClick={() => setOpen(false)}>
+            HTML <small>plays offline, with animations</small>
+          </a>
+          <button type="button" role="menuitem" onClick={() => make("pdf")}>
+            PDF <small>one page per slide</small>
+          </button>
+          <button type="button" role="menuitem" onClick={() => make("png")}>
+            PNG <small>zip of slide images</small>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

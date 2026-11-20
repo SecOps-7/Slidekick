@@ -45,13 +45,15 @@ Never write HTML. Compose elements (heading, text, bullets, image, code, stat, q
 type Options struct {
 	Renderer *render.Renderer // nil or unavailable: render_slide explains how to enable it
 	Exporter *export.Exporter
+	// Files makes PDF or PNG exports and stores them as downloadable files.
+	Files func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error)
 }
 
 // New builds the MCP server around a deck service.
 func New(svc *service.Service, schemaFS fs.FS, version string, opt Options) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "slidekick", Title: "Slidekick", Version: version},
 		&mcp.ServerOptions{Instructions: instructions})
-	h := &handlers{svc: svc, render: opt.Renderer, export: opt.Exporter}
+	h := &handlers{svc: svc, render: opt.Renderer, export: opt.Exporter, files: opt.Files}
 	h.tools(s)
 	resources(s, svc, schemaFS)
 	prompts(s)
@@ -62,6 +64,7 @@ type handlers struct {
 	svc    *service.Service
 	render *render.Renderer
 	export *export.Exporter
+	files  func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error)
 }
 
 const actor = "agent"
@@ -221,7 +224,7 @@ type UploadOut struct {
 
 type ExportIn struct {
 	DeckID string `json:"deck_id"`
-	Format string `json:"format,omitempty" jsonschema:"html (default). PDF is planned for a later release."`
+	Format string `json:"format,omitempty" jsonschema:"html (default; one self-contained file), pdf (one page per slide) or png (zip of slide images)"`
 }
 
 type ExportOut struct {
@@ -351,10 +354,25 @@ func (h *handlers) tools(s *mcp.Server) {
 			return nil, &UploadOut{ID: a.ID, URL: a.URL(), AbsoluteURL: h.svc.BaseURL + a.URL(), MIME: a.MIME, Size: a.Size}, nil
 		})
 
-	mcp.AddTool(s, read("export_deck", "Export a deck as one self-contained HTML file that plays offline with all animations. Returns a download link."),
+	mcp.AddTool(s, read("export_deck", "Export a deck: html (one self-contained file that plays offline with all animations), pdf or png. Returns a download link."),
 		func(ctx context.Context, _ *mcp.CallToolRequest, in ExportIn) (*mcp.CallToolResult, *ExportOut, error) {
+			if in.Format == "pdf" || in.Format == "png" {
+				if h.files == nil || h.render == nil || !h.render.Available() {
+					return nil, nil, render.ErrUnavailable
+				}
+				d, _, _, err := h.svc.Get(ctx, in.DeckID)
+				if err != nil {
+					return nil, nil, notFound(err, in.DeckID)
+				}
+				a, err := h.files(ctx, d, in.Format)
+				if err != nil {
+					return nil, nil, err
+				}
+				return nil, &ExportOut{URL: h.svc.BaseURL + a.URL(), Filename: a.Name, Bytes: int(a.Size),
+					Note: "Every slide fully built. The link is unguessable and can be shared as is."}, nil
+			}
 			if in.Format != "" && in.Format != "html" {
-				return nil, nil, fmt.Errorf("format %q is not supported yet; use html", in.Format)
+				return nil, nil, fmt.Errorf("format %q is not supported; use html, pdf or png", in.Format)
 			}
 			if h.export == nil {
 				return nil, nil, errors.New("export is not configured on this server")

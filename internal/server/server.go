@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -30,25 +31,31 @@ type Options struct {
 	Web      fs.FS
 	Log      *slog.Logger
 	Exporter *export.Exporter
+	// Files makes a binary export (pdf or png) and stores it; see export.MakeFile.
+	Files func(ctx context.Context, deckID, format string) (*store.Asset, error)
 }
 
 type server struct {
-	svc *service.Service
-	opt Options
+	svc     *service.Service
+	opt     Options
+	fails   *failLimiter
+	conns   *connLimiter
+	exports *exportCache
 }
 
 // New returns the root handler.
 func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler {
-	s := &server{svc: svc, opt: opt}
+	s := &server{svc: svc, opt: opt, fails: newFailLimiter(), conns: newConnLimiter(50, 500), exports: newExportCache(2, 8)}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok\n") })
-	mux.HandleFunc("GET /api/decks", s.listDecks)
+	mux.Handle("GET /api/decks", s.auth(http.HandlerFunc(s.listDecks))) // deck ids are share links: don't list them publicly
 	mux.HandleFunc("GET /api/decks/{id}", s.getDeck)
 	mux.HandleFunc("GET /api/decks/{id}/history", s.history)
 	mux.Handle("POST /api/decks/{id}/patch", s.auth(http.HandlerFunc(s.patchDeck)))
 	mux.HandleFunc("GET /api/catalog", s.catalog)
 	mux.HandleFunc("GET /api/decks/{id}/export.html", s.exportHTML)
+	mux.Handle("POST /api/decks/{id}/export", s.auth(http.HandlerFunc(s.exportFile)))
 	mux.Handle("GET /api/auth", s.auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "required": opt.Token != ""})
 	})))
@@ -87,8 +94,12 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	})
 
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return mcpServer }, nil)
-	mux.Handle("/mcp", s.auth(mcpHandler))
-	mux.Handle("/mcp/", s.auth(mcpHandler))
+	mcpCapped := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 24<<20) // upload_asset carries up to 15 MB as base64
+		mcpHandler.ServeHTTP(w, r)
+	})
+	mux.Handle("/mcp", s.auth(mcpCapped))
+	mux.Handle("/mcp/", s.auth(mcpCapped))
 
 	mux.Handle("/", s.spa())
 	return securityHeaders(mux)
@@ -99,6 +110,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("X-Frame-Options", "DENY")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -109,12 +121,20 @@ func (s *server) auth(next http.Handler) http.Handler {
 	}
 	want := []byte("Bearer " + s.opt.Token)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := clientIP(r)
+		if !s.fails.allowed(ip) {
+			w.Header().Set("Retry-After", "300")
+			http.Error(w, "too many failed attempts; try again in a few minutes", http.StatusTooManyRequests)
+			return
+		}
 		got := []byte(r.Header.Get("Authorization"))
 		if subtle.ConstantTimeCompare(got, want) != 1 {
+			s.fails.fail(ip)
 			w.Header().Set("WWW-Authenticate", `Bearer realm="slidekick"`)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		s.fails.succeed(ip)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -214,6 +234,12 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	ip := clientIP(r)
+	if !s.conns.acquire(ip, id) {
+		http.Error(w, "too many live connections", http.StatusServiceUnavailable)
+		return
+	}
+	defer s.conns.release(ip, id)
 	c, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return
@@ -253,7 +279,16 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 			}
 			switch m.Type {
 			case "auth":
-				authed = s.opt.Token == "" || subtle.ConstantTimeCompare([]byte(m.Token), []byte(s.opt.Token)) == 1
+				if !s.fails.allowed(ip) {
+					authed = false
+				} else {
+					authed = s.opt.Token == "" || subtle.ConstantTimeCompare([]byte(m.Token), []byte(s.opt.Token)) == 1
+					if authed {
+						s.fails.succeed(ip)
+					} else {
+						s.fails.fail(ip)
+					}
+				}
 				reply, _ := json.Marshal(map[string]any{"type": "auth", "ok": authed})
 				c.Write(ctx, websocket.MessageText, reply)
 			case "present":
@@ -348,6 +383,12 @@ func (s *server) restore(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, res)
 }
 
+// appCSP locks the app page down: scripts only from this server, images and
+// media from here, data: or https, embeds only over https.
+const appCSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; " +
+	"media-src 'self' blob: https:; font-src 'self' data:; connect-src 'self' ws: wss:; frame-src https:; " +
+	"object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
 // spa serves the built web app, falling back to index.html for client routes.
 func (s *server) spa() http.Handler {
 	files := http.FileServerFS(s.opt.Web)
@@ -366,6 +407,7 @@ func (s *server) spa() http.Handler {
 				}
 			}
 		}
+		w.Header().Set("Content-Security-Policy", appCSP)
 		idx, err := fs.ReadFile(s.opt.Web, "index.html")
 		if err != nil {
 			http.Error(w, "web app not built (run: npm --prefix web run build)", http.StatusServiceUnavailable)
@@ -395,6 +437,9 @@ func (s *server) serveFile(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", a.MIME)
 	h.Set("Content-Security-Policy", "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; media-src 'self'; sandbox")
 	h.Set("Cache-Control", "public, max-age=31536000, immutable")
+	if a.MIME == "application/pdf" || a.MIME == "application/zip" {
+		h.Set("Content-Disposition", `attachment; filename="`+strings.ReplaceAll(a.Name, `"`, "")+`"`)
+	}
 	http.ServeContent(w, r, a.ID+a.Ext, a.CreatedAt, f)
 }
 
@@ -418,19 +463,46 @@ func (s *server) exportHTML(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "export not configured", http.StatusNotImplemented)
 		return
 	}
-	d, raw, _, err := s.svc.Get(r.Context(), r.PathValue("id"))
+	d, raw, ver, err := s.svc.Get(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	out, err := s.opt.Exporter.HTML(r.Context(), raw)
-	if err != nil {
-		writeErr(w, err)
-		return
+	key := fmt.Sprintf("%s@%d", d.ID, ver)
+	out, ok := s.exports.get(key)
+	if !ok {
+		select {
+		case s.exports.sem <- struct{}{}:
+		case <-r.Context().Done():
+			return
+		}
+		out, err = s.opt.Exporter.HTML(r.Context(), raw)
+		<-s.exports.sem
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		s.exports.put(key, out)
 	}
+	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if r.URL.Query().Get("download") != "" {
 		w.Header().Set("Content-Disposition", `attachment; filename="`+export.Filename(d.Title)+`"`)
 	}
 	w.Write(out)
+}
+
+// exportFile makes a PDF or PNG zip (headless Chromium), stores it as an
+// asset and returns its download URL. Needs the token: rendering is costly.
+func (s *server) exportFile(w http.ResponseWriter, r *http.Request) {
+	if s.opt.Files == nil {
+		http.Error(w, "export not configured", http.StatusNotImplemented)
+		return
+	}
+	a, err := s.opt.Files(r.Context(), r.PathValue("id"), r.URL.Query().Get("format"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"url": a.URL(), "name": a.Name, "bytes": a.Size})
 }
