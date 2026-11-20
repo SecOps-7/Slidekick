@@ -378,5 +378,7 @@ export async function mountEditor(host: HTMLElement, deckId: string) {
     return;
   }
   document.title = `Edit · ${initial.deck.title}`;
+  const theme = cat.themes[initial.deck.theme];
+  if (theme) applyTheme(document.documentElement, theme); // before the first render: diagrams read the tokens
   render(<Editor api={api} cat={cat} initial={initial} />, host);
 }

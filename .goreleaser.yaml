@@ -1,0 +1,41 @@
+# GoReleaser: standalone binaries for each OS/arch. Docker images are built by
+# .github/workflows/release.yml. Runs only when a v* tag is pushed.
+version: 2
+project_name: slidekick
+
+before:
+  hooks:
+    - npm --prefix web ci --no-fund --no-audit
+    - npm --prefix web run build
+    - go mod tidy
+
+builds:
+  - id: slidekick
+    main: ./cmd/slidekick
+    binary: slidekick
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md, CHANGELOG.md, themes/fonts/licenses/*]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]
+
+release:
+  draft: true # review the notes, then publish by hand
+  prerelease: auto

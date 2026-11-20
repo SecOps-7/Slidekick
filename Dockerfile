@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 # Slidekick: one static Go binary with the web app embedded, on distroless.
 
-FROM node:24-alpine AS web
+# Web and Go stages run on the build machine's platform and cross-compile, so
+# multi-arch builds (buildx --platform linux/amd64,linux/arm64) stay fast.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-fund --no-audit
@@ -9,14 +11,15 @@ COPY web/ ./
 COPY schema/ /src/schema/
 RUN npm run build
 
-FROM golang:1.27-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
+ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=0.1.0-dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/slidekick ./cmd/slidekick
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/slidekick ./cmd/slidekick
 
 # ---- render: adds headless Chromium for render_slide (tag: slidekick:<ver>-render)
 FROM debian:trixie-slim AS render
@@ -32,6 +35,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s CMD ["/usr/local/bin/s
 ENTRYPOINT ["/usr/local/bin/slidekick"]
 CMD ["serve"]
 
+LABEL org.opencontainers.image.source="https://github.com/SecOps-7/slidekick" org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.description="Slidekick with headless Chromium for render_slide and PDF/PNG export"
+
 # ---- default: minimal distroless image (render_slide reports Chromium is missing)
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/slidekick /usr/local/bin/slidekick
@@ -41,3 +47,5 @@ EXPOSE 7410
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s CMD ["/usr/local/bin/slidekick", "health"]
 ENTRYPOINT ["/usr/local/bin/slidekick"]
 CMD ["serve"]
+LABEL org.opencontainers.image.source="https://github.com/SecOps-7/slidekick" org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.description="Slidekick: agents author animated slide decks over MCP; humans watch, edit and present live"
