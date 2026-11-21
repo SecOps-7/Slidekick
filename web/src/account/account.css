@@ -66,3 +66,51 @@
 .acc-models { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; max-height: 260px; overflow: auto; padding: 8px; border: 1px solid var(--app-line); border-radius: 8px; font-size: 13px; }
 .acc-brand { line-height: 0; color: var(--app-text); justify-self: start; }
 .acc-brand svg { height: 30px; width: auto; display: block; }
+
+/* ---- sign-in and setup: brand stage + form ---- */
+/* The stage is always dark, like the screen a deck plays on; the form side
+   follows the light/dark theme. One motion: the slides kick into place on load. */
+.auth { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+.auth-stage {
+  position: relative; overflow: hidden; isolation: isolate; color: #e8ebf5;
+  background: radial-gradient(120% 90% at 85% 10%, #1c1546 0%, transparent 55%), radial-gradient(90% 80% at 0% 100%, #0d2a2c 0%, transparent 60%), #0b1020;
+  display: flex; flex-direction: column; justify-content: flex-end; padding: clamp(28px, 5vw, 72px);
+}
+.auth-deck { position: absolute; inset: 0; z-index: -1; }
+.auth-slide {
+  --w: clamp(220px, 30vw, 430px); position: absolute; left: 30%; top: 22%; width: var(--w); aspect-ratio: 16 / 10;
+  border-radius: clamp(14px, 1.6vw, 22px); box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8);
+  display: grid; align-content: center; gap: calc(var(--w) * 0.045); padding: 0 calc(var(--w) * 0.09);
+  animation: auth-kick 0.9s cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
+}
+.auth-slide i { display: block; height: clamp(9px, 1.2vw, 16px); border-radius: 99px; background: currentColor; }
+.auth-slide.s1 { color: rgba(94, 234, 212, 0.55); background: rgba(45, 212, 191, 0.16); border: 1px solid rgba(45, 212, 191, 0.3); transform: translate(-44%, 34%) rotate(-6deg); padding-right: calc(var(--w) * 0.4); --from: translate(-60%, 60%) rotate(4deg); animation-delay: 0.16s; }
+.auth-slide.s1 i:nth-child(2) { width: 78%; } .auth-slide.s1 i:nth-child(3) { width: 56%; }
+.auth-slide.s2 { background: #16233a; border: 1px solid rgba(94, 234, 212, 0.35); transform: translate(-22%, 12%) rotate(-14deg); --from: translate(-40%, 50%) rotate(-2deg); animation-delay: 0.08s;
+  grid-auto-flow: column; grid-auto-columns: 1fr; grid-template-rows: 1fr; align-items: end; align-content: stretch; gap: calc(var(--w) * 0.03); padding: calc(var(--w) * 0.08) calc(var(--w) * 0.5) calc(var(--w) * 0.09) calc(var(--w) * 0.09); }
+.auth-slide.s2 b { height: var(--h); border-radius: 6px 6px 2px 2px; background: linear-gradient(180deg, #5eead4, #2dd4bf); opacity: 0.9; }
+.auth-slide.s3 { color: #fff; background: linear-gradient(45deg, #2dd4bf, #8b5cf6); transform: translate(14%, -10%) rotate(-22deg); --from: translate(-20%, 40%) rotate(-6deg); }
+.auth-slide.s3 i { width: 52%; } .auth-slide.s3 i + i { width: 32%; opacity: 0.7; }
+@keyframes auth-kick { from { transform: var(--from); opacity: 0; } }
+.auth-brand { display: grid; gap: 14px; }
+.auth-wordmark { display: block; line-height: 0; color: #fff; width: clamp(240px, 30vw, 460px); justify-self: start; }
+.auth-wordmark svg { width: 100%; height: auto; display: block; }
+.auth-wordmark:focus-visible { outline: 2px solid #5eead4; outline-offset: 6px; border-radius: 6px; }
+.auth-tag { margin: 0; max-width: 44ch; font: 500 clamp(17px, 1.6vw, 22px)/1.35 "Space Grotesk", Inter, system-ui, sans-serif; color: #b8c0d8; letter-spacing: -0.005em; }
+.auth-panel { display: grid; place-items: center; padding: clamp(32px, 5vw, 72px) 16px; }
+.auth-form { width: min(380px, 100%); max-width: none; margin: 0; padding: 0; gap: 16px; }
+.auth-form h1 { font: 600 clamp(28px, 2.4vw, 34px)/1.15 "Space Grotesk", Inter, system-ui, sans-serif; letter-spacing: -0.02em; }
+.auth-form .acc-form { gap: 16px; margin-top: 6px; }
+.auth-form input { padding: 11px 12px; }
+.auth-form .acc-primary { justify-self: stretch; padding: 11px 14px; font-size: 15px; border: 0; color: #fff; background: linear-gradient(135deg, #14b8a6, #7c3aed); }
+.auth-form .acc-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.auth-form .acc-or { display: flex; align-items: center; gap: 12px; }
+.auth-form .acc-or::before, .auth-form .acc-or::after { content: ""; flex: 1; height: 1px; background: var(--app-line); }
+@media (max-width: 900px) {
+  .auth { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .auth-stage { min-height: clamp(260px, 42vh, 380px); padding: 24px 16px; }
+  .auth-slide { --w: clamp(170px, 46vw, 300px); left: auto; right: 6%; top: 10%; }
+  .auth-wordmark { width: clamp(200px, 62vw, 340px); }
+  .auth-panel { place-items: start center; padding: 32px 16px 56px; }
+}
+@media (prefers-reduced-motion: reduce) { .auth-slide { animation: none; } }

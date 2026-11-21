@@ -147,7 +147,7 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
 
 | | |
 |---|---|
-| 🤖 **Built for agents** | 20 MCP tools over streamable HTTP or stdio: create and patch decks (RFC 6902 JSON Patch), lint, `render_slide` screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links. The schema, element catalogues and a design guide are resources, and `outline_to_deck`, `polish_deck` and `restyle_deck` are prompts. Every write returns the new version, lint findings and the number of open human comments. |
+| 🤖 **Built for agents** | 28 MCP tools over streamable HTTP or stdio: create and patch decks (RFC 6902 JSON Patch), lint, `render_slide` screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links, and presenting: run the deck out loud, step through it, and cast it to a TV. The schema, element catalogues and a design guide are resources, and `outline_to_deck`, `polish_deck` and `restyle_deck` are prompts. Every write returns the new version, lint findings and the number of open human comments. |
 | 🧱 **Elements and layouts** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, icons, shapes, embeds, and a sandboxed HTML escape hatch that lint always flags. 8 layouts, styled with theme tokens only. |
 | 🎬 **Motion** | 28 build presets (fades and slides from any side, zoom, pop, bounce, 3D flips, iris, typewriter, line drawing...) with spring physics and stagger, per-item bullet builds, count-up stats and charts that draw in. 18 transitions, including **morph** between slides. All respect reduced motion. |
 | 🎨 **Themes** | 18 themes, from corporate Boardroom and editorial Magazine to Synthwave, Terminal, Chalkboard and an accessibility-first High Contrast, all with self-hosted fonts. Tests lint every example deck in every theme and enforce contrast. [Write your own](docs/themes.md). |
@@ -156,8 +156,8 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
 | 📺 **Casting** | Cast a deck to a Chromecast from the editor, the presenter view or an agent. Devices on your network are found automatically; the TV shows a full-screen, sign-in-free view that follows the presenter and plays the narration, while the laptop stays muted unless you unmute it. |
 | 💬 **AI chat** | A chat panel in the editor that works with OpenAI, Anthropic, Google or any OpenAI-compatible (local) model. It edits only the open deck, through Slidekick's own tools as the signed-in user, so roles, validation and lint apply. Stop and Undo at any time. |
 | ✏️ **Editor** | Follows the agent as it works: slide sorter, inline text editing, property panel, build timeline, undo/redo across agent and human edits, and a schema check on every change. |
-| 🎤 **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer, an audience window and remote followers. |
-| 📚 **Library** | Every deck shown as a live miniature of its first slide in its own theme, with search, sort, All/Mine and quick actions. |
+| 🎤 **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer, an audience window for the projector, and remote followers. Captions and a Mute voice / Unmute voice button for the AI voice. |
+| 📚 **Library** | Every deck shown as a live miniature of its first slide in its own theme, with search, sort, All/Mine, and a menu to share links or delete. |
 | 🔐 **Accounts** | Admin, editor and viewer roles, enforced on every route, the live WebSocket and MCP. Password sign-in (argon2id) and single sign-on with OpenID Connect (Entra, Google, Authentik, Keycloak), several providers at once. Personal agent tokens and per-deck edit tokens. |
 | 🔗 **Sharing** | Two kinds of link: a **viewer link** watches the deck with no controls but Fullscreen (or, with **Loop**, plays it on repeat for kiosk screens), and a **presenter link** presents it without signing in (slides, laser, AI voice, casting). Links can expire after 30 minutes to 24 hours, or never; **Make new links** revokes them all. New decks are private: only signed-in people and link holders can watch. |
 | 📦 **Export** | Standalone HTML that plays offline with every animation, PDF, or PNGs. |
@@ -195,10 +195,10 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
 
 | Key | Where | Action |
 |---|---|---|
-| `→` `Space` `PageDown` | Viewer, presenter | Next build step or slide |
-| `←` `PageUp` | Viewer, presenter | Previous |
-| `Home` `End` | Viewer, presenter | First or last slide |
-| `F` | Viewer, presenter | Full screen |
+| `→` `Space` `PageDown` | Presenter | Next build step or slide (viewers follow) |
+| `←` `PageUp` | Presenter | Previous |
+| `Home` `End` | Presenter | First or last slide |
+| `F` | Viewer, presenter | Full screen (viewer links have no other control) |
 | `L` | Presenter | Laser pointer |
 | `T` | Presenter | Reset the timer |
 | `Ctrl+Z` `Ctrl+Shift+Z` | Editor | Undo, redo (agent and human edits alike) |
@@ -220,6 +220,9 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
   <tr>
     <td><img src="docs/img/ai-chat.png" alt="AI chat"><p align="center"><sub>The AI chat adding a slide</sub></p></td>
     <td><img src="docs/img/settings-users.png" alt="Users and roles"><p align="center"><sub>Users and roles</sub></p></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/img/sign-in.png" alt="Sign-in page"><p align="center"><sub>Sign in</sub></p></td>
   </tr>
 </table>
 
@@ -269,7 +272,8 @@ slidekick version            print the version
 Slidekick is built for your **local network**. It serves plain HTTP; terminate TLS at a reverse proxy if you need it.
 
 - **Roles everywhere.** Admin, editor and viewer roles are enforced on every REST route, the live WebSocket and MCP. Decks have one owner; only the owner or an admin changes one.
-- **New decks are private.** A private deck answers 404 without its 96-bit link key, so its id can't even be confirmed. Rotating the key disconnects old viewers.
+- **New decks are private.** A private deck answers 404 without its 96-bit link key, so its id can't even be confirmed.
+- **Two kinds of link, both revocable.** A viewer link only watches. A presenter link presents one deck without an account (slides, AI voice, casting) and nothing else: no editing, sharing or other decks; treat it like a password, since it can spend AI and voice credits. Either can expire after 30 minutes to 24 hours, and **Make new links** ends every link at once and disconnects whoever is using one.
 - **First-run setup needs a code.** Until an account exists, `/setup` needs a one-time code from the server log (or the server token).
 - **Sign-in is hardened.** argon2id passwords, 14-day session cookies with CSRF protection, and lockout per address and per username. Single sign-on checks PKCE, state, nonce, issuer and audience.
 - **Secrets at rest** (SSO client secrets, AI and voice keys) are encrypted with AES-256-GCM, never sent to the browser and never logged. Tokens are stored as hashes.
@@ -289,7 +293,7 @@ Agents (MCP: HTTP /mcp or stdio)        Browsers (editor, viewer, presenter, TV)
             └──────────────┬─────────────────────────┘
                            │
   internal/server      HTTP routes, sessions, CSRF, the live hub
-  internal/mcpserver   the 20 MCP tools, resources and prompts
+  internal/mcpserver   the 28 MCP tools, resources and prompts
   internal/service     one place for every deck operation, with authz checks
   internal/deck        the JSON Schema contract, validation and JSON Patch
   internal/lint        design lint returned with every write

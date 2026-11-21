@@ -33,6 +33,46 @@ function Shell({ title, children, wide }: { title: string; children: ComponentCh
   );
 }
 
+// Sign-in and first-run setup: a dark stage with the brand on one side (a
+// deck kicked into motion, the logo's own shapes at full size) and the form on
+// the other. Stacks on narrow screens.
+function AuthShell({ title, lead, children }: { title: string; lead?: string; children: ComponentChildren }) {
+  return (
+    <main class="auth">
+      <section class="auth-stage">
+        <div class="auth-deck" aria-hidden="true">
+          <div class="auth-slide s1">
+            <i />
+            <i />
+            <i />
+          </div>
+          <div class="auth-slide s2">
+            <b style="--h:38%" />
+            <b style="--h:62%" />
+            <b style="--h:48%" />
+            <b style="--h:86%" />
+          </div>
+          <div class="auth-slide s3">
+            <i />
+            <i />
+          </div>
+        </div>
+        <div class="auth-brand">
+          <a class="auth-wordmark" href="/" aria-label="Slidekick home" dangerouslySetInnerHTML={{ __html: wordmarkSVG() }} />
+          <p class="auth-tag">Agents write the deck. You watch it move.</p>
+        </div>
+      </section>
+      <section class="auth-panel">
+        <div class="acc auth-form">
+          <h1>{title}</h1>
+          {lead && <p class="acc-lead">{lead}</p>}
+          {children}
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export function Err({ msg }: { msg: string }) {
   return msg ? (
     <p class="acc-err" role="alert">
@@ -70,7 +110,7 @@ function Login() {
     }
   };
   return (
-    <Shell title="Sign in">
+    <AuthShell title="Sign in">
       <Err msg={err} />
       <form class="acc-form" onSubmit={submit}>
         <label>
@@ -95,7 +135,7 @@ function Login() {
           ))}
         </div>
       )}
-    </Shell>
+    </AuthShell>
   );
 }
 
@@ -112,11 +152,11 @@ function Setup() {
   if (!info) return null;
   if (!info.needed)
     return (
-      <Shell title="Already set up">
+      <AuthShell title="Already set up">
         <p>
           An admin account exists. <a href="/login">Sign in</a>.
         </p>
-      </Shell>
+      </AuthShell>
     );
   const submit = async (e: Event) => {
     e.preventDefault();
@@ -130,8 +170,7 @@ function Setup() {
     }
   };
   return (
-    <Shell title="Create the admin account">
-      <p class="acc-lead">This is the first account on this Slidekick. It can add other people and connect sign-in and AI providers.</p>
+    <AuthShell title="Create the admin account" lead="This is the first account on this Slidekick. It can add other people and connect sign-in and AI providers.">
       <Err msg={err} />
       <form class="acc-form" onSubmit={submit}>
         <label>
@@ -157,7 +196,7 @@ function Setup() {
         </label>
         <button class="acc-primary">Create admin and sign in</button>
       </form>
-    </Shell>
+    </AuthShell>
   );
 }
 

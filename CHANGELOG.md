@@ -14,7 +14,7 @@ First public release.
 - Casting: cast devices on the server's network are found automatically and appear in the Cast menu; others can be added by address, saved, renamed or hidden under Settings > Cast devices.
 - Sharing: two kinds of link. A viewer link is view-only (Fullscreen is its one control; clicks, swipes and keys don't move it), or with Loop plays it by itself on repeat for kiosk screens; a presenter link presents it without signing in: it moves the slides for everyone watching, uses the laser pointer and audience window, runs the AI voice and casts. Both can expire after 30 minutes to 24 hours (or never, the default); Make new links revokes every link at once.
 - About page (Settings > About): the build, the system it runs on, these release notes, and every Go module, web library and font in the build with its licence.
-- Agents (MCP): 20 tools over streamable HTTP (`/mcp`, bearer token) or stdio: create and edit decks, JSON Patch, lint, `render_slide` screenshots, uploads, HTML/PDF/PNG export, comments, history and undo.
+- Agents (MCP): 28 tools over streamable HTTP (`/mcp`, bearer token) or stdio: create and edit decks, JSON Patch, lint, `render_slide` screenshots, uploads, HTML/PDF/PNG export, comments, history and undo.
 - Agents (MCP): every write returns the new version, lint findings and the number of open human comments.
 - Agents (MCP): deck edit tokens. An `ske_...` token edits, presents and exports one deck only (MCP and REST), and an MCP session can't be reused under another token.
 - Agents (MCP): resources (schema, catalogues, design guide, per-deck comments) and prompts (`outline_to_deck`, `polish_deck`, `restyle_deck`).
@@ -45,6 +45,7 @@ First public release.
 - The server token is documented as an all-powerful emergency key that stays configured as a backstop (decision of 2026-11-20).
 - The AI presenter talks about each slide's content and data, using the speaker notes as talking points rather than reading them out, and no longer needs notes to start.
 - The AI chat works only on the open deck: it can't create decks out of view, every call is pinned to the open deck, and naming a slide in a message ("slide 4") brings it into view.
+- The sign-in and first-run setup pages lead with the brand: a dark stage with the logo and wordmark at full size and a deck kicked into motion, beside the form (stacked on phones).
 - Slidekick's own dialogs replace the browser's pop-ups everywhere, with a clear action on the button and Cancel focused for anything destructive.
 - Pages fill the window and scale up on large screens.
 - Diagrams use Mermaid 12, pinned to its classic look and dagre layout so existing diagrams keep their shape; the full standalone export grows to about 7 MB as a result.
