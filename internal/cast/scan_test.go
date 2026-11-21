@@ -149,6 +149,13 @@ func TestPlanSubnets(t *testing.T) {
 	if err != nil || len(notes) != 0 || len(got) != 2 || got[0].String() != "172.16.5.0/24" || got[1].String() != "192.168.1.0/24" {
 		t.Fatalf("got %v notes %v err %v", got, notes, err)
 	}
+	// A bridged container's own network is Docker's, whatever its pool: only
+	// the server's LAN address (from the base URL) is searched.
+	bridged := []cast.Interface{{Name: "eth0", Prefix: netip.MustParsePrefix("192.168.32.2/20")}}
+	got, _, _ = cast.PlanSubnets(ctx, "", "http://172.16.5.5:7410", bridged, true)
+	if len(got) != 1 || got[0].String() != "172.16.5.0/24" {
+		t.Fatalf("bridged container: %v", got)
+	}
 	// Outside a container the 172.17 interface is a real network.
 	got, _, _ = cast.PlanSubnets(ctx, "", "http://172.16.5.5:7410", ifaces[:1], false)
 	if len(got) != 2 || got[1].String() != "172.17.0.0/24" {

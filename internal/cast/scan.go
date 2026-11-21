@@ -210,8 +210,8 @@ var dockerPool = netip.MustParsePrefix("172.16.0.0/12")
 // PlanSubnets decides what to scan: the explicit list when there is one
 // (SLIDEKICK_CAST_SUBNETS), else the /24 around the server's LAN address
 // (the host in the base URL, resolved if it is a name) plus the /24s of the
-// machine's own LAN-facing interfaces. In a container, interfaces in
-// Docker's 172.16.0.0/12 pool are the bridge, not the LAN, and are skipped.
+// machine's own LAN-facing interfaces. In a bridged container only the base
+// URL counts; with host networking, Docker's 172.16.0.0/12 pool is skipped.
 // Notes says why candidates were left out.
 func PlanSubnets(ctx context.Context, explicit, baseURL string, ifaces []Interface, inContainer bool) (subnets []netip.Prefix, notes []string, err error) {
 	if strings.TrimSpace(explicit) != "" {
@@ -238,6 +238,13 @@ func PlanSubnets(ctx context.Context, explicit, baseURL string, ifaces []Interfa
 			}
 		}
 	}
+	// In a bridged container the interfaces are Docker's own networks (any
+	// address pool, e.g. 192.168.32.0/20), not the LAN the server is on, so
+	// only the base URL's address says where that is. With host networking the
+	// container sees the host's interfaces, Docker's virtual ones included.
+	if inContainer && !hostNetwork(ifaces) {
+		ifaces = nil
+	}
 	for _, i := range ifaces {
 		a := i.Prefix.Addr().Unmap()
 		if virtualIface(i.Name) || !a.Is4() || (inContainer && dockerPool.Contains(a)) {
@@ -257,6 +264,17 @@ func PlanSubnets(ctx context.Context, explicit, baseURL string, ifaces []Interfa
 		out = out[:len(out)-1]
 	}
 	return out, notes, nil
+}
+
+// hostNetwork reports whether the interfaces are the host's own: only there
+// are Docker's bridge (docker0, br-*) and veth interfaces visible.
+func hostNetwork(ifaces []Interface) bool {
+	for _, i := range ifaces {
+		if i.Name == "docker0" || strings.HasPrefix(i.Name, "br-") || strings.HasPrefix(i.Name, "veth") {
+			return true
+		}
+	}
+	return false
 }
 
 // LocalInterfaces lists this machine's IPv4 interface addresses.

@@ -129,9 +129,7 @@ function CastDevices() {
         Editors can show a deck on a TV: the server tells the Chromecast to open the deck, and it follows along as someone presents. Casting only works on your own network.
       </p>
       <p class="acc-muted">
-        Slidekick finds cast devices by itself, shortly after it starts, every 10 minutes and when you press Scan now. It asks with mDNS and also knocks on port 8009 at every
-        address in {disc?.subnets.length ? disc.subnets.join(", ") : "the server's own network"}, which works from Docker's default bridge network. Host networking makes mDNS
-        work too, but isn't required.
+        Slidekick looks for cast devices on the network it's connected to, shortly after it starts, every 10 minutes and when you press Scan now.
       </p>
       <Err msg={err} />
       {note && (
