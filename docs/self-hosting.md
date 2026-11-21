@@ -1,20 +1,13 @@
 # Self-hosting
 
-Slidekick is one container. Pick an image:
-
-| Image | Size | What you get |
-| --- | --- | --- |
-| `ghcr.io/secops-7/slidekick:<version>-render` | ~890 MB | Everything, including `render_slide` and PDF/PNG export (headless Chromium) |
-| `ghcr.io/secops-7/slidekick:<version>` | ~32 MB | Everything except screenshots and PDF/PNG export |
-
-Both are multi-arch (amd64, arm64) and run as a non-root user.
+Slidekick is one container: `ghcr.io/secops-7/slidekick:latest` (or a version, `:1.0.0`, or `:1.0` for patch updates). The image includes headless Chromium for `render_slide` and PDF/PNG export (about 890 MB), is multi-arch (amd64, arm64) and runs as a non-root user.
 
 ## Docker Compose
 
 ```yaml
 services:
   slidekick:
-    image: ghcr.io/secops-7/slidekick:1-render
+    image: ghcr.io/secops-7/slidekick:latest
     restart: unless-stopped
     user: "1000:1000"
     ports: ["7410:7410"]
@@ -23,7 +16,7 @@ services:
       SLIDEKICK_BASE_URL: https://slides.example.com
     volumes: ["./data:/data"]
     read_only: true
-    tmpfs: ["/tmp:size=512m"]           # Chromium scratch space (render image)
+    tmpfs: ["/tmp:size=512m"]           # Chromium scratch space
     shm_size: 256m
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]

@@ -51,7 +51,7 @@ AI slide tools today either wrap Markdown (flat slides) or export a PPTX and wal
 # compose.yaml
 services:
   slidekick:
-    image: ghcr.io/secops-7/slidekick:1-render
+    image: ghcr.io/secops-7/slidekick:latest
     restart: unless-stopped
     user: "1000:1000"
     ports: ["7410:7410"]
@@ -84,7 +84,7 @@ read -rsp "admin password: " PW
 docker run -d --name slidekick -p 7410:7410 \
   -e SLIDEKICK_ADMIN_USERNAME=admin -e SLIDEKICK_ADMIN_PASSWORD="$PW" \
   -v slidekick-data:/data --tmpfs /tmp --shm-size 256m \
-  ghcr.io/secops-7/slidekick:latest-render
+  ghcr.io/secops-7/slidekick:latest
 ```
 
 `SLIDEKICK_ADMIN_*` creates the first admin on first run and is ignored afterwards.
@@ -92,16 +92,11 @@ docker run -d --name slidekick -p 7410:7410 \
 </details>
 
 <details>
-<summary><strong>Which image?</strong></summary>
+<summary><strong>About the image</strong></summary>
 
 <br>
 
-| Tag | Size | What it adds |
-|---|---|---|
-| `:<version>-render` | larger | Chromium, for `render_slide` screenshots and PDF/PNG export. Recommended. |
-| `:<version>` | slim, distroless | Everything else. Agents can still build and lint decks; screenshots and PDF/PNG export are unavailable. |
-
-Both are built for amd64 and arm64.
+There is one image, for amd64 and arm64, with everything included: headless Chromium for `render_slide` screenshots and PDF/PNG export comes built in (about 890 MB). Pin a version (`:1.0.0`, or `:1.0` for patch updates) instead of `latest` if you'd rather choose when to upgrade.
 
 </details>
 
@@ -112,7 +107,7 @@ Both are built for amd64 and arm64.
 
 ```bash
 git clone https://github.com/SecOps-7/Slidekick.git && cd Slidekick
-docker build --target render -t slidekick:local-render .
+docker build -t slidekick:local .
 ```
 
 Or without Docker (Go and Node 24):

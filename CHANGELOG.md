@@ -35,7 +35,7 @@ First public release.
 - People: private decks, whose links carry a view key; rotating it disconnects old viewers.
 - People: an editor that follows the slide the agent is editing, with a Share menu (viewer and presenter links, deck tokens), a schema check on every edit and a slide sorter.
 - People: a presenter view with notes, next slide, timer, build progress, laser pointer, an audience window and remote followers.
-- Operations: one static Go binary with the web app embedded, SQLite storage, and distroless and Chromium (`-render`) images for amd64 and arm64.
+- Operations: one static Go binary with the web app embedded, SQLite storage, and one image for amd64 and arm64 with headless Chromium built in for screenshots and PDF/PNG export.
 - Operations: optional S3-compatible storage (AWS S3, MinIO and others) for uploaded and exported files via `SLIDEKICK_S3_*`; files are served with ETag and Range support either way.
 - Operations: TLS on the LAN through a reverse proxy. `SLIDEKICK_TRUSTED_PROXIES` names the proxy, cookies are `Secure` on https requests, and lockouts use the real client address.
 

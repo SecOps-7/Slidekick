@@ -19,7 +19,7 @@ import (
 )
 
 // ErrUnavailable means no Chromium binary was found.
-var ErrUnavailable = errors.New("slide rendering needs Chromium, which is not installed in this build; run the -render image (or set SLIDEKICK_CHROME to a Chromium binary)")
+var ErrUnavailable = errors.New("slide rendering needs Chromium, which is not installed in this build; run the Slidekick image, which includes it (or set SLIDEKICK_CHROME to a Chromium binary)")
 
 // Renderer owns one long-lived headless browser and opens a tab per render.
 type Renderer struct {

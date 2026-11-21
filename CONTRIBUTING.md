@@ -18,11 +18,11 @@ Generated files are committed and CI checks they're current: `npm --prefix web r
 
 ### Golden screenshots
 
-`internal/golden` renders every example deck through a running render image and compares it with `examples/golden/*.png` (CI does this on every push). Run it locally against a throwaway container:
+`internal/golden` renders every example deck through a running Slidekick container and compares it with `examples/golden/*.png` (CI does this on every push). Run it locally against a throwaway container:
 
 ```bash
-docker build --target render -t slidekick:dev-render .
-docker run -d --rm --name sk-golden -p 127.0.0.1:7411:7410 --tmpfs /data:uid=65532 --tmpfs /tmp --shm-size 256m slidekick:dev-render serve
+docker build -t slidekick:dev .
+docker run -d --rm --name sk-golden -p 127.0.0.1:7411:7410 --tmpfs /data:uid=65532 --tmpfs /tmp --shm-size 256m slidekick:dev serve
 SLIDEKICK_GOLDEN_URL=http://127.0.0.1:7411 go test ./internal/golden
 ```
 

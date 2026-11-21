@@ -2,8 +2,8 @@ name: release
 
 # Runs only when a version tag (v1.2.3) is pushed. Publishes a draft GitHub
 # release with binaries and pushes multi-arch images to GHCR:
-#   ghcr.io/<owner>/slidekick:<version>          slim (no Chromium)
-#   ghcr.io/<owner>/slidekick:<version>-render   with Chromium (render_slide, PDF/PNG)
+#   ghcr.io/<owner>/slidekick:<version>, :<major>.<minor> and :latest
+# (one image, with headless Chromium for render_slide and PDF/PNG export)
 on:
   push:
     tags: ["v*"]
@@ -34,13 +34,6 @@ jobs:
 
   images:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - target: render
-            suffix: -render
-          - target: ""
-            suffix: ""
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v4
@@ -56,18 +49,16 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           flavor: |
             latest=auto
-            suffix=${{ matrix.suffix }},onlatest=true
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
       - uses: docker/build-push-action@v7
         with:
           context: .
-          target: ${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: VERSION=${{ github.ref_name }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.target || 'slim' }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.target || 'slim' }}
+          cache-from: type=gha,scope=image
+          cache-to: type=gha,mode=max,scope=image

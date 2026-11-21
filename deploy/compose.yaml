@@ -3,13 +3,12 @@
 # paths to taste). Secrets live in /opt/slidekick/slidekick.env (mode 600, never
 # in this file): SLIDEKICK_TOKEN, the all-powerful emergency server token, and
 # optionally SLIDEKICK_SECRET_KEY. To run a published image instead, replace
-# `build:` with `image: ghcr.io/secops-7/slidekick:1-render`.
+# `build:` with `image: ghcr.io/secops-7/slidekick:latest`.
 services:
   slidekick:
     build:
       context: /opt/slidekick/src
-      target: render # includes Chromium for render_slide; drop for the slim image
-    image: slidekick:local-render
+    image: slidekick:local
     container_name: slidekick
     restart: unless-stopped
     user: "1000:1000"

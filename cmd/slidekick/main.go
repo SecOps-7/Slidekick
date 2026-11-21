@@ -87,7 +87,7 @@ func main() {
 		fmt.Println("slidekick", version)
 		return
 	case "health":
-		// Used by the container HEALTHCHECK (distroless has no curl).
+		// Used by the container HEALTHCHECK (the image has no curl).
 		_, port, _ := net.SplitHostPort(*addr)
 		c := http.Client{Timeout: 2 * time.Second}
 		r, err := c.Get("http://127.0.0.1:" + port + "/healthz")

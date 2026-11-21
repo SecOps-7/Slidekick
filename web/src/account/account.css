@@ -98,7 +98,7 @@
 .auth-wordmark:focus-visible { outline: 2px solid #5eead4; outline-offset: 6px; border-radius: 6px; }
 .auth-tag { margin: 0; max-width: 44ch; font: 500 clamp(17px, 1.6vw, 22px)/1.35 "Space Grotesk", Inter, system-ui, sans-serif; color: #b8c0d8; letter-spacing: -0.005em; }
 .auth-panel { display: grid; place-items: center; padding: clamp(32px, 5vw, 72px) 16px; }
-.auth-form { width: min(380px, 100%); max-width: none; margin: 0; padding: 0; gap: 16px; }
+.auth-form { width: min(420px, 100%); max-width: none; margin: 0; padding: 0; gap: 16px; }
 .auth-form h1 { font: 600 clamp(28px, 2.4vw, 34px)/1.15 "Space Grotesk", Inter, system-ui, sans-serif; letter-spacing: -0.02em; }
 .auth-form .acc-form { gap: 16px; margin-top: 6px; }
 .auth-form input { padding: 11px 12px; }
