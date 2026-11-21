@@ -85,16 +85,7 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   progress.append(bar);
   const toast = el("div", "toast");
   toast.setAttribute("role", "status");
-  const help = el("div", "help");
-  help.hidden = true;
-  help.innerHTML = `<h2>Keys</h2><dl>
-    <dt>→ Space PgDn</dt><dd>Next build or slide</dd>
-    <dt>← PgUp</dt><dd>Previous</dd>
-    <dt>Home / End</dt><dd>First / last slide</dd>
-    <dt>F</dt><dd>Fullscreen</dd>
-    <dt>H</dt><dd>Hide this bar</dd>
-    <dt>?</dt><dd>This help</dd></dl>`;
-  document.body.append(hud, progress, toast, help);
+  document.body.append(hud, progress, toast);
 
   let toastTimer = 0;
   const say = (msg: string) => {
@@ -135,34 +126,25 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     window.setTimeout(step, wait());
   }
 
-  // ---- navigation ----
+  // ---- view only: no clicking, swiping or keys to change slides; the deck
+  // moves with the presenter (or by itself with Loop). F toggles fullscreen.
   addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    const k = e.key;
-    if (["ArrowRight", "ArrowDown", " ", "PageDown", "Enter"].includes(k)) player.next();
-    else if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(k)) player.prev();
-    else if (k === "Home") player.goto(0);
-    else if (k === "End") player.goto(deck.slides.length - 1, Infinity);
-    else if (k === "f" || k === "F") toggleFullscreen();
-    else if (k === "h" || k === "H") document.body.classList.toggle("hud-hidden");
-    else if (k === "?") help.hidden = !help.hidden;
-    else if (k === "Escape") help.hidden = true;
-    else return;
-    e.preventDefault();
-  });
-  player.viewport.addEventListener("click", (e) => {
-    const x = e.clientX / innerWidth;
-    if (x < 0.3) player.prev();
-    else player.next();
-  });
-  let touchX = 0;
-  player.viewport.addEventListener("touchstart", (e) => (touchX = e.touches[0].clientX), { passive: true });
-  player.viewport.addEventListener("touchend", (e) => {
-    const dx = e.changedTouches[0].clientX - touchX;
-    if (Math.abs(dx) > 40) dx < 0 ? player.next() : player.prev();
+    if (e.key === "f" || e.key === "F") {
+      e.preventDefault();
+      toggleFullscreen();
+    }
   });
   const toggleFullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}));
   fsBtn.onclick = toggleFullscreen;
+  // The label follows the state however it changes (this button, F, or Esc).
+  const showFullscreen = () => {
+    const on = Boolean(document.fullscreenElement);
+    fsBtn.textContent = on ? "Exit Fullscreen" : "Fullscreen";
+    fsBtn.setAttribute("aria-pressed", String(on));
+  };
+  document.addEventListener("fullscreenchange", showFullscreen);
+  showFullscreen();
 
   let idle = 0;
   addEventListener("mousemove", () => {

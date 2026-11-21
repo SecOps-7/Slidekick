@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -50,7 +49,8 @@ type ScanOptions struct {
 	InfoTimeout time.Duration // per identification attempt (1.5 s)
 	Concurrency int           // parallel probes (64)
 	// Progress, when set, is called after each address with how many of
-	// how many are done.
+	// how many are done. Calls come one at a time, in order, so it needn't
+	// be safe for concurrent use.
 	Progress func(done, total int)
 }
 
@@ -324,7 +324,8 @@ func Scan(ctx context.Context, opt ScanOptions) ([]Found, error) {
 	var (
 		mu    sync.Mutex
 		found []Found
-		done  atomic.Int64
+		pmu   sync.Mutex // serialises Progress calls
+		done  int
 		wg    sync.WaitGroup
 		next  = make(chan netip.Addr)
 		total = len(targets)
@@ -339,10 +340,12 @@ func Scan(ctx context.Context, opt ScanOptions) ([]Found, error) {
 					found = append(found, f)
 					mu.Unlock()
 				}
-				n := done.Add(1)
+				pmu.Lock()
+				done++
 				if opt.Progress != nil {
-					opt.Progress(int(n), total)
+					opt.Progress(done, total)
 				}
+				pmu.Unlock()
 			}
 		}()
 	}
