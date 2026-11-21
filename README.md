@@ -184,7 +184,7 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
 - **Automatic run.** **Present with AI voice** in the presenter view, `start_presentation` over MCP, or asking the AI chat to present. Just before each slide the configured model writes one to four sentences per build step from the slide's content (text, numbers, chart data, diagram labels, image descriptions), using the notes as intent. The next slide is prepared while the current one is spoken, so there are no gaps.
 - **Step by step.** Agents can drive it themselves with `present_slide` (a slide, a build step and a line to say); it returns once the line has been heard.
 - **Without an AI provider** the run reads the notes, split across build steps by blank lines.
-- **Where it plays.** On one screen in the room: the cast TV, else the audience window, else the presenter view, which mutes itself (with an option to unmute) while the TV or audience window plays it. Remote viewers on the deck's link hear it too. Captions show only in the presenter view, never for the audience.
+- **Where it plays.** On the cast TV, else the audience window. The presenter view starts muted, with a Mute voice / Unmute voice button. Remote viewers on the deck's link hear it too. Captions show only in the presenter view, never for the audience.
 
 </details>
 

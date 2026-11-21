@@ -74,8 +74,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   const ai = el("div", "pr-ai");
   const aiBtn = el("button", "pr-btn", "Present with AI voice");
   const capBtn = el("button", "pr-btn", "Captions");
-  const soundBtn = el("button", "pr-btn", "Sound on this screen");
-  soundBtn.hidden = true;
+  const soundBtn = el("button", "pr-btn", "Unmute voice");
   const aiStatus = el("span", "pr-ai-status");
   aiStatus.setAttribute("role", "status");
   [aiBtn, capBtn, soundBtn].forEach((b) => (b.type = "button"));
@@ -96,8 +95,8 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   const narrator = new Narrator({
     deckId,
     host: current,
-    ack: true,
-    audible: true,
+    ack: false,
+    audible: false,
     captions: true,
     show: (index, build, slideId) => followTo(player, slideIndex(deck.slides, index, slideId), build),
   });
@@ -107,38 +106,42 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   };
   setCaptions(true);
   capBtn.onclick = () => setCaptions(!narrator.captions);
-  // Muted here while a cast TV or the audience window plays the voice, so it
-  // doesn't play twice in the room. Unmuted, this screen also reports lines
-  // heard; the server takes the first.
+  // This screen's own sound starts muted: the audience window, a cast TV or
+  // the viewers usually carry the voice. Mute voice / Unmute voice toggles it
+  // at any time. It mutes again when a TV or the audience window starts
+  // playing the voice, so it isn't heard twice in the room, and takes the
+  // voice over while the audience window's browser blocks sound. Unmuted, it
+  // also reports lines heard (the server takes the first).
   const setSound = (on: boolean) => {
     narrator.setAudible(on);
     narrator.setAck(on);
+    soundBtn.textContent = on ? "Mute voice" : "Unmute voice";
+    soundBtn.title = on ? "The AI voice plays on this screen: click to mute it here" : "The AI voice is muted on this screen: click to hear it here";
     soundBtn.setAttribute("aria-pressed", String(on));
   };
+  setSound(false);
   soundBtn.onclick = () => setSound(!narrator.audible);
   let castingTo: string | null = null;
   let audienceOpen = false;
-  let othersPlay = false;
   let tellAudience = (_on: boolean) => {}; // wired up once the live connection exists
-  const updateSound = () => {
-    // The audience window stays quiet while a TV casts the voice into the room.
-    tellAudience(!castingTo);
-    soundBtn.title = castingTo
-      ? "The TV plays the AI voice while casting; turn this on to hear it on this screen too"
-      : "The audience window plays the AI voice; turn this on to hear it on this screen too";
-    const others = Boolean(castingTo) || audienceOpen;
-    if (others === othersPlay) return; // keep the presenter's own choice until this changes
-    othersPlay = others;
-    soundBtn.hidden = !others;
-    setSound(!others);
-  };
+  // The audience window stays quiet while a TV casts the voice into the room.
+  const updateAudience = () => tellAudience(!castingTo);
   onCasting = (device) => {
+    const started = Boolean(device) && !castingTo;
     castingTo = device;
-    updateSound();
+    updateAudience();
+    if (started) setSound(false);
   };
-  const setAudience = (open: boolean) => {
-    audienceOpen = open;
-    updateSound();
+  const setAudience = (state: string) => {
+    audienceOpen = state === "open" || state === "blocked";
+    updateAudience();
+    if (castingTo) return;
+    if (state === "open") setSound(false); // the audience window carries the voice (again)
+    else if (state === "blocked") {
+      // Its browser blocks sound until someone clicks there: say the current line here meanwhile.
+      setSound(true);
+      narrator.replay();
+    }
   };
   const showRun = (running: boolean, text: string, err = false) => {
     aiBtn.textContent = running ? "Stop AI voice" : "Present with AI voice";
@@ -189,12 +192,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
         void alertModal({ title: "Presenter link ended", message: "This presenter link has expired or was replaced. Ask the deck's owner for a new one." });
         return;
       }
-      if (m.type === "audience") {
-        setAudience(m.state === "open");
-        // Blocked there until someone clicks it: say the current line here.
-        if (m.state === "blocked") narrator.replay();
-        return;
-      }
+      if (m.type === "audience") return setAudience(String(m.state));
       if (narrator.handle(m)) return onNarration(m);
       cast.onEvent(m);
       // A TV that just started casting opens on slide 1: tell it where we are once it has loaded.
@@ -292,7 +290,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
     // Backstop for a window closed without a pagehide message (a crash, say).
     if (audWin?.closed) {
       audWin = null;
-      if (audienceOpen) setAudience(false);
+      if (audienceOpen) setAudience("closed");
     }
   }, 2000);
   openAud.onclick = () => {

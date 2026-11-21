@@ -8,7 +8,7 @@ First public release.
 
 ### New
 - Presenting: the built-in AI and MCP agents present a deck on their own. `start_presentation` runs the whole deck, `present_slide` drives it step by step, and each step waits until the line has been heard before moving on.
-- Presenting: the voice plays on one screen in the room (the cast TV, the audience window or the presenter view, which mutes itself while either of the others plays it) and for remote viewers on the deck's link. Captions show only in the presenter view. The editor shows a status chip with Stop while a presentation runs.
+- Presenting: the voice plays on the cast TV or the audience window (the presenter view starts muted, with a Mute voice / Unmute voice button) and for remote viewers on the deck's link. Captions show only in the presenter view. The editor shows a status chip with Stop while a presentation runs.
 - Voices: text-to-speech through Fish Audio, ElevenLabs, OpenAI, Cartesia, Deepgram Aura or any OpenAI-compatible server (Kokoro, Piper, LocalAI), plus free browser voices. Keys are stored encrypted and managed under Settings > Voices with a sample player and a default narration voice.
 - Casting: cast a deck to a Chromecast from the editor, the presenter or an agent (`cast_deck`). The TV shows a full-screen, sign-in-free view that follows the presenter.
 - Casting: cast devices on the server's network are found automatically and appear in the Cast menu; others can be added by address, saved, renamed or hidden under Settings > Cast devices.
