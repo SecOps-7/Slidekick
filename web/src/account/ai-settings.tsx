@@ -1,5 +1,6 @@
 // Settings → AI providers (admins). Keys are write-only: the server says
 // whether one is stored and never sends it back.
+import { confirmModal } from "../ui/modal";
 import { useEffect, useState } from "preact/hooks";
 import { addSettingsTab, api, Err } from "./pages";
 
@@ -169,7 +170,10 @@ function AIProviders() {
                 <button class="acc-link" onClick={() => open(p, false)}>
                   Edit
                 </button>
-                <button class="acc-link danger" onClick={() => confirm(`Remove ${p.name}? Its key is deleted.`) && api("DELETE", `/api/admin/ai/${p.id}`).then(load)}>
+                <button class="acc-link danger" onClick={async () =>
+                    (await confirmModal({ title: `Remove ${p.name}?`, message: "Its stored key is deleted and the chat can no longer use it.", confirm: "Remove provider", danger: true })) &&
+                    api("DELETE", `/api/admin/ai/${p.id}`).then(load)
+                  }>
                   Remove
                 </button>
               </td>

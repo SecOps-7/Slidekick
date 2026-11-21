@@ -1,4 +1,5 @@
 // Sign-in, first-run setup, the account page and admin settings.
+import { confirmModal, promptModal } from "../ui/modal";
 import { render, type ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { authHeaders, me, signOut, type Me, type User } from "../auth";
@@ -232,7 +233,7 @@ function Account({ m }: { m: Me }) {
                 <td class="acc-muted">created {new Date(t.createdAt).toLocaleDateString()}</td>
                 <td class="acc-muted">{t.lastUsed ? `used ${new Date(t.lastUsed).toLocaleString()}` : "never used"}</td>
                 <td>
-                  <button class="acc-link danger" onClick={() => confirm(`Revoke "${t.name}"?`) && api("DELETE", `/api/me/tokens/${t.id}`).then(load)}>
+                  <button class="acc-link danger" onClick={async () => (await confirmModal({ title: `Revoke "${t.name}"?`, message: "Agents using this token lose access at once.", confirm: "Revoke token", danger: true })) && api("DELETE", `/api/me/tokens/${t.id}`).then(load)}>
                     Revoke
                   </button>
                 </td>
@@ -376,8 +377,15 @@ function Users({ self }: { self: string }) {
               <td class="acc-actions">
                 <button
                   class="acc-link"
-                  onClick={() => {
-                    const pw = prompt(`New password for ${u.username} (at least 10 characters):`);
+                  onClick={async () => {
+                    const pw = await promptModal({
+                      title: `Set a password for ${u.username}`,
+                      message: "Their other sessions are signed out. Tell them the new password in person or over a private channel.",
+                      label: "New password",
+                      type: "password",
+                      minLength: 10,
+                      confirm: "Set password",
+                    });
                     if (pw) run(() => api("POST", `/api/admin/users/${u.id}/password`, { password: pw }));
                   }}
                 >
@@ -390,7 +398,10 @@ function Users({ self }: { self: string }) {
                     </button>
                     <button
                       class="acc-link danger"
-                      onClick={() => confirm(`Delete ${u.username}? Their decks move to you.`) && run(() => api("DELETE", `/api/admin/users/${u.id}?transferTo=${encodeURIComponent(self)}`))}
+                      onClick={async () =>
+                        (await confirmModal({ title: `Delete ${u.username}?`, message: "Their account and agent tokens are removed. Their decks move to you.", confirm: "Delete user", danger: true })) &&
+                        run(() => api("DELETE", `/api/admin/users/${u.id}?transferTo=${encodeURIComponent(self)}`))
+                      }
                     >
                       Delete
                     </button>
@@ -622,7 +633,10 @@ function SSO() {
                 <button class="acc-link" onClick={() => (setEdit(p), setIsNew(false), setSecret(undefined))}>
                   Edit
                 </button>
-                <button class="acc-link danger" onClick={() => confirm(`Remove ${p.name}? Linked sign-ins stop working.`) && api("DELETE", `/api/admin/sso/${p.id}`).then(load)}>
+                <button class="acc-link danger" onClick={async () =>
+                    (await confirmModal({ title: `Remove ${p.name}?`, message: "People can no longer sign in with it. Their accounts stay.", confirm: "Remove provider", danger: true })) &&
+                    api("DELETE", `/api/admin/sso/${p.id}`).then(load)
+                  }>
                   Remove
                 </button>
               </td>

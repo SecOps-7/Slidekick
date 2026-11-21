@@ -1,3 +1,4 @@
+import { alertModal } from "../ui/modal";
 import { useEffect, useState } from "preact/hooks";
 import type { Catalog, ColorToken, Deck, Element, LintIssue, PatchOp, Slide } from "../../runtime/types";
 import type { Comment } from "./api";
@@ -233,7 +234,7 @@ function ElementPanel({ deck, cat, loc, commit, upload }: { deck: Deck; cat: Cat
             try {
               commit([{ op: "replace", path: `${path}/props`, value: JSON.parse(json) }], "Edit props");
             } catch {
-              alert("That isn't valid JSON.");
+              alertModal({ title: "That isn't valid JSON", message: "Check the brackets, quotes and commas, then apply it again. Nothing was changed." });
             }
           }}
         >

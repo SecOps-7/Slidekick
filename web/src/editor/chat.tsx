@@ -2,6 +2,7 @@
 // same deck operations agents use, as the signed-in user; changes stream into
 // the editor like any agent edit. Stop cancels the run; Undo restores the deck
 // to the version from before the run (as a new version, so nothing is lost).
+import { confirmModal } from "../ui/modal";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { authHeaders } from "../auth";
 import type { Api } from "./api";
@@ -145,7 +146,16 @@ export function ChatPanel({ api, version, onClose, say }: { api: Api; version: (
 
   const undo = async (m: Msg) => {
     if (!m.run) return;
-    if (version() !== m.run.end && !confirm("The deck changed after this AI run. Undo restores it to how it was before the run, dropping those later changes too (they stay in history). Continue?")) return;
+    if (
+      version() !== m.run.end &&
+      !(await confirmModal({
+        title: "Undo past later changes?",
+        message: "The deck changed after this AI run. Undo restores it to how it was before the run, which also drops those later changes. They stay in the history.",
+        confirm: "Undo anyway",
+        danger: true,
+      }))
+    )
+      return;
     try {
       await api.restore(version(), m.run.start);
       setMsgs((ms) => ms.map((x) => (x === m ? { ...x, run: undefined, text: `${x.text}\n\n(Undone.)` } : x)));

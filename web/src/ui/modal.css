@@ -1,0 +1,34 @@
+/* Slidekick modal dialogs (see modal.ts). Uses the app tokens from app.css so
+   they match every page, the editor included, in dark and light. */
+.skm {
+  width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; overflow: auto;
+  border: 1px solid var(--app-line); border-radius: 16px; background: var(--app-panel); color: var(--app-text);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+  font: 15px/1.55 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.skm::backdrop { background: rgba(4, 6, 14, 0.6); backdrop-filter: blur(3px); }
+.skm[open] { animation: skm-in 0.16s ease-out; }
+@keyframes skm-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+.skm-body { display: grid; gap: 12px; padding: 22px 22px 18px; }
+.skm-title { margin: 0; font: 600 20px/1.3 "Space Grotesk", Inter, system-ui, sans-serif; letter-spacing: -0.01em; }
+.skm-msg { margin: 0; color: var(--app-muted); }
+.skm-field { display: grid; gap: 6px; margin-top: 2px; }
+.skm-label { font-size: 14px; }
+.skm-input {
+  font: inherit; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--app-line);
+  background: var(--app-bg); color: var(--app-text); min-width: 0;
+}
+.skm-input[aria-invalid="true"] { border-color: var(--app-err); }
+.skm-err { margin: 0; color: var(--app-err); font-size: 13px; }
+.skm-err:empty { display: none; }
+.skm-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.skm-btn {
+  font: inherit; font-size: 14px; font-weight: 500; padding: 8px 16px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--app-line); background: transparent; color: var(--app-text);
+}
+.skm-btn:hover { border-color: color-mix(in srgb, var(--app-text) 30%, var(--app-line)); }
+.skm-btn.primary { background: linear-gradient(135deg, #14b8a6, #7c3aed); border-color: transparent; color: #fff; font-weight: 600; }
+.skm-btn.danger { background: #dc2626; border-color: transparent; color: #fff; font-weight: 600; }
+.skm-btn.primary:hover, .skm-btn.danger:hover { filter: brightness(1.08); }
+.skm :focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .skm[open] { animation: none; } }

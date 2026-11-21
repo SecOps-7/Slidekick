@@ -2,6 +2,7 @@
 // drawn by the real renderer in the deck's own theme (fonts, colours,
 // backdrop), so the page reads as a light table of your decks. The chrome
 // around the covers stays quiet.
+import { confirmModal, promptModal } from "./ui/modal";
 import { applyTheme, renderSlide, STAGE } from "../runtime/render";
 import type { Catalog, Slide, Theme } from "../runtime/types";
 import { authHeaders, goSignIn, me, signOut, type Me } from "./auth";
@@ -215,7 +216,13 @@ function card(d: Summary, say: (m: string) => void, onDeleted: () => void): HTML
     items.push([
       "Delete deck…",
       async () => {
-        if (!confirm(`Delete "${d.title}" for good?\n\nIts slides, history, comments and links are removed and can't be restored. Anyone watching it is told it's gone.`)) return;
+        const ok = await confirmModal({
+          title: `Delete "${d.title}"?`,
+          message: "Its slides, history, comments and links are removed for good and can't be restored. Anyone watching it is told it's gone.",
+          confirm: "Delete deck",
+          danger: true,
+        });
+        if (!ok) return;
         const r = await fetch(`/api/decks/${encodeURIComponent(d.id)}`, { method: "DELETE", headers: authHeaders() });
         if (r.ok) {
           say(`Deleted "${d.title}"`);
@@ -376,7 +383,7 @@ export async function mountHome(host: HTMLElement) {
   let loaded = false;
 
   async function newDeck() {
-    const title = prompt("Deck title", "Untitled deck");
+    const title = await promptModal({ title: "New deck", label: "Title", value: "Untitled deck", confirm: "Create deck" });
     if (title === null) return;
     const r = await fetch("/api/decks", {
       method: "POST",

@@ -1,6 +1,7 @@
 // Slidekick editor: the same deck the agent edits, editable by a human, with
 // agent changes streaming in live. Undo and redo walk the shared version
 // history, so they cover agent and human edits alike.
+import { confirmModal } from "../ui/modal";
 import { render } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { applyPatch } from "../../runtime/patch";
@@ -321,7 +322,11 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
           delete copy.id;
           commit([{ op: "add", path: slidePath(i + 1), value: copy }], "Duplicate slide");
         }}
-        onDelete={(i) => deck.slides.length > 0 && confirm(`Delete slide ${i + 1}?`) && commit([{ op: "remove", path: slidePath(i) }], "Delete slide")}
+        onDelete={async (i) =>
+          deck.slides.length > 0 &&
+          (await confirmModal({ title: `Delete slide ${i + 1}?`, message: "You can bring it back with Undo.", confirm: "Delete slide", danger: true })) &&
+          commit([{ op: "remove", path: slidePath(i) }], "Delete slide")
+        }
       />
       <main class="ed-main">
         {slide ? (
@@ -407,7 +412,10 @@ function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Ac
             </button>
           </div>
           {access.private && (
-            <button type="button" class="ed-link" onClick={() => confirm("Make a new link? Links shared so far stop working.") && run(async () => onChange(await api.setAccess(true, true)))}>
+            <button type="button" class="ed-link" onClick={async () =>
+                (await confirmModal({ title: "Make a new link?", message: "Links shared so far stop working, and anyone watching with one is disconnected.", confirm: "Make new link", danger: true })) &&
+                run(async () => onChange(await api.setAccess(true, true)))
+              }>
               Make a new link (old links stop working)
             </button>
           )}
@@ -434,8 +442,9 @@ function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Ac
                 <button
                   type="button"
                   class="ed-btn"
-                  onClick={() =>
-                    (!access.hasEditToken || confirm("Replace the existing edit token? The old one stops working.")) &&
+                  onClick={async () =>
+                    (!access.hasEditToken ||
+                      (await confirmModal({ title: "Replace the edit token?", message: "The old token stops working at once; agents using it will need the new one.", confirm: "Replace token", danger: true }))) &&
                     run(async () => {
                       setToken((await api.issueEditToken()).token);
                       onChange({ ...access, hasEditToken: true });
@@ -449,8 +458,8 @@ function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Ac
                 <button
                   type="button"
                   class="ed-link"
-                  onClick={() =>
-                    confirm("Revoke the edit token?") &&
+                  onClick={async () =>
+                    (await confirmModal({ title: "Revoke the edit token?", message: "Agents and people using it lose access to this deck at once.", confirm: "Revoke token", danger: true })) &&
                     run(async () => {
                       await api.revokeEditToken();
                       setToken("");
