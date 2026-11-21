@@ -2,6 +2,7 @@
 // drawn by the real renderer in the deck's own theme (fonts, colours,
 // backdrop), so the page reads as a light table of your decks. The chrome
 // around the covers stays quiet.
+import { copyText } from "./ui/clipboard";
 import { confirmModal, promptModal } from "./ui/modal";
 import { applyTheme, renderSlide, STAGE } from "../runtime/render";
 import type { Catalog, Slide, Theme } from "../runtime/types";
@@ -205,11 +206,16 @@ function card(d: Summary, say: (m: string) => void, onDeleted: () => void): HTML
   const items: Item[] = [
     [
       "Copy link",
-      () =>
-        navigator.clipboard?.writeText(location.origin + view).then(
-          () => say(`Copied the link to "${d.title}"`),
-          () => say("Couldn't copy the link"),
-        ),
+      async () => {
+        // A private deck's plain address only works for people who sign in; copy its private link when we may.
+        let link = location.origin + view;
+        let note = "";
+        if (d.private && d.canEdit) {
+          const r = await fetch(`/api/decks/${encodeURIComponent(d.id)}/access`, { headers: authHeaders(), cache: "no-store" });
+          if (r.ok) link = ((await r.json()) as { shareUrl?: string }).shareUrl || link;
+        } else if (d.private) note = " (people need to sign in to open it)";
+        if ((await copyText(link, `Link to "${d.title}"`)) === "copied") say(`Copied the link to "${d.title}"${note}`);
+      },
     ],
   ];
   if (d.canDelete)
@@ -248,7 +254,9 @@ function connectDialog(): HTMLDialogElement {
   const pre = el("pre", "dk-cmd", cmdText);
   const copy = el("button", "dk-btn", "Copy command");
   copy.type = "button";
-  copy.onclick = () => navigator.clipboard?.writeText(cmdText).then(() => (copy.textContent = "Copied"));
+  copy.onclick = async () => {
+    if ((await copyText(cmdText, "Command to add Slidekick")) === "copied") copy.textContent = "Copied";
+  };
   const close = el("button", "dk-btn ghost", "Close");
   close.type = "button";
   close.onclick = () => dlg.close();

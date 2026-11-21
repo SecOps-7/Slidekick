@@ -1,6 +1,7 @@
 // Slidekick editor: the same deck the agent edits, editable by a human, with
 // agent changes streaming in live. Undo and redo walk the shared version
 // history, so they cover agent and human edits alike.
+import { copyText } from "../ui/clipboard";
 import { confirmModal } from "../ui/modal";
 import { render } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -386,11 +387,9 @@ function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Ac
       say(`Sharing change failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
-  const copy = (text: string, what: string) =>
-    navigator.clipboard?.writeText(text).then(
-      () => say(`${what} copied`),
-      () => say(`Couldn't copy; select it by hand`),
-    );
+  const copy = async (text: string, what: string) => {
+    if ((await copyText(text, what)) === "copied") say(`${what} copied`);
+  };
   const origin = location.origin;
   return (
     <div class="ed-export">

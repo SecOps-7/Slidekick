@@ -164,6 +164,31 @@ export function promptModal(o: PromptOptions): Promise<string | null> {
   );
 }
 
+/** Shows text selected in a read-only field for copying by hand (when the clipboard is unavailable). */
+export function copyModal(o: { title: string; text: string }): Promise<void> {
+  return open<void>(
+    (dlg, id, done) => {
+      const form = el("form", "skm-body");
+      const input = el("input", "skm-input");
+      input.readOnly = true;
+      input.value = o.text;
+      input.setAttribute("aria-label", o.title);
+      input.addEventListener("focus", () => input.select());
+      const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+      const b = buttons(null, "Done");
+      form.append(...header({ title: o.title, message: `This browser blocked automatic copying. The text is selected: press ${isMac ? "⌘C" : "Ctrl+C"} to copy it.` }, id), input, b.foot);
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        done();
+      });
+      dlg.append(form);
+      requestAnimationFrame(() => input.select());
+      return input;
+    },
+    () => undefined,
+  );
+}
+
 /** Tells the person something. Resolves when they close it. */
 export function alertModal(o: AlertOptions): Promise<void> {
   return open<void>(
