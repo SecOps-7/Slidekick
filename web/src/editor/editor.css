@@ -221,6 +221,11 @@
 .ed-share-link input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--ed-line); background: var(--ed-bg); color: var(--ed-text); font: 12px ui-monospace, monospace; }
 .ed-share .ed-btn { display: inline-flex; place-items: center; }
 .ed-share .ed-link { padding: 2px 0; color: var(--ed-accent, #8ab4ff); font-size: 12px; text-decoration: underline; }
+.ed-share-expiry { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
+.ed-share-expiry select { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--ed-line); background: var(--ed-bg); color: var(--ed-text); font: inherit; }
+.ed-share-kind { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 10px; border: 1px solid var(--ed-line); border-radius: 8px; }
+.ed-share-kind b { font-size: 13px; }
+.ed-share-kind .ed-btn { flex: none; }
 .ed-share-token { border-top: 1px solid var(--ed-line); padding-top: 10px; display: grid; gap: 6px; }
 .ed-share-token h4 { margin: 0; font-size: 13px; }
 .ed-share-token p { margin: 0; }

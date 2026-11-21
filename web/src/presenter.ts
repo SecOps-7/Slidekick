@@ -5,8 +5,8 @@ import { Player, type Position } from "../runtime/player";
 import { renderSlide, STAGE } from "../runtime/render";
 import type { Catalog, Deck, PatchEvent } from "../runtime/types";
 import { applyPatch } from "../runtime/patch";
-import { authHeaders, currentMe, ensureAuth } from "./auth";
-import { withKey } from "./key";
+import { authHeaders, currentMe, ensureAuth, me } from "./auth";
+import { presentKey, withKey } from "./key";
 import { castMenu } from "./cast-menu";
 import { Laser } from "./laser";
 import { Live, type LiveMsg } from "./sync";
@@ -24,9 +24,11 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   // Cast mode: the page a TV opens when the server casts the deck (no sign-in, no controls).
   if (new URLSearchParams(location.search).has("cast")) return (await import("./cast")).mountCast(host, deckId);
   document.body.classList.add("pr-page");
-  const token = await ensureAuth("present this deck to remote viewers", deckId);
-  void token;
-  const deckFetch = () => fetch(`/api/decks/${encodeURIComponent(deckId)}`, { cache: "no-store" });
+  // A presenter link (?p=) presents without signing in; otherwise sign in first.
+  const viaLink = presentKey() !== "";
+  if (viaLink) await me(deckId).catch(() => null);
+  else await ensureAuth("present this deck to remote viewers", deckId);
+  const deckFetch = () => fetch(withKey(`/api/decks/${encodeURIComponent(deckId)}`), { cache: "no-store" });
   const [catalog, data] = await Promise.all([
     fetch("/api/catalog").then((r) => r.json() as Promise<Catalog>),
     deckFetch().then((r) => (r.ok ? (r.json() as Promise<{ version: number; deck: Deck }>) : null)),
@@ -74,14 +76,13 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   const capBtn = el("button", "pr-btn", "Captions");
   const soundBtn = el("button", "pr-btn", "Sound on this screen");
   soundBtn.hidden = true;
-  soundBtn.title = "The TV plays the AI voice while casting; turn this on to hear it on this screen too";
   const aiStatus = el("span", "pr-ai-status");
   aiStatus.setAttribute("role", "status");
   [aiBtn, capBtn, soundBtn].forEach((b) => (b.type = "button"));
   aiBtn.title = "An AI presenter talks through each slide's content, using the speaker notes as talking points, and moves through the deck";
   capBtn.title = "Show what the voice says over the slide";
   const can = currentMe()?.can ?? {};
-  aiBtn.hidden = !(can.narrate && can["deck:share"]);
+  aiBtn.hidden = !(viaLink || (can.narrate && can["deck:share"]));
   ai.append(aiBtn, capBtn, soundBtn, aiStatus);
   side.append(nextBox, meta, notes, ai, controls);
   root.append(current, side);
@@ -106,17 +107,38 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   };
   setCaptions(true);
   capBtn.onclick = () => setCaptions(!narrator.captions);
-  // Muted here while casting, so the voice doesn't play twice in the room.
-  // Unmuted, this screen also reports lines heard; the server takes the first.
+  // Muted here while a cast TV or the audience window plays the voice, so it
+  // doesn't play twice in the room. Unmuted, this screen also reports lines
+  // heard; the server takes the first.
   const setSound = (on: boolean) => {
     narrator.setAudible(on);
     narrator.setAck(on);
     soundBtn.setAttribute("aria-pressed", String(on));
   };
   soundBtn.onclick = () => setSound(!narrator.audible);
+  let castingTo: string | null = null;
+  let audienceOpen = false;
+  let othersPlay = false;
+  let tellAudience = (_on: boolean) => {}; // wired up once the live connection exists
+  const updateSound = () => {
+    // The audience window stays quiet while a TV casts the voice into the room.
+    tellAudience(!castingTo);
+    soundBtn.title = castingTo
+      ? "The TV plays the AI voice while casting; turn this on to hear it on this screen too"
+      : "The audience window plays the AI voice; turn this on to hear it on this screen too";
+    const others = Boolean(castingTo) || audienceOpen;
+    if (others === othersPlay) return; // keep the presenter's own choice until this changes
+    othersPlay = others;
+    soundBtn.hidden = !others;
+    setSound(!others);
+  };
   onCasting = (device) => {
-    soundBtn.hidden = !device;
-    setSound(!device);
+    castingTo = device;
+    updateSound();
+  };
+  const setAudience = (open: boolean) => {
+    audienceOpen = open;
+    updateSound();
   };
   const showRun = (running: boolean, text: string, err = false) => {
     aiBtn.textContent = running ? "Stop AI voice" : "Present with AI voice";
@@ -132,7 +154,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
     } else if (m.state === "stopped") showRun(false, "AI voice stopped");
     else if (m.state === "ended") showRun(false, m.error ? `AI voice stopped: ${m.error}` : "AI voice finished", Boolean(m.error));
   };
-  const presentURL = `/api/decks/${encodeURIComponent(deckId)}/present`;
+  const presentURL = withKey(`/api/decks/${encodeURIComponent(deckId)}/present`);
   fetch(presentURL, { cache: "no-store" })
     .then((r) => (r.ok ? r.json() : null))
     .then((st: { running: boolean; slide: number; slides: number } | null) => {
@@ -162,6 +184,17 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   const live = new Live(
     deckId,
     async (m) => {
+      if (m.type === "denied") {
+        status.textContent = "this presenter link has expired or was replaced";
+        void alertModal({ title: "Presenter link ended", message: "This presenter link has expired or was replaced. Ask the deck's owner for a new one." });
+        return;
+      }
+      if (m.type === "audience") {
+        setAudience(m.state === "open");
+        // Blocked there until someone clicks it: say the current line here.
+        if (m.state === "blocked") narrator.replay();
+        return;
+      }
       if (narrator.handle(m)) return onNarration(m);
       cast.onEvent(m);
       // A TV that just started casting opens on slide 1: tell it where we are once it has loaded.
@@ -184,6 +217,8 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   );
 
   const send = (p: Position) => live.broadcast({ type: "present", index: p.index, step: p.step });
+  tellAudience = (on) => live.local({ type: "audience-sound", on });
+  live.local({ type: "audience-ping" }); // an audience window left open from before answers
 
   // ---- next slide preview ----
   let nextKey = "";
@@ -252,9 +287,17 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   timer.ondblclick = resetTimer;
 
   // ---- audience window ----
+  let audWin: Window | null = null;
+  setInterval(() => {
+    // Backstop for a window closed without a pagehide message (a crash, say).
+    if (audWin?.closed) {
+      audWin = null;
+      if (audienceOpen) setAudience(false);
+    }
+  }, 2000);
   openAud.onclick = () => {
     const p = player.position;
-    window.open(withKey(`/d/${encodeURIComponent(deckId)}?audience=1`) + `#${p.index + 1}${p.step ? `.${p.step}` : ""}`, `slidekick-audience-${deckId}`, "popup,width=1280,height=720");
+    audWin = window.open(withKey(`/d/${encodeURIComponent(deckId)}?audience=1`) + `#${p.index + 1}${p.step ? `.${p.step}` : ""}`, `slidekick-audience-${deckId}`, "popup,width=1280,height=720");
     setTimeout(() => send(player.position), 1200);
   };
 

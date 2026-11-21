@@ -2,7 +2,7 @@
 // Presenter position and the laser pointer also travel over a same-machine
 // BroadcastChannel, so an audience window follows instantly even offline.
 
-import { viewKey } from "./key";
+import { withKey } from "./key";
 
 export interface PresentMsg {
   type: "present";
@@ -45,10 +45,8 @@ export class Live {
 
   private connect() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const key = viewKey();
-    const q = key ? `?k=${encodeURIComponent(key)}` : "";
     // A private deck opened without its key is unlocked by the auth message.
-    const ws = new WebSocket(`${proto}://${location.host}/ws/decks/${encodeURIComponent(this.deckId)}${q}`);
+    const ws = new WebSocket(`${proto}://${location.host}${withKey(`/ws/decks/${encodeURIComponent(this.deckId)}`)}`);
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 500;
@@ -81,6 +79,11 @@ export class Live {
   broadcast(msg: PresentMsg | PointerMsg) {
     this.bc?.postMessage(msg);
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
+  }
+
+  /** Same-machine only: the presenter view and its audience window agreeing on who plays the voice. */
+  local(msg: LiveMsg) {
+    this.bc?.postMessage(msg);
   }
 
   close() {

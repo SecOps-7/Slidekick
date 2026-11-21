@@ -8,10 +8,11 @@ First public release.
 
 ### New
 - Presenting: the built-in AI and MCP agents present a deck on their own. `start_presentation` runs the whole deck, `present_slide` drives it step by step, and each step waits until the line has been heard before moving on.
-- Presenting: the voice plays on the presenter screen and the cast TV; viewers and the editor follow silently with captions and can unmute. The editor shows a status chip with Stop while a presentation runs.
+- Presenting: the voice plays on one screen in the room (the cast TV, the audience window or the presenter view, which mutes itself while either of the others plays it) and for remote viewers on the deck's link. Captions show only in the presenter view. The editor shows a status chip with Stop while a presentation runs.
 - Voices: text-to-speech through Fish Audio, ElevenLabs, OpenAI, Cartesia, Deepgram Aura or any OpenAI-compatible server (Kokoro, Piper, LocalAI), plus free browser voices. Keys are stored encrypted and managed under Settings > Voices with a sample player and a default narration voice.
 - Casting: cast a deck to a Chromecast from the editor, the presenter or an agent (`cast_deck`). The TV shows a full-screen, sign-in-free view that follows the presenter.
 - Casting: cast devices on the server's network are found automatically and appear in the Cast menu; others can be added by address, saved, renamed or hidden under Settings > Cast devices.
+- Sharing: two kinds of link. A viewer link watches the deck and offers only Fullscreen; a presenter link presents it without signing in: it moves the slides for everyone watching, uses the laser pointer and audience window, runs the AI voice and casts. Both can expire after 30 minutes to 24 hours (or never, the default); Make new links revokes every link at once.
 - About page (Settings > About): the build, the system it runs on, these release notes, and every Go module, web library and font in the build with its licence.
 - Agents (MCP): 20 tools over streamable HTTP (`/mcp`, bearer token) or stdio: create and edit decks, JSON Patch, lint, `render_slide` screenshots, uploads, HTML/PDF/PNG export, comments, history and undo.
 - Agents (MCP): every write returns the new version, lint findings and the number of open human comments.
@@ -30,9 +31,9 @@ First public release.
 - Accounts: personal agent tokens (`skp_...`) let agents act as a user with that user's role.
 - AI: admins connect AI providers (OpenAI, Anthropic, Google, any OpenAI-compatible endpoint including local models) with a base URL, an encrypted key and allowed models.
 - AI: a chat panel in the editor with streamed replies and each step shown; the editor follows the changes, Stop cancels and Undo restores the deck to before the run. It edits through Slidekick's own MCP tools as the signed-in user, so roles, ownership, validation and lint all apply.
-- People: a live viewer that follows agent edits, highlights changes and shows lint.
+- People: a live viewer for shared links, on another computer or someone else's laptop: it follows the presenter and agent edits, highlights changes, and offers only Fullscreen (no editing or presenting controls).
 - People: private decks, whose links carry a view key; rotating it disconnects old viewers.
-- People: an editor that follows the slide the agent is editing, with a Share menu (private links, deck tokens), a schema check on every edit and a slide sorter.
+- People: an editor that follows the slide the agent is editing, with a Share menu (viewer and presenter links, deck tokens), a schema check on every edit and a slide sorter.
 - People: a presenter view with notes, next slide, timer, build progress, laser pointer, an audience window and remote followers.
 - Operations: one static Go binary with the web app embedded, SQLite storage, and distroless and Chromium (`-render`) images for amd64 and arm64.
 - Operations: optional S3-compatible storage (AWS S3, MinIO and others) for uploaded and exported files via `SLIDEKICK_S3_*`; files are served with ETag and Range support either way.

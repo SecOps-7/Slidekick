@@ -51,7 +51,11 @@ const (
 	KindServer Kind = "server" // SLIDEKICK_TOKEN: full access, for automation and recovery
 	KindUser   Kind = "user"   // session cookie or a personal API token (skp_)
 	KindDeck   Kind = "deck"   // a deck edit token (ske_): one deck only
-	KindOpen   Kind = "open"   // no token and no accounts yet: legacy open mode
+	// KindPresenter holds a deck's presenter link (?p=): it presents that one
+	// deck (moves the slides for every viewer, the AI voice, casting) without
+	// an account, and can't edit, share or do anything else.
+	KindPresenter Kind = "presenter"
+	KindOpen      Kind = "open" // no token and no accounts yet: legacy open mode
 )
 
 type Principal struct {
@@ -59,7 +63,7 @@ type Principal struct {
 	UserID   string
 	Username string
 	Role     Role
-	Deck     string // KindDeck: the only deck it may touch
+	Deck     string // KindDeck, KindPresenter: the only deck it may touch
 }
 
 func (p Principal) Authenticated() bool { return p.Kind != KindAnon }
@@ -71,6 +75,8 @@ func (p Principal) Actor() string {
 		return "user:" + p.Username
 	case KindDeck:
 		return "deck-token"
+	case KindPresenter:
+		return "presenter-link"
 	}
 	return "agent"
 }
@@ -83,7 +89,8 @@ const (
 	Comment        Action = "comment"
 	Edit           Action = "edit"
 	Export         Action = "export"
-	Share          Action = "share"      // private toggle and view key
+	Share          Action = "share"      // private toggle, view key and shared links
+	Drive          Action = "drive"      // a presentation's extras on a deck: the AI voice and casting
 	MintDeckToken  Action = "deck-token" // create or revoke a deck's edit token
 	Delete         Action = "delete"     // remove a deck for good
 	Create         Action = "create"
@@ -120,7 +127,16 @@ func (pol Policy) Can(p Principal, a Action, d *Deck) bool {
 			return false
 		}
 		switch a {
-		case View, Present, Comment, Edit, Export, Share:
+		case View, Present, Comment, Edit, Export, Share, Drive:
+			return true
+		}
+		return false
+	case KindPresenter:
+		if d == nil || d.ID != p.Deck {
+			return false
+		}
+		switch a {
+		case View, Present, Drive, Narrate, UseAI:
 			return true
 		}
 		return false
@@ -135,7 +151,7 @@ func (pol Policy) Can(p Principal, a Action, d *Deck) bool {
 		switch a {
 		case View, Present, Comment, Export, Create, Upload, UseAI, Narrate, ListDecks:
 			return true
-		case Edit, Share, MintDeckToken:
+		case Edit, Share, MintDeckToken, Drive:
 			if d == nil {
 				return false
 			}

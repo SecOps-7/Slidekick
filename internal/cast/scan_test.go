@@ -143,7 +143,7 @@ func TestPlanSubnets(t *testing.T) {
 		{Name: "docker0", Prefix: netip.MustParsePrefix("10.9.0.1/16")},  // virtual
 		{Name: "eno1", Prefix: netip.MustParsePrefix("192.168.1.20/16")}, // LAN, clamped to a /24
 		{Name: "wlan0", Prefix: netip.MustParsePrefix("203.0.113.5/24")}, // public: never
-		{Name: "eno2", Prefix: netip.MustParsePrefix("172.16.5.9/24")},     // same /24 as the base URL
+		{Name: "eno2", Prefix: netip.MustParsePrefix("172.16.5.9/24")},   // same /24 as the base URL
 	}
 	got, notes, err := cast.PlanSubnets(ctx, "", "http://172.16.5.5:7410", ifaces, true)
 	if err != nil || len(notes) != 0 || len(got) != 2 || got[0].String() != "172.16.5.0/24" || got[1].String() != "192.168.1.0/24" {

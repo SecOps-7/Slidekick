@@ -2,6 +2,7 @@
 // agent changes streaming in live. Undo and redo walk the shared version
 // history, so they cover agent and human edits alike.
 import { copyText } from "../ui/clipboard";
+import { copyShareLink, LINK_KINDS, LINK_TTLS, type LinkKind } from "../share-links";
 import { confirmModal } from "../ui/modal";
 import { render } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -420,6 +421,7 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
 function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Access | null; admin: boolean; onChange: (a: Access) => void; say: (m: string) => void }) {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState("");
+  const [ttl, setTtl] = useState(0); // minutes; 0: links don't expire
   if (!access) return null;
   const run = async (f: () => Promise<void>) => {
     try {
@@ -432,6 +434,11 @@ function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Ac
     if ((await copyText(text, what)) === "copied") say(`${what} copied`);
   };
   const origin = location.origin;
+  const share = (kind: LinkKind) =>
+    run(async () => {
+      const msg = await copyShareLink(api.deckId, document.title.replace(/^.*· /, ""), kind, ttl);
+      if (msg) say(msg);
+    });
   return (
     <div class="ed-export">
       <button type="button" class="ed-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -442,23 +449,39 @@ function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Ac
           <label class="ed-share-row">
             <input type="checkbox" checked={access.private} onChange={(e) => run(async () => onChange(await api.setAccess(e.currentTarget.checked)))} />
             <span>
-              Private <small>only people with the link below can watch</small>
+              Private <small>only signed-in people and people with a link can watch</small>
             </span>
           </label>
-          <div class="ed-share-link">
-            <input readOnly value={access.shareUrl} aria-label="Viewer link" onFocus={(e) => e.currentTarget.select()} />
-            <button type="button" class="ed-btn" onClick={() => copy(access.shareUrl, "Link")}>
-              Copy
-            </button>
-          </div>
-          {access.private && (
-            <button type="button" class="ed-link" onClick={async () =>
-                (await confirmModal({ title: "Make a new link?", message: "Links shared so far stop working, and anyone watching with one is disconnected.", confirm: "Make new link", danger: true })) &&
-                run(async () => onChange(await api.setAccess(true, true)))
-              }>
-              Make a new link (old links stop working)
-            </button>
-          )}
+          <label class="ed-share-expiry">
+            <span>Links expire</span>
+            <select value={ttl} onChange={(e) => setTtl(Number(e.currentTarget.value))}>
+              {LINK_TTLS.map((t) => (
+                <option key={t.minutes} value={t.minutes}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {(Object.keys(LINK_KINDS) as LinkKind[]).map((kind) => (
+            <div class="ed-share-kind" key={kind}>
+              <div>
+                <b>{LINK_KINDS[kind].name}</b>
+                <small>
+                  {LINK_KINDS[kind].about}
+                  {kind === "view" && !access.private && " This deck is public, so its viewer link never expires."}
+                </small>
+              </div>
+              <button type="button" class="ed-btn" onClick={() => share(kind)}>
+                Copy
+              </button>
+            </div>
+          ))}
+          <button type="button" class="ed-link" onClick={async () =>
+              (await confirmModal({ title: "Make new links?", message: "Every viewer and presenter link shared so far stops working, and anyone watching or presenting with one is disconnected.", confirm: "Make new links", danger: true })) &&
+              run(async () => onChange(await api.setAccess(access.private, true)))
+            }>
+            Make new links (every link shared so far stops working)
+          </button>
           {admin && (
             <div class="ed-share-token">
               <h4>Deck edit token</h4>

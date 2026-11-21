@@ -44,6 +44,8 @@ export interface NarratorOptions {
   /** Where the caption and the "Click to enable sound" button go. */
   host: HTMLElement;
   captions: boolean;
+  /** Told when the browser blocks sound here until a click (true), and when it plays again (false). */
+  onBlocked?: (blocked: boolean) => void;
 }
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
@@ -64,6 +66,7 @@ export class Narrator {
   private acked = new Set<number>();
   private fallback = 0;
   private current = 0; // seq of the line playing now (0: none)
+  private blocked = false;
   private o: NarratorOptions;
 
   constructor(o: NarratorOptions) {
@@ -176,14 +179,14 @@ export class Narrator {
     a.onerror = () => this.sendAck(st.seq); // a broken file: move on
     a.src = st.audio!;
     a.play().then(
-      () => (this.enableBtn.hidden = true),
+      () => this.setBlocked(false),
       (err: unknown) => {
         if (this.current !== st.seq) return;
         // Autoplay blocked (or the element was interrupted): ask for a click,
         // and don't hold up the presentation meanwhile.
         if (err instanceof DOMException && err.name === "AbortError") return;
-        this.enableBtn.hidden = false;
         this.ackLater(st);
+        this.setBlocked(true);
       },
     );
   }
@@ -195,12 +198,13 @@ export class Narrator {
       const v = speechSynthesis.getVoices().find((x) => x.name === st.voice || x.voiceURI === st.voice);
       if (v) u.voice = v;
     }
+    u.onstart = () => this.setBlocked(false);
     u.onend = () => this.sendAck(st.seq);
     u.onerror = (e) => {
       if (this.current !== st.seq || e.error === "interrupted" || e.error === "canceled") return;
       if (e.error === "not-allowed") {
-        this.enableBtn.hidden = false;
         this.ackLater(st);
+        this.setBlocked(true);
       } else this.sendAck(st.seq);
     };
     speechSynthesis.speak(u);
@@ -210,13 +214,24 @@ export class Narrator {
     this.fallback = window.setTimeout(() => this.sendAck(st.seq), (st.durationMs ?? 0) + 4000);
   }
 
+  private setBlocked(on: boolean) {
+    this.enableBtn.hidden = !on;
+    if (on === this.blocked) return;
+    this.blocked = on;
+    this.o.onBlocked?.(on);
+  }
+
   /** The "Click to enable sound" button: plays the current line from a user gesture. */
   private unlock() {
     this.enableBtn.hidden = true;
+    // The click itself lets this page play sound from now on.
+    this.replay();
+  }
+
+  /** Plays the current line again if it's still due (otherwise the next one will play). */
+  replay() {
     const st = this.step;
-    // The click itself lets this page play sound from now on; replay the
-    // current line if it's still due, otherwise the next one will play.
-    if (!st || !st.text || this.current !== st.seq) return;
+    if (!this.o.audible || !st || !st.text || this.current !== st.seq) return;
     if (st.audio) {
       clearTimeout(this.fallback);
       this.playAudio(st);

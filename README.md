@@ -159,7 +159,7 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
 | 🎤 **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer, an audience window and remote followers. |
 | 📚 **Library** | Every deck shown as a live miniature of its first slide in its own theme, with search, sort, All/Mine and quick actions. |
 | 🔐 **Accounts** | Admin, editor and viewer roles, enforced on every route, the live WebSocket and MCP. Password sign-in (argon2id) and single sign-on with OpenID Connect (Entra, Google, Authentik, Keycloak), several providers at once. Personal agent tokens and per-deck edit tokens. |
-| 🔗 **Sharing** | New decks are private: signed-in people and holders of the private (keyed) link can watch. Owners can make a deck public or rotate its link. |
+| 🔗 **Sharing** | Two kinds of link: a **viewer link** watches the deck with no controls but Fullscreen, and a **presenter link** presents it without signing in (slides, laser, AI voice, casting). Links can expire after 30 minutes to 24 hours, or never; **Make new links** revokes them all. New decks are private: only signed-in people and link holders can watch. |
 | 📦 **Export** | Standalone HTML that plays offline with every animation, PDF, or PNGs. |
 | ℹ️ **About** | Settings → About shows the build, the system it runs on, these release notes, and every Go module, web library and font in the build with its licence. |
 
@@ -184,7 +184,7 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
 - **Automatic run.** **Present with AI voice** in the presenter view, `start_presentation` over MCP, or asking the AI chat to present. Just before each slide the configured model writes one to four sentences per build step from the slide's content (text, numbers, chart data, diagram labels, image descriptions), using the notes as intent. The next slide is prepared while the current one is spoken, so there are no gaps.
 - **Step by step.** Agents can drive it themselves with `present_slide` (a slide, a build step and a line to say); it returns once the line has been heard.
 - **Without an AI provider** the run reads the notes, split across build steps by blank lines.
-- **Where it plays.** On the presenter view and a cast TV. Viewers and the editor follow silently with captions and can unmute. While casting, the presenter laptop is muted by default and the TV paces the run.
+- **Where it plays.** On one screen in the room: the cast TV, else the audience window, else the presenter view, which mutes itself (with an option to unmute) while the TV or audience window plays it. Remote viewers on the deck's link hear it too. Captions show only in the presenter view, never for the audience.
 
 </details>
 

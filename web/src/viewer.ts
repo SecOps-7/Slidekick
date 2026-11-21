@@ -1,9 +1,10 @@
-// Live viewer: plays a deck, follows agent edits over WebSocket, and shows a
-// small heads-up bar (position, connection, lint, follow mode).
+// Live viewer: plays a deck and follows agent edits and the presenter over
+// WebSocket. Shared links open here, on another computer or someone else's
+// laptop, so its small heads-up bar shows the title, position and connection
+// and offers only Fullscreen: no editing, presenting or narration controls.
 import { applyPatch } from "../runtime/patch";
 import { Player, type Position } from "../runtime/player";
 import type { Catalog, Deck, LintIssue, PatchEvent } from "../runtime/types";
-import { markSVG } from "./brand/brand";
 import { Laser } from "./laser";
 import { viewFetch } from "./key";
 import { Live, type PointerMsg, type PresentMsg } from "./sync";
@@ -66,29 +67,9 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   const title = el("span", "hud-title", deck.title);
   const pos = el("span", "hud-pos");
   const live = el("span", "hud-live", "connecting");
-  const lint = el("button", "hud-lint");
-  lint.type = "button";
-  const followBtn = el("button", "hud-btn", "Following edits");
-  followBtn.type = "button";
-  followBtn.setAttribute("aria-pressed", "true");
   const fsBtn = el("button", "hud-btn", "Fullscreen");
   fsBtn.type = "button";
-  const home = el("a", "hud-btn hud-home");
-  home.href = "/";
-  home.title = "All decks";
-  home.setAttribute("aria-label", "All decks");
-  home.innerHTML = markSVG();
-  const edit = el("a", "hud-btn", "Edit");
-  edit.href = `/d/${encodeURIComponent(deckId)}/edit`;
-  const present = el("a", "hud-btn", "Present");
-  present.href = `/d/${encodeURIComponent(deckId)}/present`;
-  // AI narration: the viewer follows silently; these appear once a narrated
-  // presentation is seen. Unmuting plays it here too (only presenting
-  // screens report lines as heard, so this never paces the presentation).
-  const soundBtn = el("button", "hud-btn nr-toggle", "Unmute narration");
-  const capBtn = el("button", "hud-btn nr-toggle", "Captions");
-  [soundBtn, capBtn].forEach((b) => ((b.type = "button"), (b.hidden = true)));
-  hud.append(title, pos, live, lint, followBtn, soundBtn, capBtn, fsBtn, edit, present, home);
+  hud.append(title, pos, live, fsBtn);
   // Audience window (opened by the presenter): no chrome, always follows.
   const audience = new URLSearchParams(location.search).has("audience");
   if (audience) document.body.classList.add("sk-audience", "hud-hidden");
@@ -97,8 +78,6 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   progress.append(bar);
   const toast = el("div", "toast");
   toast.setAttribute("role", "status");
-  const lintPanel = el("div", "lint-panel");
-  lintPanel.hidden = true;
   const help = el("div", "help");
   help.hidden = true;
   help.innerHTML = `<h2>Keys</h2><dl>
@@ -106,38 +85,9 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     <dt>← PgUp</dt><dd>Previous</dd>
     <dt>Home / End</dt><dd>First / last slide</dd>
     <dt>F</dt><dd>Fullscreen</dd>
-    <dt>L</dt><dd>Follow live edits on or off</dd>
     <dt>H</dt><dd>Hide this bar</dd>
     <dt>?</dt><dd>This help</dd></dl>`;
-  document.body.append(hud, progress, toast, lintPanel, help);
-
-  const setFollow = (on: boolean) => {
-    follow = on;
-    followBtn.textContent = on ? "Following" : "Not following";
-    followBtn.setAttribute("aria-pressed", String(on));
-  };
-
-  const renderLint = (issues: LintIssue[]) => {
-    const errs = issues.filter((i) => i.severity === "error").length;
-    const warns = issues.filter((i) => i.severity === "warning").length;
-    lint.textContent = errs + warns === 0 ? "Lint clean" : `${errs} errors · ${warns} warnings`;
-    lint.dataset.state = errs ? "error" : warns ? "warning" : "ok";
-    lintPanel.replaceChildren(
-      el("h2", undefined, "Lint"),
-      ...(issues.length
-        ? issues.map((i) => {
-            const row = el("button", `lint-row lint-${i.severity}`);
-            row.type = "button";
-            row.append(el("b", undefined, `Slide ${i.slide + 1}`), el("span", undefined, i.message));
-            if (i.fix) row.append(el("small", undefined, i.fix));
-            row.onclick = () => i.slide >= 0 && player.goto(i.slide, Infinity);
-            return row;
-          })
-        : [el("p", undefined, "No problems found.")]),
-    );
-  };
-  renderLint(initial.lint);
-  lint.onclick = () => (lintPanel.hidden = !lintPanel.hidden);
+  document.body.append(hud, progress, toast, help);
 
   let toastTimer = 0;
   const say = (msg: string) => {
@@ -168,10 +118,9 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     else if (k === "Home") player.goto(0);
     else if (k === "End") player.goto(deck.slides.length - 1, Infinity);
     else if (k === "f" || k === "F") toggleFullscreen();
-    else if (k === "l" || k === "L") setFollow(!follow);
     else if (k === "h" || k === "H") document.body.classList.toggle("hud-hidden");
     else if (k === "?") help.hidden = !help.hidden;
-    else if (k === "Escape") (help.hidden = true), (lintPanel.hidden = true);
+    else if (k === "Escape") help.hidden = true;
     else return;
     e.preventDefault();
   });
@@ -188,7 +137,6 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   });
   const toggleFullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}));
   fsBtn.onclick = toggleFullscreen;
-  followBtn.onclick = () => setFollow(!follow);
 
   let idle = 0;
   addEventListener("mousemove", () => {
@@ -198,22 +146,12 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   });
 
   // ---- live sync ----
-  let lintTimer = 0;
-  const refreshLint = () => {
-    clearTimeout(lintTimer);
-    lintTimer = window.setTimeout(async () => {
-      const r = await getJSON<DeckResponse>(`/api/decks/${encodeURIComponent(deckId)}`).catch(() => null);
-      if (r) renderLint(r.lint);
-    }, 400);
-  };
-
   const reload = async () => {
     const r = await getJSON<DeckResponse>(`/api/decks/${encodeURIComponent(deckId)}`);
     deck = r.deck;
     version = r.version;
     player.setDeck(deck, { keepSlideId: player.slideId });
     title.textContent = deck.title;
-    renderLint(r.lint);
     await player.refresh();
   };
 
@@ -241,43 +179,38 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     }
     player.flash(ev.changed);
     say(`${ev.actor === "agent" ? "Agent" : "Edit"} · version ${ev.version}`);
-    refreshLint();
   };
 
   // Presenter: jump (with the right animation) to wherever the presenter is.
   const laser = new Laser(player.stage);
+  let audBlocked = false; // the audience window's sound is blocked until a click
   const narrator = new Narrator({
     deckId,
     host: document.body,
-    ack: false,
-    audible: false,
-    captions: true,
+    // The audience window is the room's speaker (the presenter view goes quiet
+    // while it is open), so it reports lines as heard; remote viewers don't.
+    ack: audience,
+    audible: true,
+    captions: false,
+    // A browser that blocks sound in the audience window until someone clicks
+    // in it hands the voice back to the presenter view meanwhile.
+    onBlocked: (blocked) => {
+      if (!audience) return;
+      audBlocked = blocked;
+      narrator.setAck(!blocked && narrator.audible);
+      conn.local({ type: "audience", state: blocked ? "blocked" : "open" });
+    },
     show: (index, build, slideId) => {
       if (!follow && !audience) return;
       return followTo(player, slideIndex(deck.slides, index, slideId), build);
     },
   });
-  const showNarrationControls = () => {
-    if (audience) return;
-    soundBtn.hidden = capBtn.hidden = false;
-  };
+  // Viewers hear the voice, without captions. The audience window does what
+  // the presenter view on this machine says (quiet while a TV casts it).
   const setSound = (on: boolean) => {
     narrator.setAudible(on);
-    soundBtn.textContent = on ? "Mute narration" : "Unmute narration";
-    soundBtn.setAttribute("aria-pressed", String(on));
+    if (audience) narrator.setAck(on && !audBlocked);
   };
-  const setCaptions = (on: boolean) => {
-    narrator.setCaptions(on);
-    capBtn.setAttribute("aria-pressed", String(on));
-  };
-  setSound(false);
-  setCaptions(true);
-  soundBtn.onclick = () => setSound(!narrator.audible);
-  capBtn.onclick = () => setCaptions(!narrator.captions);
-  viewFetch(`/api/decks/${encodeURIComponent(deckId)}/present`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((st: { running?: boolean } | null) => st?.running && showNarrationControls())
-    .catch(() => {});
   const followPresenter = async (m: PresentMsg) => {
     if (!follow && !audience) return;
     const p = player.position;
@@ -288,14 +221,18 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     else if (m.index !== p.index || m.step !== p.step) await player.goto(m.index, m.step, { animate: m.index !== p.index });
   };
 
-  new Live(
+  const conn = new Live(
     deckId,
     async (msg) => {
-      if (msg.type === "hello" && msg.version !== version) await reload();
+      // The presenter view on this machine says whether the audience window
+      // plays the voice (not while a TV is casting it in the same room).
+      if (audience && msg.type === "audience-sound") setSound(Boolean(msg.on));
+      else if (audience && msg.type === "audience-ping") conn.local({ type: "audience", state: "open" });
+      else if (msg.type === "hello" && msg.version !== version) await reload();
       else if (msg.type === "patch") await onPatch(msg as unknown as PatchEvent);
-      else if (narrator.handle(msg)) showNarrationControls();
+      else if (narrator.handle(msg)) return;
       else if (msg.type === "present") await followPresenter(msg as unknown as PresentMsg);
-      else if (msg.type === "denied") say("This deck is now private: ask for a new link");
+      else if (msg.type === "denied") say("This link has expired or was replaced: ask for a new one");
       else if (msg.type === "deleted") {
         say("This deck was deleted");
         host.replaceChildren(el("div", "app-missing", "This deck was deleted."));
@@ -314,4 +251,8 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
       live.dataset.state = state === "live" ? "on" : "off";
     },
   );
+  if (audience) {
+    conn.local({ type: "audience", state: "open" });
+    addEventListener("pagehide", () => conn.local({ type: "audience", state: "closed" }));
+  }
 }

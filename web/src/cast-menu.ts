@@ -4,6 +4,7 @@
 // live {"type":"cast"} events (so every open editor and presenter agrees).
 // Used by the editor toolbar and the presenter view.
 import { authHeaders } from "./auth";
+import { withKey } from "./key";
 import type { LiveMsg } from "./sync";
 import "./cast.css";
 
@@ -32,7 +33,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 };
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const r = await fetch(path, {
+  const r = await fetch(withKey(path), {
     method,
     cache: "no-store",
     headers: { ...authHeaders(), ...(body ? { "Content-Type": "application/json" } : {}) },

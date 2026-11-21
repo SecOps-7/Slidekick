@@ -4,6 +4,7 @@
 // around the covers stays quiet.
 import { copyText } from "./ui/clipboard";
 import { confirmModal, promptModal } from "./ui/modal";
+import { shareLinksModal } from "./share-links";
 import { applyTheme, renderSlide, STAGE } from "../runtime/render";
 import type { Catalog, Slide, Theme } from "../runtime/types";
 import { authHeaders, goSignIn, me, signOut, type Me } from "./auth";
@@ -203,21 +204,19 @@ function card(d: Summary, say: (m: string) => void, onDeleted: () => void): HTML
   const when = el("span", "dk-when", `${d.slides} slide${d.slides === 1 ? "" : "s"}, ${ago(d.updatedAt)}${d.ownerName ? ` by ${d.ownerName}` : ""}`);
   meta.append(themeName, when);
 
-  const items: Item[] = [
-    [
-      "Copy link",
-      async () => {
-        // A private deck's plain address only works for people who sign in; copy its private link when we may.
-        let link = location.origin + view;
-        let note = "";
-        if (d.private && d.canEdit) {
-          const r = await fetch(`/api/decks/${encodeURIComponent(d.id)}/access`, { headers: authHeaders(), cache: "no-store" });
-          if (r.ok) link = ((await r.json()) as { shareUrl?: string }).shareUrl || link;
-        } else if (d.private) note = " (people need to sign in to open it)";
-        if ((await copyText(link, `Link to "${d.title}"`)) === "copied") say(`Copied the link to "${d.title}"${note}`);
-      },
-    ],
-  ];
+  // People who may share the deck hand out viewer and presenter links (which
+  // can expire); everyone else copies its plain address.
+  const items: Item[] = d.canEdit
+    ? [["Share links…", () => void shareLinksModal({ deckId: d.id, title: d.title, isPrivate: Boolean(d.private), say })]]
+    : [
+        [
+          "Copy link",
+          async () => {
+            const note = d.private ? " (people need to sign in to open it)" : "";
+            if ((await copyText(location.origin + view, `Link to "${d.title}"`)) === "copied") say(`Copied the link to "${d.title}"${note}`);
+          },
+        ],
+      ];
   if (d.canDelete)
     items.push([
       "Delete deck…",

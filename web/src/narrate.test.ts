@@ -116,6 +116,36 @@ describe("Narrator", () => {
     expect(n.enableBtn.hidden).toBe(true);
   });
 
+  it("reports a block and its end, and replays the current line on demand", async () => {
+    FakeAudio.reject = new DOMException("blocked", "NotAllowedError");
+    const host = document.createElement("div");
+    document.body.append(host);
+    const onBlocked = vi.fn();
+    const n = new Narrator({ deckId: "d_x", host, show: vi.fn(), captions: false, ack: false, audible: true, onBlocked });
+    n.handle(step());
+    await flush();
+    expect(onBlocked).toHaveBeenLastCalledWith(true);
+    // A second blocked line doesn't report again.
+    n.handle(step({ seq: 5 }));
+    await flush();
+    expect(onBlocked).toHaveBeenCalledTimes(1);
+    // The click plays the current line and ends the block.
+    FakeAudio.reject = null;
+    n.enableBtn.click();
+    await flush();
+    expect(FakeAudio.last?.paused).toBe(false);
+    expect(onBlocked).toHaveBeenLastCalledWith(false);
+    expect(onBlocked).toHaveBeenCalledTimes(2);
+    // replay() (the presenter view taking over) plays the line still due; a muted screen doesn't.
+    FakeAudio.last!.paused = true;
+    n.replay();
+    expect(FakeAudio.last?.paused).toBe(false);
+    FakeAudio.last!.paused = true;
+    n.setAudible(false);
+    n.replay();
+    expect(FakeAudio.last?.paused).toBe(true);
+  });
+
   it("acks a step with nothing to say at once", async () => {
     const { n } = make({ ack: true, audible: true });
     n.handle(step({ text: undefined, audio: undefined, seq: 9 }));

@@ -87,6 +87,7 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux.Handle("POST /api/decks/{id}/restore", s.require(authz.Edit, true, s.restore))
 	mux.Handle("GET /api/decks/{id}/access", s.require(authz.Share, true, s.getAccess))
 	mux.Handle("POST /api/decks/{id}/access", s.require(authz.Share, true, s.setAccess))
+	mux.Handle("POST /api/decks/{id}/links", s.require(authz.Share, true, s.mintLink))
 	mux.Handle("POST /api/decks/{id}/edit-token", s.require(authz.MintDeckToken, true, s.issueEditToken))
 	mux.Handle("DELETE /api/decks/{id}/edit-token", s.require(authz.MintDeckToken, true, s.revokeEditToken))
 	mux.Handle("PUT /api/decks/{id}/owner", s.require(authz.ManageUsers, true, s.setDeckOwner))
@@ -300,7 +301,7 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Query().Get("k")
 	// A private deck without its key needs an auth message (deck or server
 	// token) before anything is sent: browsers can't set headers on WebSockets.
-	keyOK := s.svc.CanView(r.Context(), id, key)
+	keyOK, keyUntil := s.svc.ViewAccess(r.Context(), id, key)
 	ip := clientIP(r)
 	if !s.conns.acquire(ip, id) {
 		http.Error(w, "too many live connections", http.StatusServiceUnavailable)
@@ -317,9 +318,14 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 	// check in websocket.Accept stops other sites from using it); token
 	// holders send {"type":"auth","token":...}.
 	cookieOK := false
+	// A presenter link authenticates like a cookie, until it expires or is replaced.
+	presentKey, presentUntil, viaPresenter := r.URL.Query().Get("p"), time.Time{}, false
 	if a, _ := s.identify(r); a.p.Authenticated() {
 		if d, err := s.deckRef(r.Context(), id); err == nil {
 			cookieOK = s.policy().Can(a.p, authz.Present, d)
+		}
+		if a.p.Kind == authz.KindPresenter {
+			viaPresenter, presentUntil = true, a.until
 		}
 	}
 	authed := cookieOK
@@ -389,11 +395,28 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	// Watching on an expiring link ends when it expires.
+	var until time.Time
+	switch {
+	case viaPresenter:
+		until = presentUntil
+	case !isAuthed() && keyOK:
+		until = keyUntil
+	}
+	var expired <-chan time.Time
+	if !until.IsZero() {
+		t := time.NewTimer(time.Until(until))
+		defer t.Stop()
+		expired = t.C
+	}
 	ping := time.NewTicker(25 * time.Second)
 	defer ping.Stop()
 	for {
 		select {
 		case <-ctx.Done():
+			return
+		case <-expired:
+			c.Close(websocket.StatusPolicyViolation, "link expired")
 			return
 		case msg, ok := <-ch:
 			if !ok {
@@ -403,6 +426,12 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 			if string(msg) == accessChanged && !isAuthed() && !s.svc.CanView(ctx, id, key) {
 				c.Close(websocket.StatusPolicyViolation, "deck not found") // made private or key rotated
 				return
+			}
+			if string(msg) == accessChanged && viaPresenter {
+				if ok, _ := s.svc.PresentAccess(ctx, id, presentKey); !ok {
+					c.Close(websocket.StatusPolicyViolation, "link replaced") // Make new links
+					return
+				}
 			}
 			wctx, done := context.WithTimeout(ctx, 10*time.Second)
 			err := c.Write(wctx, websocket.MessageText, msg)

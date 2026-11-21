@@ -38,6 +38,7 @@ type reqAuth struct {
 	user    *store.User
 	session string // session cookie value, when signed in by cookie
 	csrf    string
+	until   time.Time // a presenter link's expiry (zero: none)
 }
 
 type authKey struct{}
@@ -86,10 +87,35 @@ func (s *server) identify(r *http.Request) (a reqAuth, bad bool) {
 		a, ok := s.resolveToken(ctx, tok)
 		return a, !ok
 	}
+	var signedIn *reqAuth
 	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" && s.acc != nil {
 		if u, ss, err := s.acc.SessionUser(ctx, c.Value); err == nil {
-			return reqAuth{p: accounts.Principal(u), user: u, session: c.Value, csrf: ss.CSRF}, false
+			signedIn = &reqAuth{p: accounts.Principal(u), user: u, session: c.Value, csrf: ss.CSRF}
 		}
+	}
+	// A presenter link (?p=) presents the deck in the path. Someone signed in
+	// who may already drive it keeps their own identity.
+	if pk := r.URL.Query().Get("p"); pk != "" {
+		id := r.PathValue("id")
+		ok, until := false, time.Time{}
+		if id != "" {
+			ok, until = s.svc.PresentAccess(ctx, id, pk)
+		}
+		if !ok {
+			if signedIn != nil {
+				return *signedIn, false
+			}
+			return reqAuth{}, true // expired, replaced or made up: counts toward the lockout
+		}
+		if signedIn != nil {
+			if d, err := s.deckRef(ctx, id); err == nil && s.policy().Can(signedIn.p, authz.Drive, d) {
+				return *signedIn, false
+			}
+		}
+		return reqAuth{p: authz.Principal{Kind: authz.KindPresenter, Deck: id}, until: until}, false
+	}
+	if signedIn != nil {
+		return *signedIn, false
 	}
 	if s.openMode(ctx) {
 		return reqAuth{p: authz.Principal{Kind: authz.KindOpen, Username: "open-mode"}}, false
@@ -134,7 +160,7 @@ func (s *server) sameOrigin(r *http.Request) bool {
 func (s *server) authn(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP(r)
-		hasCreds := bearer(r) != ""
+		hasCreds := bearer(r) != "" || r.URL.Query().Get("p") != ""
 		if hasCreds && !s.fails.allowed(ip) {
 			w.Header().Set("Retry-After", "300")
 			http.Error(w, "too many failed attempts; try again in a few minutes", http.StatusTooManyRequests)
@@ -206,6 +232,8 @@ func (s *server) require(action authz.Action, perDeck bool, next http.HandlerFun
 
 func forbiddenMsg(p authz.Principal, a authz.Action) string {
 	switch {
+	case p.Kind == authz.KindPresenter:
+		return "a presenter link only presents deck " + p.Deck
 	case p.Kind == authz.KindDeck:
 		return "this token can't do that (it only edits deck " + p.Deck + ")"
 	case p.Role == authz.RoleViewer:
@@ -224,7 +252,7 @@ func (s *server) viewable(r *http.Request, id string) bool {
 		return true
 	}
 	ip := clientIP(r)
-	if bearer(r) != "" && !s.fails.allowed(ip) {
+	if (bearer(r) != "" || r.URL.Query().Get("p") != "") && !s.fails.allowed(ip) {
 		return false
 	}
 	a, bad := s.identify(r)
@@ -313,6 +341,28 @@ func (s *server) setAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, a)
+}
+
+// mintLink makes a viewer or presenter link: {"kind":"view"|"present","minutes":0|30..1440}.
+func (s *server) mintLink(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Kind    string `json:"kind"`
+		Minutes int    `json:"minutes"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
+		writeErr(w, err)
+		return
+	}
+	u, exp, err := s.svc.MintLink(r.Context(), r.PathValue("id"), body.Kind, time.Duration(body.Minutes)*time.Minute)
+	if err != nil {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		return
+	}
+	out := map[string]any{"url": u}
+	if !exp.IsZero() {
+		out["expiresAt"] = exp.UTC().Format(time.RFC3339)
+	}
+	writeJSON(w, 200, out)
 }
 
 func (s *server) issueEditToken(w http.ResponseWriter, r *http.Request) {

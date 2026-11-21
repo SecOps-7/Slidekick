@@ -93,6 +93,14 @@ func migrateAccounts(db *sql.DB) error {
 			return err
 		}
 	}
+	// Decks gained presenter links (the key is made when the first one is shared).
+	n = 0
+	db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('deck_access') WHERE name='present_key'`).Scan(&n)
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE deck_access ADD COLUMN present_key TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

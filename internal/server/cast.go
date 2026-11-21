@@ -22,10 +22,10 @@ func (s *server) castRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/admin/cast/found/{fid}/hide", s.require(authz.ManageSettings, false, s.hideFoundCast(true)))
 	mux.Handle("DELETE /api/admin/cast/found/{fid}/hide", s.require(authz.ManageSettings, false, s.hideFoundCast(false)))
 	mux.Handle("GET /api/cast/devices", s.require(authz.Create, false, s.listCastDevices))
-	mux.Handle("GET /api/decks/{id}/cast", s.require(authz.Share, true, s.castStatus))
-	mux.Handle("POST /api/decks/{id}/cast", s.require(authz.Share, true, s.startCast))
-	mux.Handle("DELETE /api/decks/{id}/cast", s.require(authz.Share, true, s.stopCast))
-	mux.Handle("POST /api/decks/{id}/cast/refresh", s.require(authz.Share, true, s.refreshCast))
+	mux.Handle("GET /api/decks/{id}/cast", s.require(authz.Drive, true, s.castStatus))
+	mux.Handle("POST /api/decks/{id}/cast", s.require(authz.Drive, true, s.startCast))
+	mux.Handle("DELETE /api/decks/{id}/cast", s.require(authz.Drive, true, s.stopCast))
+	mux.Handle("POST /api/decks/{id}/cast/refresh", s.require(authz.Drive, true, s.refreshCast))
 }
 
 func writeCastErr(w http.ResponseWriter, err error) {

@@ -97,6 +97,9 @@ function buttons(cancel: string | null, confirm: string, danger = false) {
   return { foot, ok, cancel: c };
 }
 
+// For dialogs built elsewhere (the library's share dialog) from the same parts.
+export { open as openModal, header as modalHeader, buttons as modalButtons };
+
 /** Asks a yes/no question. Resolves true only when confirmed. */
 export function confirmModal(o: ConfirmOptions): Promise<boolean> {
   return open<boolean>(

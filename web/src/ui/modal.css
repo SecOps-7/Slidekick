@@ -30,5 +30,9 @@
 .skm-btn.primary { background: linear-gradient(135deg, #14b8a6, #7c3aed); border-color: transparent; color: #fff; font-weight: 600; }
 .skm-btn.danger { background: #dc2626; border-color: transparent; color: #fff; font-weight: 600; }
 .skm-btn.primary:hover, .skm-btn.danger:hover { filter: brightness(1.08); }
+.skm-link { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--app-line); border-radius: 10px; }
+.skm-link b { display: block; font-size: 14px; }
+.skm-link small { display: block; color: var(--app-muted); font-size: 13px; line-height: 1.4; }
+.skm-link .skm-btn { flex: none; }
 .skm :focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .skm[open] { animation: none; } }

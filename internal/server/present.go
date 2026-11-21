@@ -19,14 +19,19 @@ func (s *server) presentRoutes(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("GET /api/decks/{id}/present", s.viewGate(s.presentStatus))
 	mux.HandleFunc("POST /api/decks/{id}/present/ack", s.viewGate(s.presentAck))
-	mux.Handle("POST /api/decks/{id}/present", s.require(authz.Share, true, s.mayNarrate(s.startPresent)))
-	mux.Handle("DELETE /api/decks/{id}/present", s.require(authz.Share, true, s.mayNarrate(s.stopPresent)))
+	mux.Handle("POST /api/decks/{id}/present", s.require(authz.Drive, true, s.mayNarrate(s.startPresent)))
+	mux.Handle("DELETE /api/decks/{id}/present", s.require(authz.Drive, true, s.mayNarrate(s.stopPresent)))
 }
 
 // mayNarrate adds the narrate permission to a route that already checked the deck.
 func (s *server) mayNarrate(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if p := authFrom(r.Context()).p; !s.policy().Can(p, authz.Narrate, nil) {
+		d, err := s.deckRef(r.Context(), r.PathValue("id"))
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		if p := authFrom(r.Context()).p; !s.policy().Can(p, authz.Narrate, d) {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": forbiddenMsg(p, authz.Narrate)})
 			return
 		}
@@ -63,8 +68,9 @@ func (s *server) startPresent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := authFrom(r.Context()).p
+	d, _ := s.deckRef(r.Context(), r.PathValue("id"))
 	st, err := s.opt.Presenter.Start(r.PathValue("id"), presenting.RunOptions{From: in.From, To: in.To, Provider: in.Provider, Voice: in.Voice,
-		AIProvider: in.AIProvider, Model: in.Model, Script: in.Script, NoAI: !s.policy().Can(p, authz.UseAI, nil)}, p.Actor())
+		AIProvider: in.AIProvider, Model: in.Model, Script: in.Script, NoAI: !s.policy().Can(p, authz.UseAI, d)}, p.Actor())
 	switch {
 	case err == nil:
 		writeJSON(w, 200, st)
