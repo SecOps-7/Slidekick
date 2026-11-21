@@ -93,6 +93,11 @@ export class Narrator {
     if (!on) this.silence();
   }
 
+  /** Whether this screen reports lines as heard (a muted laptop leaves that to the TV). */
+  setAck(on: boolean) {
+    this.o.ack = on;
+  }
+
   setCaptions(on: boolean) {
     this.o.captions = on;
     this.caption.hidden = !on || !this.caption.textContent;

@@ -63,20 +63,26 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   const laserBtn = el("button", "pr-btn", "Laser (L)");
   const status = el("span", "pr-status", "connecting");
   [openAud, laserBtn].forEach((b) => (b.type = "button"));
-  const cast = castMenu(deckId, { buttonClass: "pr-btn", up: true });
+  // While the deck is cast, the TV plays the narration; this screen stays quiet
+  // unless the presenter turns its sound on (onCasting is wired up below).
+  let onCasting = (_device: string | null) => {};
+  const cast = castMenu(deckId, { buttonClass: "pr-btn", up: true, onCasting: (d) => onCasting(d) });
   controls.append(openAud, laserBtn, cast.el, status);
   // AI voice: start/stop a narrated run and see where it is.
   const ai = el("div", "pr-ai");
   const aiBtn = el("button", "pr-btn", "Present with AI voice");
   const capBtn = el("button", "pr-btn", "Captions");
+  const soundBtn = el("button", "pr-btn", "Sound on this screen");
+  soundBtn.hidden = true;
+  soundBtn.title = "The TV plays the AI voice while casting; turn this on to hear it on this screen too";
   const aiStatus = el("span", "pr-ai-status");
   aiStatus.setAttribute("role", "status");
-  [aiBtn, capBtn].forEach((b) => (b.type = "button"));
+  [aiBtn, capBtn, soundBtn].forEach((b) => (b.type = "button"));
   aiBtn.title = "An AI presenter talks through each slide's content, using the speaker notes as talking points, and moves through the deck";
   capBtn.title = "Show what the voice says over the slide";
   const can = currentMe()?.can ?? {};
   aiBtn.hidden = !(can.narrate && can["deck:share"]);
-  ai.append(aiBtn, capBtn, aiStatus);
+  ai.append(aiBtn, capBtn, soundBtn, aiStatus);
   side.append(nextBox, meta, notes, ai, controls);
   root.append(current, side);
   host.append(root);
@@ -100,6 +106,18 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   };
   setCaptions(true);
   capBtn.onclick = () => setCaptions(!narrator.captions);
+  // Muted here while casting, so the voice doesn't play twice in the room.
+  // Unmuted, this screen also reports lines heard; the server takes the first.
+  const setSound = (on: boolean) => {
+    narrator.setAudible(on);
+    narrator.setAck(on);
+    soundBtn.setAttribute("aria-pressed", String(on));
+  };
+  soundBtn.onclick = () => setSound(!narrator.audible);
+  onCasting = (device) => {
+    soundBtn.hidden = !device;
+    setSound(!device);
+  };
   const showRun = (running: boolean, text: string, err = false) => {
     aiBtn.textContent = running ? "Stop AI voice" : "Present with AI voice";
     aiBtn.classList.toggle("on", running);

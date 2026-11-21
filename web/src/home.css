@@ -36,7 +36,8 @@
 .dk-account { display: flex; align-items: center; }
 .dk-avatar {
   display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
-  font: 600 15px/1 var(--dk-display); color: #fff; background: linear-gradient(135deg, #14b8a6, #7c3aed);
+  font: 600 15px/1 var(--dk-display); color: #fff; background: linear-gradient(135deg, #f97316, #e11d48);
+  box-shadow: 0 0 0 2px var(--app-bg), 0 0 0 3px color-mix(in srgb, #f97316 55%, transparent);
 }
 .dk-warn { color: var(--app-warn); text-decoration: none; font-size: 14px; }
 

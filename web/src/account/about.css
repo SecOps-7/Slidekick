@@ -144,3 +144,10 @@
 .ab .ab-tabs button:hover { color: var(--app-text); }
 .ab .ab-tabs button.on { color: var(--app-text); border-bottom-color: var(--app-accent); }
 .ab .ab-search { font-size: 14px; padding: 9px 12px; border-radius: 10px; background: var(--app-bg); }
+
+/* Support links, as on MikroDash's about page: full-strength icons, since they're things to click. */
+.ab .ab-actions { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 4px; }
+.ab .ab-actions .ab-inline-link { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 14px; }
+.ab .ab-actions .ab-inline-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ab .ab-coffee { color: var(--app-warn); }
+.ab-act-ico { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }

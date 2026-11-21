@@ -54,6 +54,27 @@ function make(o: { ack: boolean; audible: boolean; captions?: boolean }) {
 const acks = () => fetchMock.mock.calls.filter((c) => String(c[0]).includes("/present/ack"));
 
 describe("Narrator", () => {
+  it("stays silent and leaves the acks to the TV while casting, until unmuted", async () => {
+    vi.useFakeTimers();
+    const { n, show } = make({ ack: true, audible: true });
+    n.setAudible(false);
+    n.setAck(false);
+    n.handle(step());
+    await flush();
+    vi.advanceTimersByTime(5000);
+    expect(show).toHaveBeenCalled();
+    expect(FakeAudio.last?.paused ?? true).toBe(true);
+    expect(acks()).toHaveLength(0);
+    // Unmuted again: this screen plays the next line and reports it heard.
+    n.setAudible(true);
+    n.setAck(true);
+    n.handle(step({ seq: 5 }));
+    await flush();
+    expect(FakeAudio.last?.paused).toBe(false);
+    FakeAudio.last?.onended?.();
+    expect(acks()).toHaveLength(1);
+  });
+
   it("tells AI events from the presenter's position relay", () => {
     expect(isNarration({ type: "present", index: 1, step: 0 })).toBe(false);
     expect(isNarration({ type: "present", state: "step" })).toBe(true);

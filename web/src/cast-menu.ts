@@ -47,7 +47,10 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
  * Makes the cast button. It stays hidden for people who can't cast this deck
  * (the server answers 403 for them).
  */
-export function castMenu(deckId: string, opt: { buttonClass: string; up?: boolean; say?: (msg: string) => void }): CastMenu {
+export function castMenu(
+  deckId: string,
+  opt: { buttonClass: string; up?: boolean; say?: (msg: string) => void; onCasting?: (device: string | null) => void },
+): CastMenu {
   const base = `/api/decks/${encodeURIComponent(deckId)}/cast`;
   const wrap = el("div", "cast-menu");
   wrap.hidden = true;
@@ -68,7 +71,13 @@ export function castMenu(deckId: string, opt: { buttonClass: string; up?: boolea
   let error = "";
   let looking = false;
 
+  let told: string | null | undefined; // last casting state reported to onCasting
   const paint = () => {
+    const now = casting?.device ?? null;
+    if (now !== told) {
+      told = now;
+      opt.onCasting?.(now);
+    }
     btn.textContent = busy ? busy : casting ? `Casting to ${casting.device}` : "Cast";
     btn.classList.toggle("on", Boolean(casting));
     btn.disabled = Boolean(busy);

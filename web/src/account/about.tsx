@@ -48,6 +48,9 @@ const ICONS: Record<string, string> = {
   slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><line x1="12" y1="16" x2="12" y2="20"/><line x1="8" y1="20" x2="16" y2="20"/>',
   notes: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
   box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+  bug: '<rect x="8" y="6" width="8" height="14" rx="4"/><path d="M8 11H4"/><path d="M8 16H5"/><path d="M8 7 5.5 4.5"/><path d="M16 11h4"/><path d="M16 16h3"/><path d="m16 7 2.5-2.5"/><path d="M12 6V3"/>',
+  coffee: '<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>',
+  card: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
   ext: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
 };
 
@@ -246,7 +249,21 @@ export function About({ embedded = false }: { embedded?: boolean }) {
               </details>
             )}
           </div>
-          <p class="ab-note">Slidekick is free and open source. It runs entirely on your own server, and nothing on this page is fetched from the internet.</p>
+          <div class="ab-actions">
+            <a href="https://github.com/SecOps-7/slidekick/issues" target="_blank" rel="noopener noreferrer" class="ab-inline-link">
+              <Ico name="bug" cls="ab-act-ico" />
+              Report a bug or idea
+            </a>
+            <a href="https://buymeacoffee.com/SecOps7" target="_blank" rel="noopener noreferrer" class="ab-inline-link ab-coffee">
+              <Ico name="coffee" cls="ab-act-ico" />
+              Buy me a coffee
+            </a>
+            <a href="https://paypal.me/SecOps7App" target="_blank" rel="noopener noreferrer" class="ab-inline-link">
+              <Ico name="card" cls="ab-act-ico" />
+              PayPal
+            </a>
+          </div>
+          <p class="ab-note">Slidekick is free and open source, and always will be. If it saves you time, fuelling the developer with caffeine is welcome and never expected.</p>
           <p class="ab-note ab-disclaimer">
             Slidekick is independent and not affiliated with the AI, voice or casting services it connects to. Chromecast is a trademark of Google LLC; other names are trademarks of their owners.
           </p>
