@@ -35,6 +35,7 @@ type Summary struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 	Owner     string    `json:"owner,omitempty"`
 	OwnerName string    `json:"ownerName,omitempty"`
+	Private   bool      `json:"private"`
 }
 
 // VersionEntry is one entry of a deck's history.
@@ -198,7 +199,8 @@ func (s *Store) Update(ctx context.Context, id string, base int, title, theme st
 // List returns all decks, most recently updated first.
 func (s *Store) List(ctx context.Context) ([]Summary, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT d.id,d.title,d.theme,d.version,d.slides,d.updated_at,d.owner,COALESCE(u.username,'') FROM decks d LEFT JOIN users u ON u.id=d.owner ORDER BY d.updated_at DESC`)
+		`SELECT d.id,d.title,d.theme,d.version,d.slides,d.updated_at,d.owner,COALESCE(u.username,''),COALESCE(a.private,0)
+		 FROM decks d LEFT JOIN users u ON u.id=d.owner LEFT JOIN deck_access a ON a.deck_id=d.id ORDER BY d.updated_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -207,10 +209,12 @@ func (s *Store) List(ctx context.Context) ([]Summary, error) {
 	for rows.Next() {
 		var r Summary
 		var ts string
-		if err := rows.Scan(&r.ID, &r.Title, &r.Theme, &r.Version, &r.Slides, &ts, &r.Owner, &r.OwnerName); err != nil {
+		var priv int
+		if err := rows.Scan(&r.ID, &r.Title, &r.Theme, &r.Version, &r.Slides, &ts, &r.Owner, &r.OwnerName, &priv); err != nil {
 			return nil, err
 		}
 		r.UpdatedAt = parseTime(ts)
+		r.Private = priv == 1
 		out = append(out, r)
 	}
 	return out, rows.Err()

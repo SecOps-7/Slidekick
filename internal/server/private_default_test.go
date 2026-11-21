@@ -80,3 +80,33 @@ func TestExistingPublicDeckUnchanged(t *testing.T) {
 		t.Fatalf("existing public link: %d", code)
 	}
 }
+
+func TestDeckCovers(t *testing.T) {
+	e := newAccServer(t, token)
+	admin := e.withAdmin(t)
+	_, out := admin.do("POST", "/api/decks", map[string]any{"title": "Covered", "theme": "synthwave", "slides": oneSlide})
+	id := out["deckId"].(string)
+	old := legacyDeck(t, e.env, "Old public")
+
+	// The cover is the first slide plus what's needed to draw it, and it is as private as the deck.
+	code, c := admin.do("GET", "/api/decks/"+id+"/cover?v=1", nil)
+	if code != 200 || c["theme"] != "synthwave" || c["slide"] == nil || c["version"] != float64(1) {
+		t.Fatalf("cover: %d %v", code, c)
+	}
+	if code, _ := e.client(t).do("GET", "/api/decks/"+id+"/cover", nil); code != 404 {
+		t.Fatalf("anonymous cover of a private deck: %d", code)
+	}
+	if code, _ := e.client(t).do("GET", "/api/decks/"+old+"/cover", nil); code != 200 {
+		t.Fatalf("cover of a public deck: %d", code)
+	}
+	// The list says which decks are private, for the cards' public badge.
+	_, list := admin.do("GET", "/api/decks", nil)
+	priv := map[string]bool{}
+	for _, x := range list["decks"].([]any) {
+		m := x.(map[string]any)
+		priv[m["id"].(string)] = m["private"].(bool)
+	}
+	if !priv[id] || priv[old] {
+		t.Fatalf("private flags %v", priv)
+	}
+}

@@ -1,0 +1,170 @@
+/* Home: the deck library. The covers carry the colour; the chrome stays quiet.
+   Uses the app tokens from app.css (dark by default, light when preferred). */
+
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/space-grotesk-latin-wght-normal.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+.home-page {
+  background: var(--app-bg);
+  --dk-display: "Space Grotesk", Inter, system-ui, sans-serif; /* on body: the dialog lives outside .dk */
+  --dk-radius: 12px;
+}
+.dk {
+  min-height: 100vh;
+  padding: clamp(18px, 2.4vw, 40px) clamp(16px, 4vw, 80px) clamp(48px, 6vw, 96px);
+}
+
+/* ---- top bar ---- */
+.dk-bar { display: flex; align-items: center; gap: 16px 24px; flex-wrap: wrap; }
+.dk-logo { line-height: 0; color: var(--app-text); margin-right: auto; border-radius: 8px; }
+.dk-logo svg { height: 40px; width: auto; display: block; }
+.dk-bar-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dk-search {
+  font: inherit; font-size: 14px; width: clamp(180px, 22vw, 340px); padding: 9px 12px 9px 34px;
+  border-radius: 10px; border: 1px solid var(--app-line); color: var(--app-text);
+  background: var(--app-panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='4.5' fill='none' stroke='%238b93ab' stroke-width='1.6'/%3E%3Cpath d='M10.5 10.5 14 14' stroke='%238b93ab' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") 11px 50% / 15px no-repeat;
+}
+.dk-search::placeholder { color: var(--app-muted); }
+.dk-btn {
+  font: inherit; font-size: 14px; font-weight: 500; padding: 9px 15px; border-radius: 10px; cursor: pointer; white-space: nowrap;
+  border: 1px solid var(--app-line); background: var(--app-panel); color: var(--app-text);
+}
+.dk-btn:hover { border-color: color-mix(in srgb, var(--app-text) 30%, var(--app-line)); }
+.dk-btn.primary { background: linear-gradient(135deg, #14b8a6, #7c3aed); border-color: transparent; color: #fff; font-weight: 600; }
+.dk-btn.primary:hover { filter: brightness(1.08); }
+.dk-btn.ghost { background: transparent; }
+
+/* account */
+.dk-account { display: flex; align-items: center; }
+.dk-avatar {
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  font: 600 15px/1 var(--dk-display); color: #fff; background: linear-gradient(135deg, #14b8a6, #7c3aed);
+}
+.dk-warn { color: var(--app-warn); text-decoration: none; font-size: 14px; }
+
+/* ---- heading row ---- */
+.dk-head { display: flex; align-items: end; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; margin: clamp(28px, 4vw, 56px) 0 clamp(18px, 2vw, 28px); }
+.dk-head h1 { margin: 0; font: 600 clamp(30px, 3vw, 44px)/1.05 var(--dk-display); letter-spacing: -0.02em; }
+.dk-count { font-weight: 400; color: var(--app-muted); font-size: 0.55em; letter-spacing: 0; vertical-align: 0.35em; margin-left: 6px; }
+.dk-controls { display: flex; gap: 10px; align-items: center; }
+.dk-sort { font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--app-line); background: var(--app-panel); color: var(--app-text); }
+.dk-filter { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--app-panel); border: 1px solid var(--app-line); }
+.dk-filter button { font: inherit; font-size: 13px; border: 0; background: none; color: var(--app-muted); padding: 5px 12px; border-radius: 7px; cursor: pointer; }
+.dk-filter button.on { background: var(--app-bg); color: var(--app-text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+
+/* ---- the grid of covers ---- */
+.dk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: clamp(26px, 2.4vw, 40px) clamp(18px, 1.8vw, 28px); }
+.dk-card { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.dk-cover-wrap { position: relative; border-radius: var(--dk-radius); transition: transform 0.18s ease, box-shadow 0.18s ease; box-shadow: 0 10px 28px -16px rgba(0, 0, 0, 0.7); }
+.dk-cover {
+  position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--dk-radius);
+  background: color-mix(in srgb, var(--app-panel) 80%, var(--app-line));
+  outline: 1px solid color-mix(in srgb, var(--app-text) 8%, transparent); outline-offset: -1px;
+}
+.dk-cover:empty::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--app-text) 6%, transparent) 50%, transparent 70%) 0 0 / 200% 100%;
+  animation: dk-shimmer 1.4s linear infinite;
+}
+@keyframes dk-shimmer { to { background-position: -200% 0; } }
+.dk-stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; transform: scale(var(--dk-scale, 0.15)); pointer-events: none; background: var(--sk-bg); color: var(--sk-text); }
+.dk-stage .sk-slide { position: absolute; inset: 0; }
+/* A cover is a still: no ambient theme motion across a page of decks. */
+.dk-stage *, .dk-stage *::before, .dk-stage *::after { animation: none !important; transition: none !important; }
+.dk-blank { position: absolute; inset: 0; display: grid; place-items: center; font: 400 64px var(--sk-font-body); color: var(--sk-muted); }
+
+@media (hover: hover) {
+  .dk-cover-wrap:hover, .dk-cover-wrap:focus-within { transform: translateY(-3px); box-shadow: 0 22px 40px -18px rgba(0, 0, 0, 0.8); }
+}
+
+/* Edit / Present sit over the cover's bottom edge, shown on hover or keyboard focus. */
+.dk-actions {
+  position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px;
+  opacity: 0; transform: translateY(4px); transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dk-cover-wrap:hover .dk-actions, .dk-cover-wrap:focus-within .dk-actions { opacity: 1; transform: none; }
+@media (hover: none) { .dk-actions { opacity: 1; transform: none; } }
+.dk-act {
+  font-size: 13px; font-weight: 600; text-decoration: none; padding: 6px 12px; border-radius: 8px;
+  color: #fff; background: rgba(10, 12, 22, 0.72); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.dk-act.primary { background: rgba(255, 255, 255, 0.94); color: #10131f; border-color: transparent; }
+.dk-act:hover { filter: brightness(1.1); }
+.dk-public {
+  position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  color: #fff; background: rgba(10, 12, 22, 0.62); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.dk-public svg { width: 14px; height: 14px; }
+
+/* Title and details under the cover: no box, just type. */
+.dk-info { display: grid; gap: 4px; padding: 0 2px; min-width: 0; }
+.dk-info-row { display: flex; align-items: start; gap: 8px; }
+.dk-title { margin: 0; flex: 1; min-width: 0; font: 600 17px/1.3 var(--dk-display); letter-spacing: -0.01em; }
+.dk-title a { color: var(--app-text); text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dk-title a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.dk-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 13px; color: var(--app-muted); }
+.dk-theme { display: inline-flex; align-items: center; gap: 7px; color: var(--app-text); }
+.dk-swatch { display: inline-flex; }
+.dk-swatch i { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--app-bg); }
+.dk-swatch i + i { margin-left: -4px; }
+
+/* ---- menus (native popovers, anchored to their button) ---- */
+.dk-menu-btn { border: 0; background: none; color: var(--app-muted); padding: 4px 6px; border-radius: 7px; cursor: pointer; line-height: 0; }
+.dk-menu-btn:hover, .dk-menu-btn:focus-visible { color: var(--app-text); background: var(--app-panel); }
+.dk-menu-btn svg { width: 18px; height: 18px; }
+.dk-account .dk-menu-btn { padding: 0; border-radius: 50%; }
+.dk-pop {
+  margin: 0; min-width: 200px; padding: 6px; border-radius: 12px; border: 1px solid var(--app-line);
+  background: var(--app-panel); color: var(--app-text); box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.6);
+}
+.dk-pop button { display: block; width: 100%; text-align: left; font: inherit; font-size: 14px; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: inherit; cursor: pointer; }
+.dk-pop button:hover, .dk-pop button:focus-visible { background: var(--app-bg); }
+.dk-pop button.danger { color: var(--app-err); }
+.dk-pop-head { display: grid; gap: 2px; padding: 8px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--app-line); font-size: 14px; }
+.dk-pop-head span { color: var(--app-muted); font-size: 12px; text-transform: capitalize; }
+
+/* ---- connect dialog ---- */
+.dk-dialog {
+  width: min(640px, calc(100vw - 32px)); padding: 24px; border-radius: 16px; border: 1px solid var(--app-line);
+  background: var(--app-panel); color: var(--app-text); box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+}
+.dk-dialog::backdrop { background: rgba(4, 6, 14, 0.6); backdrop-filter: blur(3px); }
+.dk-dialog h2 { margin: 0 0 12px; font: 600 24px/1.2 var(--dk-display); }
+.dk-steps { margin: 0; padding-left: 20px; display: grid; gap: 12px; line-height: 1.55; }
+.dk-steps a { color: var(--app-accent); }
+.dk-cmd { margin: 8px 0 0; padding: 12px; border-radius: 10px; background: var(--app-bg); border: 1px solid var(--app-line); font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
+.dk-dialog-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* ---- empty state, errors, toast ---- */
+.dk-empty { grid-column: 1 / -1; padding: clamp(32px, 6vw, 80px) 0; max-width: 560px; }
+.dk-empty h2 { margin: 0 0 8px; font: 600 28px/1.2 var(--dk-display); }
+.dk-empty p { margin: 0 0 18px; color: var(--app-muted); line-height: 1.6; }
+.dk-empty-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.dk-error { color: var(--app-muted); }
+.dk-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  padding: 10px 16px; border-radius: 10px; background: var(--app-text); color: var(--app-bg); font-size: 14px; transition: opacity 0.2s, transform 0.2s;
+}
+.dk-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- quality floor ---- */
+.dk a:focus-visible, .dk button:focus-visible, .dk input:focus-visible, .dk select:focus-visible, .dk-dialog :focus-visible {
+  outline: 2px solid #2dd4bf; outline-offset: 2px;
+}
+.dk-cover:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .dk-logo svg { height: 32px; }
+  .dk-bar-tools { width: 100%; }
+  .dk-search { flex: 1; width: auto; }
+  .dk-bar-tools .dk-btn.ghost { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dk-cover-wrap, .dk-actions, .dk-toast { transition: none; }
+  .dk-cover:empty::after { animation: none; }
+  .dk-cover-wrap:hover, .dk-cover-wrap:focus-within { transform: none; }
+}
+.dk-pop { position: fixed; }

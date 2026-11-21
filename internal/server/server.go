@@ -66,6 +66,7 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux.Handle("POST /api/decks", s.require(authz.Create, false, s.createDeck))
 	mux.HandleFunc("GET /api/decks/{id}", s.viewGate(s.getDeck))
 	mux.HandleFunc("GET /api/decks/{id}/history", s.viewGate(s.history))
+	mux.HandleFunc("GET /api/decks/{id}/cover", s.viewGate(s.cover))
 	mux.Handle("POST /api/decks/{id}/patch", s.require(authz.Edit, true, s.patchDeck))
 	mux.HandleFunc("GET /api/catalog", s.catalog)
 	mux.HandleFunc("GET /api/decks/{id}/export.html", s.viewGate(s.exportHTML))
@@ -185,6 +186,26 @@ func (s *server) listDecks(w http.ResponseWriter, r *http.Request) {
 		out = append(out, listed{row, pol.Can(p, authz.Edit, d), pol.Can(p, authz.Delete, d)})
 	}
 	writeJSON(w, 200, map[string]any{"decks": out})
+}
+
+// cover returns just what a deck card needs to draw a miniature of the first
+// slide. With ?v=<version> it may be cached for good: a new version is a new URL.
+func (s *server) cover(w http.ResponseWriter, r *http.Request) {
+	d, _, ver, err := s.svc.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	var first any
+	if len(d.Slides) > 0 {
+		first = d.Slides[0]
+	}
+	if r.URL.Query().Get("v") == fmt.Sprint(ver) {
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "no-store")
+	}
+	writeJSON(w, 200, map[string]any{"version": ver, "title": d.Title, "theme": d.Theme, "aspect": d.Aspect, "slides": len(d.Slides), "slide": first})
 }
 
 func (s *server) getDeck(w http.ResponseWriter, r *http.Request) {
