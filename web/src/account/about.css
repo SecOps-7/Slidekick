@@ -87,8 +87,9 @@
 .ab-rel-v { font-weight: 600; color: var(--app-text); }
 .ab-rel-when { margin-left: auto; font-size: 12px; color: var(--app-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ab-notes { list-style: none; margin: 0; padding: 0 14px 12px; display: grid; gap: 2px; max-height: 32rem; overflow-y: auto; }
-.ab-note-row { display: grid; grid-template-columns: 11rem 1fr; gap: 12px; align-items: start; padding: 6px 0; border-top: 1px solid color-mix(in srgb, var(--app-line) 60%, transparent); }
-.ab-kind { justify-content: center; font-size: 11px; white-space: normal; text-align: center; line-height: 1.35; }
+.ab-note-row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 12px; align-items: start; padding: 6px 0; border-top: 1px solid color-mix(in srgb, var(--app-line) 60%, transparent); }
+.ab-kind { justify-content: center; font-size: 11.5px; }
+.ab-embedded { padding: 4px 0 0; max-width: none; margin: 0; }
 .ab-note-text { font-size: 14px; line-height: 1.55; color: var(--app-text); }
 @media (max-width: 640px) { .ab-note-row { grid-template-columns: 1fr; gap: 4px; } .ab-kind { justify-self: start; } }
 .tone-teal { background: color-mix(in srgb, #2dd4bf 16%, transparent); color: #5eead4; }
@@ -97,6 +98,7 @@
 .tone-sky { background: color-mix(in srgb, #38bdf8 16%, transparent); color: #7dd3fc; }
 .tone-rose { background: color-mix(in srgb, #fb7185 16%, transparent); color: #fda4af; }
 .tone-lime { background: color-mix(in srgb, #84cc16 16%, transparent); color: #bef264; }
+.tone-neutral { color: var(--app-muted); }
 
 /* dependencies */
 .ab-search {
@@ -130,3 +132,15 @@
   .ab-slogan { color: #0f766e; }
 }
 @media (prefers-reduced-motion: reduce) { .ab-release > summary::before { transition: none; } }
+
+/* Inside Settings the page sits in .acc, whose element rules (h2, p, button,
+   input, section) are more specific than single classes; restate ours. */
+.ab .ab-card-h { margin: 0 0 16px; font: 600 17px var(--ab-display); letter-spacing: -0.01em; text-transform: none; color: var(--app-text); }
+.ab .ab-sys, .ab .ab-wide { display: block; }
+.ab .ab-note { margin: 12px 0 0; }
+.ab .ab-blurb { margin: 14px 0 0; }
+.ab .ab-inline-link { padding: 0; border: 0; border-radius: 0; background: none; color: var(--app-accent); font-size: 13px; justify-self: auto; }
+.ab .ab-tabs button { justify-self: stretch; border-radius: 0; border: 0; border-bottom: 2px solid transparent; background: none; padding: 14px 12px; font-size: 15px; color: var(--app-muted); }
+.ab .ab-tabs button:hover { color: var(--app-text); }
+.ab .ab-tabs button.on { color: var(--app-text); border-bottom-color: var(--app-accent); }
+.ab .ab-search { font-size: 14px; padding: 9px 12px; border-radius: 10px; background: var(--app-bg); }

@@ -280,12 +280,21 @@ export function addSettingsTab(t: { id: string; label: string; render: () => Com
   extraTabs = [...extraTabs.filter((x) => x.id !== t.id), t];
 }
 
+function AboutTab() {
+  const [About, setAbout] = useState<null | ((p: { embedded?: boolean }) => ComponentChildren)>(null);
+  useEffect(() => {
+    import("./about").then((x) => setAbout(() => x.About));
+  }, []);
+  return About ? <About embedded /> : null;
+}
+
 function Settings({ m }: { m: Me }) {
   const [tab, setTab] = useState<string>(location.hash.slice(1) || "users");
   useEffect(() => {
     history.replaceState(null, "", `#${tab}`);
   }, [tab]);
-  const tabs = [...baseTabs, ...extraTabs.map(({ id, label }) => ({ id, label }))];
+  // About is always the last tab, after the ones settings modules add.
+  const tabs = [...baseTabs, ...extraTabs.map(({ id, label }) => ({ id, label })), { id: "about", label: "About" }];
   const extra = extraTabs.find((t) => t.id === tab);
   return (
     <Shell title="Settings" wide>
@@ -300,6 +309,7 @@ function Settings({ m }: { m: Me }) {
       {tab === "sso" && <SSO />}
       {tab === "general" && <General />}
       {extra && extra.render()}
+      {tab === "about" && <AboutTab />}
     </Shell>
   );
 }

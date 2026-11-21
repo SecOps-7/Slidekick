@@ -71,10 +71,19 @@ function uptime(sec: number): string {
   return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-// Each changelog section gets a steady colour by name, so the same topic is
-// the same colour in every release.
-const TONES = ["teal", "violet", "amber", "sky", "rose", "lime"];
-const tone = (s: string) => TONES[[...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % TONES.length];
+// A note's badge is its change type, the changelog heading it sits under.
+// An unknown heading gets the neutral pill rather than a wrong colour.
+const KIND_TONE: Record<string, string> = {
+  new: "teal",
+  added: "teal",
+  changed: "sky",
+  fixed: "amber",
+  security: "rose",
+  removed: "rose",
+  deprecated: "lime",
+  internal: "violet",
+};
+const tone = (kind: string) => KIND_TONE[kind.trim().toLowerCase()] ?? "neutral";
 
 function Releases({ list }: { list: Release[] }) {
   if (!list.length) return <p class="ab-empty">No release notes are packaged with this build.</p>;
@@ -145,7 +154,8 @@ function Deps({ list }: { list: Dep[] }) {
   );
 }
 
-export function About() {
+/** The about page; `embedded` drops the page title and back link (Settings > About). */
+export function About({ embedded = false }: { embedded?: boolean }) {
   const [info, setInfo] = useState<Info | null>(null);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<"notes" | "deps">("notes");
@@ -158,11 +168,15 @@ export function About() {
   const rt = info?.runtime;
 
   return (
-    <main class="ab">
-      <a href="/" class="ab-back">
-        ← Your decks
-      </a>
-      <h1 class="ab-h1">About</h1>
+    <div class={`ab ${embedded ? "ab-embedded" : ""}`}>
+      {!embedded && (
+        <>
+          <a href="/" class="ab-back">
+            ← Your decks
+          </a>
+          <h1 class="ab-h1">About</h1>
+        </>
+      )}
       {failed && <p class="ab-empty">Couldn't load the details for this install. Reload to try again.</p>}
 
       <div class="ab-top">
@@ -252,6 +266,6 @@ export function About() {
         </div>
         <div role="tabpanel">{tab === "notes" ? <Releases list={info?.releases ?? []} /> : <Deps list={deps} />}</div>
       </section>
-    </main>
+    </div>
   );
 }
