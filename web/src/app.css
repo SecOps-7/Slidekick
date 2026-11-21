@@ -31,11 +31,21 @@ body {
 button { font: inherit; }
 
 /* ---- home ---- */
-.home { max-width: 960px; margin: 0 auto; padding: 64px 16px 96px; display: grid; gap: 48px; }
+/* The home page fills the window: fluid side margins, and on wide screens the
+   deck grid gets the main column with "connect an agent" beside it. */
+.home {
+  padding: clamp(28px, 4vw, 72px) clamp(16px, 4vw, 80px) clamp(48px, 6vw, 96px);
+  display: grid; gap: clamp(32px, 3.5vw, 56px); grid-template-columns: minmax(0, 1fr); align-items: start;
+}
+@media (min-width: 1100px) {
+  .home { grid-template-columns: minmax(0, 1fr) clamp(320px, 27vw, 480px); column-gap: clamp(32px, 3vw, 64px); }
+  .home-head { grid-column: 1 / -1; }
+  .home-connect { position: sticky; top: 24px; padding: 20px; border-radius: 14px; background: var(--app-panel); border: 1px solid var(--app-line); }
+}
 .home-head h1 { margin: 0; font-size: 44px; letter-spacing: -0.03em; }
 .home-head p { margin: 6px 0 0; color: var(--app-muted); font-size: 18px; }
 .home h2 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--app-muted); margin: 0 0 14px; }
-.deck-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.deck-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: clamp(12px, 1vw, 18px); }
 .deck-card {
   display: grid;
   gap: 6px;
@@ -252,3 +262,18 @@ button { font: inherit; }
 .hud-home svg { width: 22px; height: 22px; display: block; }
 .deck-delete { font: inherit; font-size: inherit; border: 0; background: none; padding: 0; color: var(--app-err); cursor: pointer; text-decoration: none; }
 .deck-delete:hover { text-decoration: underline; }
+
+/* Scale the page chrome on large and 4K monitors so text keeps a comfortable
+   size relative to the screen. The editor, viewer and presenter size their
+   own stage, so they're left alone. */
+/* Roughly proportional to width beyond ~1600px (a 4K screen gets about 2.3x). */
+@media (min-width: 1700px) { body.home-page, body.acc-page { zoom: 1.08; } }
+@media (min-width: 1900px) { body.home-page, body.acc-page { zoom: 1.2; } }
+@media (min-width: 2200px) { body.home-page, body.acc-page { zoom: 1.38; } }
+@media (min-width: 2500px) { body.home-page, body.acc-page { zoom: 1.56; } }
+@media (min-width: 2900px) { body.home-page, body.acc-page { zoom: 1.8; } }
+@media (min-width: 3300px) { body.home-page, body.acc-page { zoom: 2.05; } }
+@media (min-width: 3700px) { body.home-page, body.acc-page { zoom: 2.3; } }
+/* The Copy button sits above the command, so scrolled text never hides under it. */
+.cmd { display: grid; gap: 6px; }
+.cmd .copy { position: static; justify-self: end; order: -1; }

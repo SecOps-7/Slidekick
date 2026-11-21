@@ -205,7 +205,7 @@ function Account({ m }: { m: Me }) {
     }
   };
   return (
-    <Shell title="Your account">
+    <Shell title="Your account" wide>
       <p class="acc-lead">
         Signed in as <b>{u.username}</b> ({u.role}).{" "}
         <button class="acc-link" onClick={() => signOut()}>
