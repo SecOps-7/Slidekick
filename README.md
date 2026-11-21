@@ -159,7 +159,7 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
 | 🎤 **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer, an audience window and remote followers. |
 | 📚 **Library** | Every deck shown as a live miniature of its first slide in its own theme, with search, sort, All/Mine and quick actions. |
 | 🔐 **Accounts** | Admin, editor and viewer roles, enforced on every route, the live WebSocket and MCP. Password sign-in (argon2id) and single sign-on with OpenID Connect (Entra, Google, Authentik, Keycloak), several providers at once. Personal agent tokens and per-deck edit tokens. |
-| 🔗 **Sharing** | Two kinds of link: a **viewer link** watches the deck with no controls but Fullscreen, and a **presenter link** presents it without signing in (slides, laser, AI voice, casting). Links can expire after 30 minutes to 24 hours, or never; **Make new links** revokes them all. New decks are private: only signed-in people and link holders can watch. |
+| 🔗 **Sharing** | Two kinds of link: a **viewer link** watches the deck with no controls but Fullscreen (or, with **Loop**, plays it on repeat for kiosk screens), and a **presenter link** presents it without signing in (slides, laser, AI voice, casting). Links can expire after 30 minutes to 24 hours, or never; **Make new links** revokes them all. New decks are private: only signed-in people and link holders can watch. |
 | 📦 **Export** | Standalone HTML that plays offline with every animation, PDF, or PNGs. |
 | ℹ️ **About** | Settings → About shows the build, the system it runs on, these release notes, and every Go module, web library and font in the build with its licence. |
 

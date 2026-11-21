@@ -2,7 +2,7 @@
 // agent changes streaming in live. Undo and redo walk the shared version
 // history, so they cover agent and human edits alike.
 import { copyText } from "../ui/clipboard";
-import { copyShareLink, LINK_KINDS, LINK_TTLS, type LinkKind } from "../share-links";
+import { copyShareLink, LINK_KINDS, LINK_TTLS, LOOP_SECONDS, type LinkKind } from "../share-links";
 import { confirmModal } from "../ui/modal";
 import { render } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -422,6 +422,8 @@ function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Ac
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState("");
   const [ttl, setTtl] = useState(0); // minutes; 0: links don't expire
+  const [loop, setLoop] = useState(false); // viewer links that play the deck by itself (kiosk)
+  const [loopSecs, setLoopSecs] = useState(LOOP_SECONDS[0]);
   if (!access) return null;
   const run = async (f: () => Promise<void>) => {
     try {
@@ -436,7 +438,7 @@ function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Ac
   const origin = location.origin;
   const share = (kind: LinkKind) =>
     run(async () => {
-      const msg = await copyShareLink(api.deckId, document.title.replace(/^.*· /, ""), kind, ttl);
+      const msg = await copyShareLink(api.deckId, document.title.replace(/^.*· /, ""), kind, ttl, loop ? loopSecs : 0);
       if (msg) say(msg);
     });
   return (
@@ -470,6 +472,21 @@ function ShareMenu({ api, access, admin, onChange, say }: { api: Api; access: Ac
                   {LINK_KINDS[kind].about}
                   {kind === "view" && !access.private && " This deck is public, so its viewer link never expires."}
                 </small>
+                {kind === "view" && (
+                  <div class="sk-loop">
+                    <label class="sk-loop-box">
+                      <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.currentTarget.checked)} /> Loop
+                    </label>
+                    <select class="sk-loop-secs" aria-label="Seconds per slide" disabled={!loop} value={loopSecs} onChange={(e) => setLoopSecs(Number(e.currentTarget.value))}>
+                      {LOOP_SECONDS.map((s) => (
+                        <option key={s} value={s}>
+                          {s} s per slide
+                        </option>
+                      ))}
+                    </select>
+                    <small>Plays the deck by itself, over and over: for kiosk screens.</small>
+                  </div>
+                )}
               </div>
               <button type="button" class="ed-btn" onClick={() => share(kind)}>
                 Copy

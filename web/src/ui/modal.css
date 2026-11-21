@@ -36,3 +36,10 @@
 .skm-link .skm-btn { flex: none; }
 .skm :focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .skm[open] { animation: none; } }
+
+/* Loop (kiosk) option under the viewer link, in the editor's Share menu and the library's share dialog. */
+.sk-loop { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 6px; }
+.sk-loop-box { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.sk-loop-secs { padding: 3px 6px; border-radius: 6px; border: 1px solid var(--ed-line, var(--app-line)); background: var(--ed-bg, var(--app-bg)); color: var(--ed-text, var(--app-text)); font: inherit; font-size: 12px; }
+.sk-loop-secs:disabled { opacity: 0.5; }
+.sk-loop small { flex-basis: 100%; }

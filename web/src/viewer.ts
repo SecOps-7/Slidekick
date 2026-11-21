@@ -44,6 +44,13 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   let deck = initial.deck;
   let version = initial.version;
   let follow = true;
+  // Kiosk loop (?loop=<seconds per slide>, from a viewer link made with Loop):
+  // plays the deck by itself, over and over, instead of following a presenter,
+  // and stays silent.
+  const loopParam = new URLSearchParams(location.search).get("loop");
+  const looping = loopParam !== null;
+  const loopSecs = Number(loopParam) >= 3 ? Math.min(600, Number(loopParam)) : 10;
+  if (looping) follow = false;
 
   const player = new Player(host, catalog);
   player.setDeck(deck);
@@ -108,6 +115,25 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   // ---- initial position from the URL hash (#slide or #slide.build) ----
   const m = /^#(\d+)(?:\.(\d+))?$/.exec(location.hash);
   await player.goto(m ? Number(m[1]) - 1 : 0, m?.[2] ? Number(m[2]) : 0, { animate: false });
+
+  // ---- kiosk loop: builds every 1.5 s, each slide held for loopSecs, then from the top ----
+  if (looping) {
+    const BUILD_GAP = 1500;
+    const wait = () => {
+      const p = player.position;
+      return p.step < p.maxStep ? BUILD_GAP : loopSecs * 1000;
+    };
+    const step = async () => {
+      const p = player.position;
+      try {
+        if (p.step < p.maxStep || p.index < p.count - 1) await player.next();
+        else await player.goto(0, 0);
+      } finally {
+        window.setTimeout(step, wait());
+      }
+    };
+    window.setTimeout(step, wait());
+  }
 
   // ---- navigation ----
   addEventListener("keydown", (e) => {
@@ -190,7 +216,7 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     // The audience window is the room's speaker (the presenter view goes quiet
     // while it is open), so it reports lines as heard; remote viewers don't.
     ack: audience,
-    audible: true,
+    audible: !looping,
     captions: false,
     // A browser that blocks sound in the audience window until someone clicks
     // in it hands the voice back to the presenter view meanwhile.
