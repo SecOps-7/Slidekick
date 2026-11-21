@@ -94,7 +94,7 @@ Agents authenticate MCP with a bearer token:
 
 `SLIDEKICK_TOKEN` is an all-powerful emergency key: whoever holds it can read, change and delete every deck, manage every user and setting, and act over MCP without any account. It stays configured as a backstop (decided 2026-11-20) for when nobody can sign in, and as the setup code for the first admin. Day-to-day agents use personal tokens instead.
 
-- **Where it lives:** only in the deployment's owner-only env file, the one named by `env_file:` in the compose file (in the reference deployment `/opt/slidekick/slidekick.env`, mode 600, folder 700). Never in the compose file, the stack's `.env`, the repository, shell history or chat.
+- **Where it lives:** only in the deployment's owner-only env file, the one named by `env_file:` in the compose file (for example `/opt/slidekick/slidekick.env`, mode 600, in a folder only its owner can open). Never in the compose file, the stack's `.env`, the repository, shell history or chat.
 - **Using it without showing it:** read it from that file in the same command, e.g. ``T=$(sed -n 's/^SLIDEKICK_TOKEN=//p' /opt/slidekick/slidekick.env); curl -H "Authorization: Bearer $T" ...; unset T``. Slidekick never logs or displays it.
 - **Rotating it:** put a new value (`openssl rand -hex 24`) in that file and recreate the container; the old one stops working at once.
 

@@ -1,6 +1,9 @@
-# Slidekick stack. Install to /opt/slidekick/compose.yaml.
-# Secrets live in /opt/slidekick/slidekick.env (mode 600): SLIDEKICK_TOKEN, the
-# all-powerful emergency server token, and optionally SLIDEKICK_SECRET_KEY.
+# Example stack that builds Slidekick from source. Clone the repository to
+# /opt/slidekick/src and put this file at /opt/slidekick/compose.yaml (adjust the
+# paths to taste). Secrets live in /opt/slidekick/slidekick.env (mode 600, never
+# in this file): SLIDEKICK_TOKEN, the all-powerful emergency server token, and
+# optionally SLIDEKICK_SECRET_KEY. To run a published image instead, replace
+# `build:` with `image: ghcr.io/secops-7/slidekick:1-render`.
 services:
   slidekick:
     build:
@@ -18,7 +21,7 @@ services:
       SLIDEKICK_ADDR: ":7410"
       SLIDEKICK_DATA: /data
       SLIDEKICK_BASE_URL: ${SLIDEKICK_BASE_URL:-http://localhost:7410}
-      # The LAN address of the TLS proxy (Nginx Proxy Manager). Only it may set the
+      # The LAN address of your TLS reverse proxy. Only it may set the
       # client address and https headers. Empty: no proxy trusted (plain LAN http).
       SLIDEKICK_TRUSTED_PROXIES: ${SLIDEKICK_TRUSTED_PROXIES:-}
     volumes:
