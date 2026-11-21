@@ -7,6 +7,7 @@ import { markSVG } from "./brand/brand";
 import { Laser } from "./laser";
 import { viewFetch } from "./key";
 import { Live, type PointerMsg, type PresentMsg } from "./sync";
+import { followTo, Narrator, slideIndex } from "./narrate";
 
 interface DeckResponse {
   version: number;
@@ -81,7 +82,13 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   edit.href = `/d/${encodeURIComponent(deckId)}/edit`;
   const present = el("a", "hud-btn", "Present");
   present.href = `/d/${encodeURIComponent(deckId)}/present`;
-  hud.append(title, pos, live, lint, followBtn, fsBtn, edit, present, home);
+  // AI narration: the viewer follows silently; these appear once a narrated
+  // presentation is seen. Unmuting plays it here too (only presenting
+  // screens report lines as heard, so this never paces the presentation).
+  const soundBtn = el("button", "hud-btn nr-toggle", "Unmute narration");
+  const capBtn = el("button", "hud-btn nr-toggle", "Captions");
+  [soundBtn, capBtn].forEach((b) => ((b.type = "button"), (b.hidden = true)));
+  hud.append(title, pos, live, lint, followBtn, soundBtn, capBtn, fsBtn, edit, present, home);
   // Audience window (opened by the presenter): no chrome, always follows.
   const audience = new URLSearchParams(location.search).has("audience");
   if (audience) document.body.classList.add("sk-audience", "hud-hidden");
@@ -239,6 +246,38 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
 
   // Presenter: jump (with the right animation) to wherever the presenter is.
   const laser = new Laser(player.stage);
+  const narrator = new Narrator({
+    deckId,
+    host: document.body,
+    ack: false,
+    audible: false,
+    captions: true,
+    show: (index, build, slideId) => {
+      if (!follow && !audience) return;
+      return followTo(player, slideIndex(deck.slides, index, slideId), build);
+    },
+  });
+  const showNarrationControls = () => {
+    if (audience) return;
+    soundBtn.hidden = capBtn.hidden = false;
+  };
+  const setSound = (on: boolean) => {
+    narrator.setAudible(on);
+    soundBtn.textContent = on ? "Mute narration" : "Unmute narration";
+    soundBtn.setAttribute("aria-pressed", String(on));
+  };
+  const setCaptions = (on: boolean) => {
+    narrator.setCaptions(on);
+    capBtn.setAttribute("aria-pressed", String(on));
+  };
+  setSound(false);
+  setCaptions(true);
+  soundBtn.onclick = () => setSound(!narrator.audible);
+  capBtn.onclick = () => setCaptions(!narrator.captions);
+  viewFetch(`/api/decks/${encodeURIComponent(deckId)}/present`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((st: { running?: boolean } | null) => st?.running && showNarrationControls())
+    .catch(() => {});
   const followPresenter = async (m: PresentMsg) => {
     if (!follow && !audience) return;
     const p = player.position;
@@ -254,6 +293,7 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     async (msg) => {
       if (msg.type === "hello" && msg.version !== version) await reload();
       else if (msg.type === "patch") await onPatch(msg as unknown as PatchEvent);
+      else if (narrator.handle(msg)) showNarrationControls();
       else if (msg.type === "present") await followPresenter(msg as unknown as PresentMsg);
       else if (msg.type === "denied") say("This deck is now private: ask for a new link");
       else if (msg.type === "deleted") {

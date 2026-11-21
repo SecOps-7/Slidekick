@@ -26,6 +26,16 @@ export interface Access {
   shareUrl: string;
 }
 
+/** An AI-narrated presentation of the deck (see internal/presenting). */
+export interface PresentStatus {
+  running: boolean;
+  slide: number;
+  build: number;
+  slides: number;
+  actor?: string;
+  error?: string;
+}
+
 export interface WriteResult {
   version: number;
   changed?: string[];
@@ -78,6 +88,8 @@ export class Api {
   setAccess = (priv: boolean, rotate = false) => this.req<Access>("POST", `${this.base}/access`, { private: priv, rotate });
   issueEditToken = () => this.req<{ token: string }>("POST", `${this.base}/edit-token`);
   revokeEditToken = () => this.req<{ ok: boolean }>("DELETE", `${this.base}/edit-token`);
+  presentStatus = () => this.req<PresentStatus>("GET", `${this.base}/present`);
+  stopPresent = () => this.req<{ stopped: boolean }>("DELETE", `${this.base}/present`);
   upload = (file: File) =>
     this.req<{ url: string }>("POST", `/api/files?name=${encodeURIComponent(file.name)}`, file, { "Content-Type": file.type || "application/octet-stream" });
 }

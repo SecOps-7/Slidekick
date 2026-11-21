@@ -24,6 +24,8 @@ import (
 	"github.com/SecOps-7/slidekick/internal/authz"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
+	"github.com/SecOps-7/slidekick/internal/narration"
+	"github.com/SecOps-7/slidekick/internal/presenting"
 	"github.com/SecOps-7/slidekick/internal/service"
 	"github.com/SecOps-7/slidekick/internal/store"
 )
@@ -32,7 +34,10 @@ type Options struct {
 	Token    string // server token (SLIDEKICK_TOKEN): full access for automation and recovery
 	BaseURL  string // public URL: Secure cookies when https, SSO redirect URLs, origin checks
 	Accounts *accounts.Service
-	AI       *ai.Service // nil: no AI chat
+	AI       *ai.Service        // nil: no AI chat
+	TTS      *narration.Service // nil: no text-to-speech providers
+	// Presenter runs AI-narrated presentations; nil: no presenting routes.
+	Presenter *presenting.Manager
 	// TrustedProxies are the addresses of a TLS-terminating reverse proxy.
 	// Only requests from them may set X-Real-IP / X-Forwarded-For (the client
 	// address used for lockouts) and X-Forwarded-Proto (https -> Secure cookies).
@@ -85,6 +90,9 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux.Handle("POST /api/files", s.require(authz.Upload, false, s.uploadFile))
 	s.accountRoutes(mux)
 	s.aiRoutes(mux)
+	s.castRoutes(mux)
+	s.ttsRoutes(mux)
+	s.presentRoutes(mux)
 	mux.HandleFunc("GET /files/{name}", s.serveFile)
 	mux.HandleFunc("GET /ws/decks/{id}", s.ws)
 	mux.HandleFunc("GET /schema/deck.schema.json", func(w http.ResponseWriter, r *http.Request) {

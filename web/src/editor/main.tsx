@@ -13,6 +13,8 @@ import { Live } from "../sync";
 import { withKey } from "../key";
 import { Api, ApiError, type Access, type Comment } from "./api";
 import { Canvas } from "./canvas";
+import { CastButton } from "./cast";
+import type { CastMenu } from "../cast-menu";
 import { markSVG } from "../brand/brand";
 import { ChatPanel } from "./chat";
 import { checkPatch } from "./check";
@@ -20,6 +22,7 @@ import { elPath, findEl, slidePath, slideTemplate, stripIds } from "./ops";
 import { Panel } from "./panel";
 import { Sorter } from "./sorter";
 import { Timeline } from "./timeline";
+import { isNarration, slideIndex as narratedIndex } from "../narrate";
 import "./editor.css";
 
 type Cat = Catalog & { icons: string[]; elements: Record<string, string> };
@@ -43,6 +46,10 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
   const [admin, setAdmin] = useState(false);
   const [canAI, setCanAI] = useState(false);
   const [chat, setChat] = useState(false);
+  // AI presentation running on this deck: the slide it's on, for the status chip.
+  const [narrating, setNarrating] = useState<{ slide: number; slides: number } | null>(null);
+  const [canStopNarration, setCanStopNarration] = useState(false);
+  const castRef = useRef<CastMenu | null>(null);
   const followRef = useRef(followAgent);
   followRef.current = followAgent;
   useEffect(() => {
@@ -50,7 +57,9 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
     api.me().then((m) => {
       setAdmin(Boolean(m.can["deck:deck-token"]));
       setCanAI(Boolean(m.can.ai));
+      setCanStopNarration(Boolean(m.can.narrate && m.can["deck:share"]));
     }, () => {});
+    api.presentStatus().then((st) => st.running && setNarrating({ slide: st.slide || 1, slides: st.slides }), () => {});
   }, []);
   const key = access?.private ? access.viewKey : "";
 
@@ -120,6 +129,17 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
       async (m) => {
         if (m.type === "hello" && m.version !== versionRef.current) await reload();
         if (m.type === "comments") loadComments();
+        castRef.current?.onEvent(m);
+        // An AI presenting the deck: follow its slides silently (presenting screens play the voice).
+        if (isNarration(m)) {
+          if (m.state === "step") {
+            const i = narratedIndex(deckRef.current.slides, m.index, m.slideId);
+            setNarrating({ slide: i + 1, slides: deckRef.current.slides.length });
+            if (followRef.current && deckRef.current.slides[i]) setSlideId(deckRef.current.slides[i].id);
+          } else if (m.state === "started") setNarrating({ slide: 0, slides: deckRef.current.slides.length });
+          else setNarrating(null);
+          return;
+        }
         if (m.type === "deleted") {
           say("This deck was deleted. Returning to all decks…");
           setTimeout(() => location.assign("/"), 2500);
@@ -306,6 +326,27 @@ function Editor({ api, cat, initial }: { api: Api; cat: Cat; initial: { version:
         )}
         <ShareMenu api={api} access={access} admin={admin} onChange={setAccess} say={say} />
         <ExportMenu api={api} say={say} viewKey={key ?? ""} />
+        {narrating && (
+          <span class="ed-narrating" role="status">
+            <span class="ed-narrating-dot" aria-hidden="true" />
+            {narrating.slide ? `AI presenting · slide ${narrating.slide} of ${narrating.slides}` : "AI presenting"}
+            {canStopNarration && (
+              <button
+                type="button"
+                class="ed-narrating-stop"
+                onClick={() =>
+                  api.stopPresent().then(
+                    () => setNarrating(null),
+                    (e: Error) => say(`Couldn't stop: ${e.message}`),
+                  )
+                }
+              >
+                Stop
+              </button>
+            )}
+          </span>
+        )}
+        <CastButton deckId={api.deckId} say={say} menuRef={castRef} />
         <a class="ed-btn primary" href={`/d/${api.deckId}/present#${slideIndex + 1}`} target="_blank" rel="noopener">
           ▶ Present
         </a>

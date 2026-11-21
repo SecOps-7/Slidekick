@@ -130,6 +130,42 @@ How it stays safe:
 
 Providers bill by usage; the chat sends the design guide, the layout list and the tool definitions with each request.
 
+## Voices (text-to-speech)
+
+Narration reads speaker notes aloud. Admins set up voices under **Settings → Voices**: connect providers, load each one's voice list, **Play sample**, and pick the **default for narration** (provider and voice). Keys are handled exactly like AI provider keys: stored encrypted, never sent to the browser, removed from errors, and each provider's client can reach only its own base URL. Every engine is asked for MP3.
+
+| Provider | Needs | Voice |
+|---|---|---|
+| **Browser voices (free)** | Nothing. Built in; the presenter's browser speaks with its own voices (`speechSynthesis`), so quality and choice depend on the browser and OS. The server never calls anything. | A voice name the browser offers |
+| **Fish Audio** | API key from fish.audio. Model: `s1`, `s2-pro`, `s2.1-pro` (default) or `s2.1-pro-free`. | A voice model id (`reference_id`), listed from your own and popular public models |
+| **ElevenLabs** | API key. Model defaults to `eleven_multilingual_v2`. | A voice id from your voice library |
+| **OpenAI** | API key. Model defaults to `gpt-4o-mini-tts` (`tts-1`, `tts-1-hd` also work). | alloy, ash, ballad, cedar, coral, echo, fable, marin, nova, onyx, sage, shimmer, verse |
+| **Cartesia** | API key. Model defaults to `sonic-3.6`. | A voice id from your Cartesia voices |
+| **Deepgram Aura** | API key. | The Aura model is the voice, e.g. `aura-2-thalia-en` |
+| **OpenAI-compatible (self-hosted)** | Base URL of a server speaking OpenAI's `/v1/audio/speech`: Kokoro-FastAPI (`http://host:8880/v1`, model `kokoro`), openedai-speech / Piper (model `tts-1`), LocalAI (your model name). Key optional. | Whatever the server offers; Kokoro's list is loaded from `/v1/audio/voices`, others get the OpenAI names, which they map to their own voices |
+
+Editors and admins can list voices (`GET /api/tts/voices?provider=`). Long notes are split at sentence ends to fit each provider's limit (4,000 characters per request, 2,000 for Deepgram; 20,000 per narration). Generated audio is kept in memory for 30 minutes after its last use and served from an unguessable URL (`/api/tts/audio/<hash>.mp3`) so a cast receiver can play it without signing in. Providers bill per character.
+
+## Casting to a TV
+
+Slidekick can show a deck on a Chromecast (or a TV with Chromecast built in) on your network. The server talks to the device itself, over the Cast protocol (TLS on TCP port 8009), and tells it to open the deck's **cast view**: `<SLIDEKICK_BASE_URL>/d/<deck id>/present?k=<view key>&cast=1`. That page shows only the slides, with no controls and no cursor, and follows whoever drives the deck: the presenter view, and agents or the AI bringing a slide into view. It keeps reconnecting on its own. The view key in the link lets a private deck open on the TV without anyone signing in there.
+
+- **LAN only.** Nothing is exposed to the internet: no port forward, tunnel or public URL is needed or used.
+- **Add devices:** admins go to **Settings → Cast devices** and enter a name ("Living room TV") and the device's IP address (shown in the Google Home app under the device's settings; give it a fixed address in your router). The port is 8009 unless you say otherwise. Editors never type addresses: they choose from this list.
+- **Find devices** looks for Chromecasts with mDNS for two seconds. mDNS is multicast, which doesn't cross Docker's default bridge network, so in a normal container it finds nothing and adding by IP is the way. For discovery, run the container with `network_mode: host` (or on a macvlan network with its own LAN address). Casting itself works from the bridge network: it's an ordinary outgoing TCP connection.
+- **The base URL must be reachable from the TV.** The TV opens `SLIDEKICK_BASE_URL` itself, so it can't be `localhost`: Slidekick refuses to cast with a loopback base URL and says so. Use the server's LAN address (`http://192.168.1.10:7410`) or a LAN hostname the TV can resolve. Chromecasts often use Google's public DNS rather than your router's, so an internal-only hostname may not resolve there; the LAN IP always works. Plain http is fine.
+- **Outbound from the TV:** the TV loads the small DashCast receiver page (the public receiver app catt uses, app id `84912283`) from the internet, then navigates to your base URL on the LAN. Slidekick only sends it the deck link.
+- **Who can cast:** whoever may share a deck (its owner, admins, its deck edit token) starts and stops casting from the **Cast** button in the editor toolbar or the presenter view; everyone with the deck open sees "Casting to Living room TV". A device shows one deck at a time: casting another deck to it takes the first one off. Viewers can't cast.
+
+## AI presenting
+
+An AI can present a deck out loud: it moves through the slides and their build steps and speaks in the narration voice (see Voices above).
+
+- **Where the voice plays.** Only presenting screens play it: the **presenter view** (`/d/<id>/present`) and a **cast TV**. They tell the server when each line has finished, which is what paces the presentation; if no presenting screen answers, each step waits for the audio's own length plus a little slack instead. Viewers (`/d/<id>`) and the editor follow the slides silently; the viewer shows **Unmute narration** to hear it there too, and **Captions**. Captions are on in the presenter view and the viewer, off on the TV (add `&captions=1` to the cast link to show them). If the browser blocks sound until someone clicks, the presenter view shows a small **Click to enable sound** button and keeps going meanwhile.
+- **Automatic run.** **Present with AI voice** in the presenter view (or `start_presentation` over MCP, or asking the AI chat to present) speaks each slide's **speaker notes** (the presenter view starts from the slide on screen, or from the beginning when that is the last slide). Blank lines split a slide's notes across its build steps: the first paragraph is said before any build, the next after the first build, and so on. Slides without notes stop it before it starts, with the list of slide numbers; write notes for them (or ask the AI to) first. The editor shows a small "AI presenting" chip with **Stop** while a run is going.
+- **Step by step.** Agents can drive it themselves with `present_slide` (a slide, a build step and a line to say); it returns once the line has been heard, so the agent paces itself on the narration. `presentation_status`, `stop_presentation`, `list_cast_devices`, `cast_deck` and `stop_cast` round it off.
+- **Who may.** Starting and stopping needs the right to share the deck (its owner or an admin) and the narrate permission (editors and admins); deck tokens can't present. HTTP: `POST /api/decks/<id>/present` `{from?, to?, provider?, voice?}` starts (422 with `missingNotes` when slides have no notes), `DELETE` stops, `GET` is the status, and `POST /api/decks/<id>/present/ack` `{seq}` is the presenting screens' "heard it", which needs only view access (the TV uses the view key).
+
 ## TLS on the LAN
 
 Slidekick speaks plain HTTP. Serve it over https through a TLS-terminating reverse proxy on your home network (decided 2026-11-20 for the reference deployment: the existing Nginx Proxy Manager, an internal hostname, **nothing exposed to the internet**: no public DNS record, no tunnel, no port forward).
@@ -155,7 +191,7 @@ Without `SLIDEKICK_TRUSTED_PROXIES`, every client behind a proxy shares the prox
 - **Public links** still exist for decks created before that, and for any deck an owner makes public: anyone with the link (`/d/<id>`, 80-bit random id) can watch it live and download its HTML export, signed in or not. Treat them like unlisted documents.
 - **Private links** carry a key (`/d/<id>?k=<key>`, 96-bit). Without it the deck answers 404, so its id can't even be confirmed. Make a deck private from the editor's **Share** menu or with the `set_deck_access` tool; **Make a new link** rotates the key and disconnects anyone watching with the old one. Signed-in people and token holders for the deck can always view it.
 - **Everything else needs a signed-in account or a token**: editing, presenting to remote viewers, uploads, PDF/PNG export, listing decks, MCP, settings. Tokens are stored as hashes; revoking one, or disabling its user, takes effect on the next request, and an MCP session can't switch to another principal midway.
-- **Stored secrets** (SSO client secrets, AI provider keys) are encrypted with AES-256-GCM under `SLIDEKICK_SECRET_KEY` or the key file, are never sent to the browser and never logged.
+- **Stored secrets** (SSO client secrets, AI and voice provider keys) are encrypted with AES-256-GCM under `SLIDEKICK_SECRET_KEY` or the key file, are never sent to the browser and never logged.
 - **Rendering is sandboxed from your network**: headless Chromium reaches only public internet addresses and Slidekick itself, so deck content can't read internal services through `render_slide`.
 - **Uploads** are content-addressed, type-checked and served with a sandboxing Content-Security-Policy. Their URLs are unguessable (80-bit hashes) but not tied to a deck, so a private deck's images are as private as their links.
 - **The `html` element** (an escape hatch for agents) renders in a sandboxed frame: no scripts, no same-origin access, no forms, and its own CSP allows only https images and fonts.

@@ -29,6 +29,8 @@ import (
 	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/hub"
 	"github.com/SecOps-7/slidekick/internal/mcpserver"
+	"github.com/SecOps-7/slidekick/internal/narration"
+	"github.com/SecOps-7/slidekick/internal/presenting"
 	"github.com/SecOps-7/slidekick/internal/render"
 	"github.com/SecOps-7/slidekick/internal/server"
 	"github.com/SecOps-7/slidekick/internal/service"
@@ -168,7 +170,9 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 	defer rnd.Close()
 	log.Info("slide rendering", "available", rnd.Available())
 
-	mcpSrv := mcpserver.New(svc, slidekick.Schema, version, mcpserver.Options{Renderer: rnd, Exporter: exp,
+	voices := &narration.Service{Store: st, Box: acc.Box}
+	presenter := &presenting.Manager{Deps: presenting.SvcDeps{Svc: svc}, Voice: voices}
+	mcpSrv := mcpserver.New(svc, slidekick.Schema, version, mcpserver.Options{Renderer: rnd, Exporter: exp, Presenter: presenter,
 		Files: func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error) {
 			return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
 		}, Policy: acc.Policy()})
@@ -180,7 +184,8 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
 	}
 	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, Accounts: acc, TrustedProxies: trusted,
-		AI: &ai.Service{Store: st, Box: acc.Box, Accounts: acc, MCPURL: "http://127.0.0.1:" + port + "/mcp"}, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
+		AI:  &ai.Service{Store: st, Box: acc.Box, Accounts: acc, MCPURL: "http://127.0.0.1:" + port + "/mcp"},
+		TTS: voices, Presenter: presenter, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 2 * time.Minute, IdleTimeout: 2 * time.Minute}
 	httpErr := make(chan error, 1)

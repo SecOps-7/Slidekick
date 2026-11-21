@@ -15,6 +15,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 
 	"github.com/SecOps-7/slidekick/internal/blob"
+	"github.com/SecOps-7/slidekick/internal/cast"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/hub"
 	"github.com/SecOps-7/slidekick/internal/lint"
@@ -33,7 +34,10 @@ type Service struct {
 	FilesDir string
 	// Blobs, when set, stores file bytes instead of FilesDir (e.g. S3).
 	Blobs blob.Store
-	mu    sync.Mutex // serialises writes inside this process
+	// Cast drives Chromecasts (see cast.go); made on first use when nil.
+	Cast     *cast.Manager
+	castOnce sync.Once
+	mu       sync.Mutex // serialises writes inside this process
 }
 
 func New(st *store.Store, v *deck.Validator, cat *deck.Catalog, themes *deck.ThemeSet, h *hub.Hub, baseURL string) *Service {

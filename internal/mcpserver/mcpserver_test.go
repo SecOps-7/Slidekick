@@ -10,6 +10,7 @@ import (
 
 	"github.com/SecOps-7/slidekick"
 	"github.com/SecOps-7/slidekick/internal/mcpserver"
+	"github.com/SecOps-7/slidekick/internal/presenting"
 	"github.com/SecOps-7/slidekick/internal/testenv"
 )
 
@@ -53,8 +54,8 @@ func TestAgentLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 21 {
-		t.Fatalf("want 21 tools, got %d", len(tools.Tools))
+	if len(tools.Tools) != 24 { // the presenting tools need Options.Presenter
+		t.Fatalf("want 24 tools, got %d", len(tools.Tools))
 	}
 
 	var deck map[string]any
@@ -118,3 +119,45 @@ func TestAgentLoop(t *testing.T) {
 func testenvExample(t *testing.T) []byte { return testenv.Example(t, "launch.json") }
 
 func mustJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
+
+func TestPresentingToolsListed(t *testing.T) {
+	env := testenv.New(t)
+	m := &presenting.Manager{Deps: presenting.SvcDeps{Svc: env.Svc}}
+	srv := mcpserver.New(env.Svc, slidekick.Schema, "test", mcpserver.Options{Presenter: m})
+	ct, st := mcp.NewInMemoryTransports()
+	ctx := context.Background()
+	if _, err := srv.Connect(ctx, st, nil); err != nil {
+		t.Fatal(err)
+	}
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	tools, err := cs.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	have := map[string]bool{}
+	for _, tl := range tools.Tools {
+		have[tl.Name] = true
+	}
+	for _, n := range []string{"present_slide", "start_presentation", "stop_presentation", "presentation_status", "list_cast_devices", "cast_deck", "stop_cast"} {
+		if !have[n] {
+			t.Errorf("missing tool %s", n)
+		}
+	}
+	if len(tools.Tools) != 28 {
+		t.Fatalf("want 28 tools, got %d", len(tools.Tools))
+	}
+	// The server token (stdio) may present; a deck without notes says how to fix it.
+	res, _ := cs.CallTool(ctx, &mcp.CallToolParams{Name: "create_deck", Arguments: map[string]any{"title": "T", "slides": []any{
+		map[string]any{"layout": "title", "regions": map[string]any{"title": []any{map[string]any{"type": "heading", "props": map[string]any{"text": "Hi"}}}}}}}})
+	b, _ := json.Marshal(res.StructuredContent)
+	var out map[string]any
+	json.Unmarshal(b, &out)
+	res, _ = cs.CallTool(ctx, &mcp.CallToolParams{Name: "start_presentation", Arguments: map[string]any{"deck_id": out["deckId"]}})
+	if !res.IsError || !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "slide 1 has no speaker notes") {
+		t.Fatalf("start: %+v", res.Content)
+	}
+}

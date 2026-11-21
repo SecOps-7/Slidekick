@@ -213,7 +213,13 @@ var chatTools = map[string]bool{
 	"get_deck": true, "add_slide": true, "update_slide": true, "delete_slide": true, "move_slide": true,
 	"patch_deck": true, "set_theme": true, "list_themes": true, "lint_deck": true, "list_comments": true,
 	"resolve_comment": true, "get_history": true, "focus_slide": true,
+	// Presenting with a voice, and showing the deck on a TV the user names.
+	"present_slide": true, "start_presentation": true, "stop_presentation": true, "presentation_status": true,
+	"list_cast_devices": true, "cast_deck": true, "stop_cast": true,
 }
+
+// unpinned tools take no deck_id.
+var unpinned = map[string]bool{"list_themes": true, "list_cast_devices": true}
 
 const systemPrompt = `You are the slide-building assistant inside Slidekick, a self-hosted presentation app. You edit decks only through the tools provided, acting with the permissions of the signed-in user, %[1]s (role: %[2]s).
 
@@ -223,6 +229,13 @@ Work where the user can see it:
 - Read the deck with get_deck before changing it.
 - Before you change or discuss a slide, call focus_slide with its number so the user's editor shows it; do this again each time you move to another slide. When the user names a slide ("slide 4"), that's the one to focus and change. Slide numbers start at 1, in the order shown in the editor.
 - Prefer small precise edits (update_slide, patch_deck), keep element ids so morph transitions keep working, and fix the lint findings each write returns.
+
+Presenting: when the user asks you to present the deck (or "walk me through it", "read it out"):
+- Read the deck with get_deck and check every slide's notes: start_presentation speaks each slide's speaker notes, and blank lines split a slide's notes across its build steps.
+- If some slides have no notes, write a short spoken narration into their notes first (update_slide with fields {"notes": ...}), in the deck's language, a few natural sentences per slide, then call start_presentation. If it still lists slides without notes, fill those too and start again.
+- The narration plays in the presenter view or on a TV. If the user names a TV ("on the living room TV"), call list_cast_devices and cast_deck with that device before starting. Otherwise tell them to open the presenter view to hear it.
+- To improvise instead of reading notes (the user asks you to explain a slide out loud), use present_slide with your own line; it returns once the line has been spoken, so call it again for the next one.
+- stop_presentation ends a run; presentation_status says where it is.
 
 When you're done, reply in a few plain sentences saying what you changed and on which slides.
 
@@ -381,7 +394,7 @@ func (s *Service) callTool(ctx context.Context, cs *mcp.ClientSession, deckID st
 		return "The tool arguments weren't valid JSON.", false, nil
 	}
 	// The chat works on the open deck only, whatever id the model sends.
-	if call.Name != "list_themes" {
+	if !unpinned[call.Name] {
 		if id, ok := args["deck_id"].(string); ok && id != "" && id != deckID {
 			return fmt.Sprintf("Only the open deck (%s) can be changed from this chat.", deckID), false, nil
 		}

@@ -1,0 +1,59 @@
+/* Cast mode: what the TV shows. Slides only, no cursor, no scrollbars. */
+body.sk-cast { overflow: hidden; background: #000; }
+body.sk-cast, body.sk-cast * { cursor: none !important; }
+.cast-note {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 5vw;
+  text-align: center;
+  font: 500 clamp(20px, 3vw, 40px) / 1.3 system-ui, sans-serif;
+  color: #c9cfe0;
+  background: #000;
+}
+
+/* Cast menu (editor toolbar and presenter view). */
+.cast-menu { position: relative; display: inline-block; }
+.cast-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  display: grid;
+  gap: 4px;
+  width: min(300px, 92vw);
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--ed-panel2, #141927);
+  border: 1px solid var(--ed-line, #262d40);
+  color: var(--ed-text, #e8ebf5);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6);
+  font-size: 13px;
+}
+.cast-pop[hidden], .cast-menu[hidden] { display: none; }
+.cast-pop.up { top: auto; bottom: calc(100% + 6px); }
+.cast-pop h4 { margin: 2px 4px 4px; font-size: 12px; font-weight: 600; color: var(--ed-muted, #8b93ab); }
+.cast-pop p { margin: 4px; color: var(--ed-muted, #8b93ab); }
+.cast-pop button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cast-pop button:hover:not(:disabled) { background: var(--ed-bg, #0b0e17); }
+.cast-pop button:disabled { opacity: 0.5; cursor: default; }
+.cast-pop button[aria-checked="true"] { color: var(--ed-accent, #5eead4); }
+.cast-pop button.cast-stop { color: var(--ed-err, #f87171); }
+.cast-pop small { color: var(--ed-muted, #8b93ab); }
+.cast-pop .cast-err { color: var(--ed-err, #f87171); }
+.cast-menu .on { border-color: var(--ed-accent, #5eead4); color: var(--ed-accent, #5eead4); }
+.cast-menu button:focus-visible,
+.cast-pop button:focus-visible { outline: 2px solid var(--ed-accent, #5eead4); outline-offset: 2px; }

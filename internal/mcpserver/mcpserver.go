@@ -22,6 +22,7 @@ import (
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/lint"
+	"github.com/SecOps-7/slidekick/internal/presenting"
 	"github.com/SecOps-7/slidekick/internal/render"
 	"github.com/SecOps-7/slidekick/internal/service"
 	"github.com/SecOps-7/slidekick/internal/store"
@@ -41,6 +42,7 @@ Workflow:
 6. Check your work visually: render_slide returns a screenshot of any slide (when Chromium is installed).
 7. Give the user the url from get_share_url so they can watch or present. export_deck makes a standalone HTML file.
 8. Work where the user can see it: when the user names a slide ("slide 4") or you move on to another slide, call focus_slide first, so their editor and viewer show that slide while you change it. Edits move the view too.
+9. To present a deck with a spoken voice: have the user open the presenter view (the share url + "/present"), or cast_deck to a TV from list_cast_devices; those screens play the narration. Then either start_presentation for a full run that speaks each slide's speaker notes (if it lists slides without notes, write a spoken narration into their notes first and start again; stop_presentation ends it, presentation_status follows it), or drive it yourself with present_slide, one line per call, which returns once the line has been spoken.
 
 Don't write HTML: compose elements (heading, text, bullets, image, code, stat, quote, chart, diagram, icon, shape, embed) inside layout regions. The sandboxed html element is a last resort for something no element can express; lint warns on it; style only with theme tokens. Upload images with upload_asset and use the returned /files/... url.`
 
@@ -52,13 +54,15 @@ type Options struct {
 	Files func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error)
 	// Policy decides what each caller may do (roles, deck owners).
 	Policy authz.Policy
+	// Presenter runs narrated presentations; nil leaves the presenting tools out.
+	Presenter *presenting.Manager
 }
 
 // New builds the MCP server around a deck service.
 func New(svc *service.Service, schemaFS fs.FS, version string, opt Options) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "slidekick", Title: "Slidekick", Version: version},
 		&mcp.ServerOptions{Instructions: instructions})
-	h := &handlers{svc: svc, render: opt.Renderer, export: opt.Exporter, files: opt.Files, policy: opt.Policy}
+	h := &handlers{svc: svc, render: opt.Renderer, export: opt.Exporter, files: opt.Files, policy: opt.Policy, presenter: opt.Presenter}
 	s.AddReceivingMiddleware(h.scopeMiddleware)
 	h.tools(s)
 	resources(s, svc, schemaFS)
@@ -72,6 +76,8 @@ type handlers struct {
 	export *export.Exporter
 	files  func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error)
 	policy authz.Policy
+	// presenter is nil when presenting isn't set up.
+	presenter *presenting.Manager
 }
 
 // ---- tool inputs and outputs ----
@@ -539,6 +545,11 @@ func (h *handlers) tools(s *mcp.Server) {
 			}
 			return nil, &FocusOut{SlideID: out.SlideID, Slide: out.Index + 1, Watching: h.svc.Hub.Count(in.DeckID)}, nil
 		})
+
+	h.castTools(s)
+	if h.presenter != nil {
+		h.presentTools(s)
+	}
 }
 
 type FocusIn struct {

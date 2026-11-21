@@ -67,6 +67,22 @@ var toolActions = map[string]authz.Action{
 	"set_deck_access": authz.Share,
 	"focus_slide":     authz.Edit, // moves everyone's view, so only for people who may change the deck
 	"get_share_url":   authz.View,
+	// Presenting and casting show the deck on screens and TVs, so they need
+	// the right to share it; speaking also needs the narrate permission.
+	"present_slide":       authz.Share,
+	"start_presentation":  authz.Share,
+	"stop_presentation":   authz.Share,
+	"presentation_status": authz.View,
+	"list_cast_devices":   authz.Create, // editors and admins, as in the cast menu
+	"cast_deck":           authz.Share,
+	"stop_cast":           authz.Share,
+}
+
+// alsoNeeds lists a second permission some tools need on top of toolActions.
+var alsoNeeds = map[string]authz.Action{
+	"present_slide":      authz.Narrate,
+	"start_presentation": authz.Narrate,
+	"stop_presentation":  authz.Narrate,
 }
 
 const anyone authz.Action = "any"
@@ -115,6 +131,9 @@ func (h *handlers) scopeMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 			}
 			if !h.allowed(ctx, p, act, id) {
 				return denied("%s", refusal(p, params.Name, act)), nil
+			}
+			if extra, ok := alsoNeeds[params.Name]; ok && !h.allowed(ctx, p, extra, id) {
+				return denied("%s", refusal(p, params.Name, extra)), nil
 			}
 		case *mcp.ReadResourceParams:
 			if rest, ok := strings.CutPrefix(params.URI, "slidekick://decks/"); ok {

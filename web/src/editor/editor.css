@@ -252,3 +252,11 @@
 .ed-chat-input textarea { font: inherit; font-size: 14px; resize: none; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--ed-line); background: var(--ed-bg); color: var(--ed-text); }
 .ed-mark { display: block; line-height: 0; }
 .ed-mark svg { width: 26px; height: 26px; display: block; }
+
+/* AI presentation running: subtle status chip with Stop */
+.ed-narrating { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; border: 1px solid var(--ed-line, #2a3142); font-size: 12px; color: var(--ed-muted, #9aa3b5); white-space: nowrap; }
+.ed-narrating-dot { width: 7px; height: 7px; border-radius: 50%; background: #5eead4; animation: ed-narrating-pulse 1.6s ease-in-out infinite; }
+.ed-narrating-stop { font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--ed-line, #2a3142); background: none; color: inherit; cursor: pointer; }
+.ed-narrating-stop:hover { border-color: #f43f5e; color: #fda4af; }
+@keyframes ed-narrating-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .ed-narrating-dot { animation: none; } }

@@ -1,0 +1,23 @@
+/* AI narration: caption over the slide and the "Click to enable sound" button. */
+.nr-caption {
+  position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); z-index: 30;
+  max-width: min(80%, 60ch); padding: 8px 14px; border-radius: 8px;
+  background: rgba(10, 12, 20, 0.78); color: #f4f6fb; font: 500 clamp(14px, 1.6vw, 22px)/1.4 system-ui, sans-serif;
+  text-align: center; pointer-events: none; white-space: pre-line;
+}
+.nr-enable {
+  position: absolute; right: 12px; top: 12px; z-index: 31;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(10, 12, 20, 0.8); color: #f4f6fb; font: 500 13px/1.2 system-ui, sans-serif; cursor: pointer;
+}
+.nr-enable:hover { border-color: #5eead4; }
+body > .nr-caption, body > .nr-enable { position: fixed; }
+
+/* presenter view: run control and status */
+.pr-ai { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pr-ai-status { color: #8f98b3; font-size: 13px; }
+.pr-ai-status.err { color: #fda4af; }
+.pr-ai .pr-btn[aria-pressed="true"] { border-color: #5eead4; color: #5eead4; }
+
+/* viewer HUD toggles appear once an AI presentation is seen */
+.hud-btn[aria-pressed="true"].nr-toggle { border-color: #5eead4; }

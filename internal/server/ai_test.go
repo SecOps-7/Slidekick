@@ -20,6 +20,7 @@ import (
 	"github.com/SecOps-7/slidekick/internal/ai"
 	"github.com/SecOps-7/slidekick/internal/mcpserver"
 	"github.com/SecOps-7/slidekick/internal/oidc"
+	"github.com/SecOps-7/slidekick/internal/presenting"
 	"github.com/SecOps-7/slidekick/internal/secret"
 	"github.com/SecOps-7/slidekick/internal/server"
 	"github.com/SecOps-7/slidekick/internal/testenv"
@@ -108,12 +109,13 @@ func newAIServer(t *testing.T) *aiEnv {
 	box, _, _ := secret.Load("", t.TempDir())
 	acc := accounts.New(env.Store, box, oidc.NewManager(nil))
 	e := &aiEnv{accEnv: &accEnv{env: env, acc: acc}, llm: newFakeLLM(t), log: &bytes.Buffer{}}
-	mcpSrv := mcpserver.New(env.Svc, slidekick.Schema, "test", mcpserver.Options{Policy: acc.Policy()})
+	pres := &presenting.Manager{Deps: presenting.SvcDeps{Svc: env.Svc}, Slack: 50 * time.Millisecond, Pause: 5 * time.Millisecond}
+	mcpSrv := mcpserver.New(env.Svc, slidekick.Schema, "test", mcpserver.Options{Policy: acc.Policy(), Presenter: pres})
 	e.ts = httptest.NewServer(http.NotFoundHandler())
 	t.Cleanup(e.ts.Close)
 	aiSvc := &ai.Service{Store: env.Store, Box: box, Accounts: acc, MCPURL: e.ts.URL + "/mcp"}
 	var logMu sync.Mutex
-	e.ts.Config.Handler = server.New(env.Svc, mcpSrv, server.Options{BaseURL: e.ts.URL, Accounts: acc, AI: aiSvc, SchemaFS: slidekick.Schema,
+	e.ts.Config.Handler = server.New(env.Svc, mcpSrv, server.Options{BaseURL: e.ts.URL, Accounts: acc, AI: aiSvc, Presenter: pres, SchemaFS: slidekick.Schema,
 		Web: fstest.MapFS{"index.html": {Data: []byte("app")}}, Log: newLockedLogger(e.log, &logMu)})
 	return e
 }
@@ -429,5 +431,54 @@ func TestMentionedSlide(t *testing.T) {
 		if got := ai.MentionedSlide(msg); got != want {
 			t.Errorf("%q: %d, want %d", msg, got, want)
 		}
+	}
+}
+
+func TestAIChatPresents(t *testing.T) {
+	e := newAIServer(t)
+	admin := e.withAdmin(t)
+	e.setupProvider(t, admin)
+	ed := e.addUser(t, admin, "edna", "editor")
+	_, out := ed.do("POST", "/api/decks", map[string]any{"title": "Talk", "slides": oneSlide})
+	id := out["deckId"].(string)
+	d, _, _, _ := e.env.Svc.Get(context.Background(), id)
+	ch, cancel := e.env.Svc.Hub.Subscribe(id)
+	defer cancel()
+
+	// The model finds the slide has no notes, writes them, starts, and looks
+	// for the TV the user named (none are set up).
+	e.llm.script(
+		callTool("start_presentation", map[string]any{"deck_id": id}),
+		callTool("update_slide", map[string]any{"deck_id": id, "slide_id": d.Slides[0].ID, "fields": map[string]any{"notes": "Welcome, everyone."}}),
+		callTool("list_cast_devices", map[string]any{}),
+		callTool("start_presentation", map[string]any{"deck_id": id}),
+		sayText("Presenting now."),
+	)
+	_, evs := ed.chat(id, "Present this deck")
+	var got []string
+	for _, ev := range evs {
+		if ev.Type == "tool_result" {
+			got = append(got, fmt.Sprintf("%s:%v", ev.Tool, ev.OK))
+		}
+	}
+	want := "[start_presentation:false update_slide:true list_cast_devices:true start_presentation:true]"
+	if fmt.Sprint(got) != want {
+		t.Fatalf("tool results %v, want %s (%+v)", got, want, evs)
+	}
+	if b := toJSON(e.llm.seen[1]); !strings.Contains(b, "no speaker notes") {
+		t.Fatalf("the model didn't see the missing notes: %s", b)
+	}
+	for {
+		ev := nextEvent(t, ch, "present")
+		if ev["state"] == "step" {
+			if ev["text"] != "Welcome, everyone." || ev["actor"] != "agent:edna" {
+				t.Fatalf("step %v", ev)
+			}
+			break
+		}
+	}
+	// The system prompt tells the model how to present.
+	if b := toJSON(e.llm.seen[0]); !strings.Contains(b, "start_presentation") || !strings.Contains(b, "present_slide") {
+		t.Fatal("presenting tools or guidance missing from the first request")
 	}
 }

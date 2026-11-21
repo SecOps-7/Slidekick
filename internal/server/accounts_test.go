@@ -48,7 +48,6 @@ func newAccServerWith(t *testing.T, serverToken string, tweak func(*server.Optio
 	}
 	acc := accounts.New(env.Store, box, oidc.NewManager(nil))
 	e := &accEnv{env: env, acc: acc}
-	mcpSrv := mcpserver.New(env.Svc, slidekick.Schema, "test", mcpserver.Options{Policy: acc.Policy()})
 	var h http.Handler
 	e.ts = httptest.NewUnstartedServer(http.NotFoundHandler())
 	e.ts.Start()
@@ -57,6 +56,7 @@ func newAccServerWith(t *testing.T, serverToken string, tweak func(*server.Optio
 	if tweak != nil {
 		tweak(&opt)
 	}
+	mcpSrv := mcpserver.New(env.Svc, slidekick.Schema, "test", mcpserver.Options{Policy: acc.Policy(), Presenter: opt.Presenter})
 	h = server.New(env.Svc, mcpSrv, opt)
 	e.ts.Config.Handler = h
 	t.Cleanup(e.ts.Close)

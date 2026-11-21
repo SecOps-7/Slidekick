@@ -5,10 +5,13 @@ import { Player, type Position } from "../runtime/player";
 import { renderSlide, STAGE } from "../runtime/render";
 import type { Catalog, Deck, PatchEvent } from "../runtime/types";
 import { applyPatch } from "../runtime/patch";
-import { ensureAuth } from "./auth";
+import { authHeaders, currentMe, ensureAuth } from "./auth";
 import { withKey } from "./key";
+import { castMenu } from "./cast-menu";
 import { Laser } from "./laser";
-import { Live } from "./sync";
+import { Live, type LiveMsg } from "./sync";
+import { followTo, Narrator, slideIndex, type NarrationStep } from "./narrate";
+import { alertModal } from "./ui/modal";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
   const n = document.createElement(tag);
@@ -18,6 +21,8 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 };
 
 export async function mountPresenter(host: HTMLElement, deckId: string) {
+  // Cast mode: the page a TV opens when the server casts the deck (no sign-in, no controls).
+  if (new URLSearchParams(location.search).has("cast")) return (await import("./cast")).mountCast(host, deckId);
   document.body.classList.add("pr-page");
   const token = await ensureAuth("present this deck to remote viewers", deckId);
   void token;
@@ -58,8 +63,21 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   const laserBtn = el("button", "pr-btn", "Laser (L)");
   const status = el("span", "pr-status", "connecting");
   [openAud, laserBtn].forEach((b) => (b.type = "button"));
-  controls.append(openAud, laserBtn, status);
-  side.append(nextBox, meta, notes, controls);
+  const cast = castMenu(deckId, { buttonClass: "pr-btn", up: true });
+  controls.append(openAud, laserBtn, cast.el, status);
+  // AI voice: start/stop a narrated run and see where it is.
+  const ai = el("div", "pr-ai");
+  const aiBtn = el("button", "pr-btn", "Present with AI voice");
+  const capBtn = el("button", "pr-btn", "Captions");
+  const aiStatus = el("span", "pr-ai-status");
+  aiStatus.setAttribute("role", "status");
+  [aiBtn, capBtn].forEach((b) => (b.type = "button"));
+  aiBtn.title = "An AI voice reads each slide's speaker notes and moves through the deck";
+  capBtn.title = "Show what the voice says over the slide";
+  const can = currentMe()?.can ?? {};
+  aiBtn.hidden = !(can.narrate && can["deck:share"]);
+  ai.append(aiBtn, capBtn, aiStatus);
+  side.append(nextBox, meta, notes, ai, controls);
   root.append(current, side);
   host.append(root);
 
@@ -67,10 +85,76 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   player.setDeck(deck);
   const laser = new Laser(player.stage);
 
+  // ---- AI narration: this screen plays the voice and reports each line heard ----
+  const narrator = new Narrator({
+    deckId,
+    host: current,
+    ack: true,
+    audible: true,
+    captions: true,
+    show: (index, build, slideId) => followTo(player, slideIndex(deck.slides, index, slideId), build),
+  });
+  const setCaptions = (on: boolean) => {
+    narrator.setCaptions(on);
+    capBtn.setAttribute("aria-pressed", String(on));
+  };
+  setCaptions(true);
+  capBtn.onclick = () => setCaptions(!narrator.captions);
+  const showRun = (running: boolean, text: string, err = false) => {
+    aiBtn.textContent = running ? "Stop AI voice" : "Present with AI voice";
+    aiBtn.classList.toggle("on", running);
+    aiStatus.textContent = text;
+    aiStatus.classList.toggle("err", err);
+  };
+  const onNarration = (m: LiveMsg) => {
+    if (m.state === "started") showRun(true, "Starting the AI voice…");
+    else if (m.state === "step") {
+      const st = m as unknown as NarrationStep;
+      showRun(true, `Narrating slide ${slideIndex(deck.slides, st.index, st.slideId) + 1} of ${deck.slides.length}`);
+    } else if (m.state === "stopped") showRun(false, "AI voice stopped");
+    else if (m.state === "ended") showRun(false, m.error ? `AI voice stopped: ${m.error}` : "AI voice finished", Boolean(m.error));
+  };
+  const presentURL = `/api/decks/${encodeURIComponent(deckId)}/present`;
+  fetch(presentURL, { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((st: { running: boolean; slide: number; slides: number } | null) => {
+      if (st?.running) showRun(true, `Narrating slide ${st.slide || 1} of ${st.slides}`);
+    })
+    .catch(() => {});
+  aiBtn.onclick = async () => {
+    const running = aiBtn.classList.contains("on");
+    aiBtn.disabled = true;
+    try {
+      const r = await fetch(presentURL, {
+        method: running ? "DELETE" : "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        // From the slide on screen; from the start when that's the last one (a run just ended there).
+        body: running ? undefined : JSON.stringify({ from: player.position.index >= deck.slides.length - 1 ? 1 : player.position.index + 1 }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 422 && Array.isArray(data.missingNotes)) {
+        const nums: number[] = data.missingNotes;
+        const list = nums.length === 1 ? `Slide ${nums[0]} has` : `Slides ${nums.slice(0, -1).join(", ")} and ${nums[nums.length - 1]} have`;
+        await alertModal({
+          title: "Some slides have no speaker notes",
+          message: `${list} no speaker notes, so the voice has nothing to say there.\n\nWrite notes for ${nums.length === 1 ? "it" : "them"} in the editor (or ask the AI to write them), then try again. Blank lines split a slide's notes across its build steps.`,
+        });
+      } else if (!r.ok) {
+        await alertModal({ title: running ? "Couldn't stop the AI voice" : "Couldn't start the AI voice", message: data.error ?? `${r.status} ${r.statusText}` });
+      } else if (running) showRun(false, "AI voice stopped");
+    } finally {
+      aiBtn.disabled = false;
+    }
+  };
+
   // ---- live connection: broadcasts our position; follows agent edits ----
   const live = new Live(
     deckId,
     async (m) => {
+      if (narrator.handle(m)) return onNarration(m);
+      cast.onEvent(m);
+      // A TV that just started casting opens on slide 1: tell it where we are once it has loaded.
+      if (m.type === "cast" && m.state === "started") [4000, 8000, 15000].forEach((ms) => setTimeout(() => send(player.position), ms));
       if (m.type !== "patch") return;
       const ev = m as unknown as PatchEvent;
       if (ev.version <= version) return;

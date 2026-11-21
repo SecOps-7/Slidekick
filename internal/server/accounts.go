@@ -116,7 +116,7 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 	out := meOut{SignedIn: a.p.Authenticated(), Kind: string(a.p.Kind), User: a.user, CSRF: a.csrf,
 		SetupNeeded: s.acc.SetupNeeded(r.Context()), OpenMode: a.p.Kind == authz.KindOpen, Can: map[string]bool{}}
 	pol := s.policy()
-	for _, act := range []authz.Action{authz.Create, authz.Upload, authz.UseAI, authz.ManageUsers, authz.ManageSettings, authz.ListDecks} {
+	for _, act := range []authz.Action{authz.Create, authz.Upload, authz.UseAI, authz.Narrate, authz.ManageUsers, authz.ManageSettings, authz.ListDecks} {
 		out.Can[string(act)] = pol.Can(a.p, act, nil)
 	}
 	if id := r.URL.Query().Get("deck"); id != "" && a.p.Authenticated() {

@@ -89,6 +89,7 @@ const (
 	Create         Action = "create"
 	Upload         Action = "upload"
 	UseAI          Action = "ai"
+	Narrate        Action = "narrate" // list voices and speak with the text-to-speech providers
 	ManageUsers    Action = "manage-users"
 	ManageSettings Action = "manage-settings" // sign-in providers, AI providers, instance settings
 	ListDecks      Action = "list"
@@ -132,7 +133,7 @@ func (pol Policy) Can(p Principal, a Action, d *Deck) bool {
 		return true
 	case RoleEditor:
 		switch a {
-		case View, Present, Comment, Export, Create, Upload, UseAI, ListDecks:
+		case View, Present, Comment, Export, Create, Upload, UseAI, Narrate, ListDecks:
 			return true
 		case Edit, Share, MintDeckToken:
 			if d == nil {
