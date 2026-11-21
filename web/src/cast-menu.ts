@@ -1,4 +1,5 @@
-// Cast button: lists the cast devices an admin added, starts and stops
+// Cast button: lists the cast devices (found on the network or saved by an
+// admin), looks for devices again on request, starts and stops
 // casting this deck, and shows "Casting to Living room TV" from the deck's
 // live {"type":"cast"} events (so every open editor and presenter agrees).
 // Used by the editor toolbar and the presenter view.
@@ -9,6 +10,8 @@ import "./cast.css";
 interface CastDevice {
   id: string;
   name: string;
+  /** Found on the network rather than saved by an admin. */
+  auto?: boolean;
 }
 interface Casting {
   deviceId: string;
@@ -63,6 +66,7 @@ export function castMenu(deckId: string, opt: { buttonClass: string; up?: boolea
   let devices: CastDevice[] = [];
   let busy = "";
   let error = "";
+  let looking = false;
 
   const paint = () => {
     btn.textContent = busy ? busy : casting ? `Casting to ${casting.device}` : "Cast";
@@ -70,7 +74,8 @@ export function castMenu(deckId: string, opt: { buttonClass: string; up?: boolea
     btn.disabled = Boolean(busy);
     if (pop.hidden) return;
     const items: HTMLElement[] = [el("h4", undefined, "Cast to a TV")];
-    if (!devices.length) items.push(el("p", undefined, "No cast devices yet. An admin adds them under Settings, Cast devices."));
+    if (!devices.length && !looking)
+      items.push(el("p", undefined, "No cast devices were found on your network. An admin can add one by IP address under Settings, Cast devices."));
     for (const d of devices) {
       const on = casting?.deviceId === d.id;
       const b = el("button");
@@ -82,6 +87,13 @@ export function castMenu(deckId: string, opt: { buttonClass: string; up?: boolea
       b.onclick = () => start(d);
       items.push(b);
     }
+    const again = el("button", "cast-refresh", looking ? "Looking for devices…" : "Refresh");
+    again.type = "button";
+    again.setAttribute("role", "menuitem");
+    again.title = "Look for cast devices on your network again";
+    again.disabled = looking || Boolean(busy);
+    again.onclick = () => lookAgain();
+    items.push(again);
     if (casting) {
       const stop = el("button", "cast-stop", "Stop casting");
       stop.type = "button";
@@ -104,6 +116,23 @@ export function castMenu(deckId: string, opt: { buttonClass: string; up?: boolea
       wrap.hidden = true; // not allowed to cast this deck (or casting is unavailable)
     }
     paint();
+  };
+
+  const lookAgain = async () => {
+    looking = true;
+    error = "";
+    paint();
+    try {
+      const r = await call<{ casting: Casting | null; devices: CastDevice[] }>("POST", `${base}/refresh`);
+      casting = r.casting;
+      devices = r.devices;
+    } catch (e) {
+      error = (e as Error).message;
+    } finally {
+      looking = false;
+      paint();
+      (pop.querySelector(".cast-refresh") as HTMLButtonElement | null)?.focus();
+    }
   };
 
   const close = (focus = false) => {

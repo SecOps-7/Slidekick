@@ -25,6 +25,7 @@ import (
 
 	"github.com/SecOps-7/slidekick"
 	"github.com/SecOps-7/slidekick/internal/ai"
+	"github.com/SecOps-7/slidekick/internal/cast"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/hub"
@@ -144,6 +145,9 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		return err
 	}
 
+	svc.CastDiscovery = castDiscoveryConfig(ctx, baseURL, log)
+	svc.StartCastDiscovery(ctx)
+
 	acc, err := openAccounts(ctx, cmd, st, data, token, log)
 	if err != nil {
 		return err
@@ -171,7 +175,9 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 	log.Info("slide rendering", "available", rnd.Available())
 
 	voices := &narration.Service{Store: st, Box: acc.Box}
-	presenter := &presenting.Manager{Deps: presenting.SvcDeps{Svc: svc}, Voice: voices}
+	aiSvc := &ai.Service{Store: st, Box: acc.Box, Accounts: acc, MCPURL: "http://127.0.0.1:" + port + "/mcp"}
+	// The presenter writes each slide's narration with the instance's AI model.
+	presenter := &presenting.Manager{Deps: presenting.SvcDeps{Svc: svc}, Voice: voices, Writer: &presenting.Scripter{AI: aiSvc}}
 	mcpSrv := mcpserver.New(svc, slidekick.Schema, version, mcpserver.Options{Renderer: rnd, Exporter: exp, Presenter: presenter,
 		Files: func(ctx context.Context, d *deck.Deck, format string) (*store.Asset, error) {
 			return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
@@ -184,7 +190,7 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
 	}
 	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, Accounts: acc, TrustedProxies: trusted,
-		AI:  &ai.Service{Store: st, Box: acc.Box, Accounts: acc, MCPURL: "http://127.0.0.1:" + port + "/mcp"},
+		AI:  aiSvc,
 		TTS: voices, Presenter: presenter, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 2 * time.Minute, IdleTimeout: 2 * time.Minute}
@@ -236,4 +242,25 @@ func isLoopback(addr string) bool {
 	}
 	ip := net.ParseIP(host)
 	return host == "localhost" || (ip != nil && ip.IsLoopback())
+}
+
+// castDiscoveryConfig reads SLIDEKICK_CAST_DISCOVERY (off disables it) and
+// SLIDEKICK_CAST_SUBNETS (CIDRs to scan; default: the /24 of the base URL's
+// LAN address and of the machine's own LAN interfaces).
+func castDiscoveryConfig(ctx context.Context, baseURL string, log *slog.Logger) service.CastDiscoveryConfig {
+	cfg := service.CastDiscoveryConfig{Log: log}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("SLIDEKICK_CAST_DISCOVERY"))) {
+	case "off", "0", "false", "no":
+		cfg.Off = true
+	}
+	subnets, notes, err := cast.PlanSubnets(ctx, os.Getenv("SLIDEKICK_CAST_SUBNETS"), baseURL, cast.LocalInterfaces(), cast.InContainer())
+	if err != nil {
+		log.Warn("SLIDEKICK_CAST_SUBNETS ignored", "err", err)
+		notes = append(notes, "SLIDEKICK_CAST_SUBNETS ignored: "+err.Error())
+	}
+	cfg.Subnets, cfg.Notes = subnets, notes
+	for _, n := range notes {
+		log.Info("cast discovery", "note", n)
+	}
+	return cfg
 }

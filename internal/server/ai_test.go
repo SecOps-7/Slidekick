@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/SecOps-7/slidekick"
 	"github.com/SecOps-7/slidekick/internal/accounts"
 	"github.com/SecOps-7/slidekick/internal/ai"
+	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/mcpserver"
 	"github.com/SecOps-7/slidekick/internal/oidc"
 	"github.com/SecOps-7/slidekick/internal/presenting"
@@ -99,8 +101,10 @@ func callTool(name string, args map[string]any) func(http.ResponseWriter, *http.
 
 type aiEnv struct {
 	*accEnv
-	llm *fakeLLM
-	log *bytes.Buffer
+	llm  *fakeLLM
+	log  *bytes.Buffer
+	ai   *ai.Service
+	pres *presenting.Manager
 }
 
 func newAIServer(t *testing.T) *aiEnv {
@@ -114,6 +118,7 @@ func newAIServer(t *testing.T) *aiEnv {
 	e.ts = httptest.NewServer(http.NotFoundHandler())
 	t.Cleanup(e.ts.Close)
 	aiSvc := &ai.Service{Store: env.Store, Box: box, Accounts: acc, MCPURL: e.ts.URL + "/mcp"}
+	e.ai, e.pres = aiSvc, pres
 	var logMu sync.Mutex
 	e.ts.Config.Handler = server.New(env.Svc, mcpSrv, server.Options{BaseURL: e.ts.URL, Accounts: acc, AI: aiSvc, Presenter: pres, SchemaFS: slidekick.Schema,
 		Web: fstest.MapFS{"index.html": {Data: []byte("app")}}, Log: newLockedLogger(e.log, &logMu)})
@@ -445,11 +450,12 @@ func TestAIChatPresents(t *testing.T) {
 	ch, cancel := e.env.Svc.Hub.Subscribe(id)
 	defer cancel()
 
-	// The model finds the slide has no notes, writes them, starts, and looks
-	// for the TV the user named (none are set up).
+	w := &recordingWriter{lines: []string{"Hi, and welcome: this talk is about growth."}}
+	e.pres.Writer = w
+
+	// The slide has no notes: the model starts right away and looks for the
+	// TV the user named (none are set up).
 	e.llm.script(
-		callTool("start_presentation", map[string]any{"deck_id": id}),
-		callTool("update_slide", map[string]any{"deck_id": id, "slide_id": d.Slides[0].ID, "fields": map[string]any{"notes": "Welcome, everyone."}}),
 		callTool("list_cast_devices", map[string]any{}),
 		callTool("start_presentation", map[string]any{"deck_id": id}),
 		sayText("Presenting now."),
@@ -461,24 +467,80 @@ func TestAIChatPresents(t *testing.T) {
 			got = append(got, fmt.Sprintf("%s:%v", ev.Tool, ev.OK))
 		}
 	}
-	want := "[start_presentation:false update_slide:true list_cast_devices:true start_presentation:true]"
+	want := "[list_cast_devices:true start_presentation:true]"
 	if fmt.Sprint(got) != want {
 		t.Fatalf("tool results %v, want %s (%+v)", got, want, evs)
-	}
-	if b := toJSON(e.llm.seen[1]); !strings.Contains(b, "no speaker notes") {
-		t.Fatalf("the model didn't see the missing notes: %s", b)
 	}
 	for {
 		ev := nextEvent(t, ch, "present")
 		if ev["state"] == "step" {
-			if ev["text"] != "Welcome, everyone." || ev["actor"] != "agent:edna" {
+			if ev["text"] != "Hi, and welcome: this talk is about growth." || ev["actor"] != "agent:edna" || ev["slideId"] != d.Slides[0].ID {
 				t.Fatalf("step %v", ev)
 			}
 			break
 		}
 	}
+	// The narration is written with the model the user chose in the chat.
+	if in := w.last(); in.Provider != "fake" || in.Model != "fake-model" || in.NoAI || in.Slide.ID != d.Slides[0].ID {
+		t.Fatalf("script input %+v", in)
+	}
 	// The system prompt tells the model how to present.
-	if b := toJSON(e.llm.seen[0]); !strings.Contains(b, "start_presentation") || !strings.Contains(b, "present_slide") {
+	if b := toJSON(e.llm.seen[0]); !strings.Contains(b, "start_presentation") || !strings.Contains(b, "present_slide") || !strings.Contains(b, "Never narrate the presentation itself") {
 		t.Fatal("presenting tools or guidance missing from the first request")
+	}
+}
+
+// recordingWriter is a presenting.ScriptWriter that remembers what it was asked.
+type recordingWriter struct {
+	mu    sync.Mutex
+	ins   []presenting.ScriptInput
+	lines []string
+}
+
+func (w *recordingWriter) Script(_ context.Context, in presenting.ScriptInput) []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.ins = append(w.ins, in)
+	return presenting.Fit(w.lines, presenting.Builds(in.Slide)+1)
+}
+
+func (w *recordingWriter) last() presenting.ScriptInput {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.ins) == 0 {
+		return presenting.ScriptInput{}
+	}
+	return w.ins[len(w.ins)-1]
+}
+
+// The presenter's script writer uses the configured provider through the AI
+// service: Pick finds the default model, Complete gets the reply.
+func TestAIScriptWriter(t *testing.T) {
+	e := newAIServer(t)
+	ctx := context.Background()
+	if _, _, err := e.ai.Pick(ctx, "", ""); !errors.Is(err, ai.ErrNoAI) {
+		t.Fatalf("no provider: %v", err)
+	}
+	admin := e.withAdmin(t)
+	e.setupProvider(t, admin)
+	if p, m, err := e.ai.Pick(ctx, "", ""); err != nil || p != "fake" || m != "fake-model" {
+		t.Fatalf("default pick %s/%s %v", p, m, err)
+	}
+	if _, _, err := e.ai.Pick(ctx, "fake", "other-model"); err == nil {
+		t.Fatal("a model the provider doesn't offer should fail")
+	}
+	e.llm.script(sayText(`{"lines": ["Churn halved after the new onboarding. Here is the next slide."]}`))
+	s := &presenting.Scripter{AI: e.ai}
+	slide := deck.Slide{ID: "s1", Notes: "Stress the onboarding.", Regions: map[string][]deck.Element{"title": {{ID: "h", Type: "heading", Props: map[string]any{"text": "Churn halved"}}}}}
+	got := s.Script(ctx, presenting.ScriptInput{DeckTitle: "Q3", Slide: slide, Number: 1, Total: 1})
+	if len(got) != 1 || got[0] != "Churn halved after the new onboarding." {
+		t.Fatalf("script %q", got)
+	}
+	if b := toJSON(e.llm.seen[0]); !strings.Contains(b, "Stress the onboarding.") || !strings.Contains(b, "Title: Churn halved") || !strings.Contains(b, "fake-model") {
+		t.Fatalf("request %s", b)
+	}
+	// The same slide again comes from the cache.
+	if s.Script(ctx, presenting.ScriptInput{DeckTitle: "Q3", Slide: slide, Number: 1, Total: 1}); len(e.llm.seen) != 1 {
+		t.Fatalf("model asked %d times", len(e.llm.seen))
 	}
 }

@@ -305,7 +305,7 @@ function Voices() {
     <>
       <section>
         <p class="acc-muted">
-          Voices read speaker notes aloud when a deck is narrated. Browser voices are free and need nothing set up; a provider gives a more natural voice and is called from this
+          Voices speak the AI presenter's narration when a deck is presented with a voice. Browser voices are free and need nothing set up; a provider gives a more natural voice and is called from this
           server, so its key never reaches anyone's browser.
         </p>
         <table class="acc-table">

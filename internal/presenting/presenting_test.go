@@ -81,12 +81,13 @@ func el(id string, step int) deck.Element {
 
 func twoSlides() *deck.Deck {
 	return &deck.Deck{Slides: []deck.Slide{
-		{ID: "s1", Notes: "Welcome.", Regions: map[string][]deck.Element{"body": {el("a", 0)}}},
-		{ID: "s2", Notes: "Intro.\n\nFirst point.\n\nSecond point.", Regions: map[string][]deck.Element{"body": {el("b", 1), el("c", 2)}}},
+		{ID: "s1", Notes: "Welcome everyone to the review.", Regions: map[string][]deck.Element{"body": {el("a", 0)}}},
+		// The stage directions in these notes are never spoken.
+		{ID: "s2", Notes: "Revenue grew 12% this quarter.\n\nThe first point builds in now. Costs fell 3%.\n\nAnd finally the second point. Margins hit 41%.", Regions: map[string][]deck.Element{"body": {el("b", 1), el("c", 2)}}},
 	}}
 }
 
-func TestBuildsLinesMissing(t *testing.T) {
+func TestBuildsLines(t *testing.T) {
 	d := twoSlides()
 	if Builds(d.Slides[0]) != 0 || Builds(d.Slides[1]) != 2 {
 		t.Fatalf("builds %d %d", Builds(d.Slides[0]), Builds(d.Slides[1]))
@@ -106,9 +107,10 @@ func TestBuildsLinesMissing(t *testing.T) {
 			t.Errorf("Lines(%q, %d) = %q, want %q", c.notes, c.builds, got, c.want)
 		}
 	}
-	d.Slides = append(d.Slides, deck.Slide{ID: "s3", Notes: "  \n "}, deck.Slide{ID: "s4"})
-	if got := MissingNotes(d); !reflect.DeepEqual(got, []int{3, 4}) {
-		t.Fatalf("missing %v", got)
+	// Bullets with buildEach reveal one item per step from their own step.
+	each := deck.Element{ID: "l", Type: "bullets", Build: &deck.Build{Step: 2}, Props: map[string]any{"buildEach": true, "items": []any{"a", "b", "c"}}}
+	if n := Builds(deck.Slide{Regions: map[string][]deck.Element{"body": {el("x", 1), each}}}); n != 4 {
+		t.Fatalf("buildEach builds = %d, want 4", n)
 	}
 }
 
@@ -198,22 +200,19 @@ func TestGoBrowserVoice(t *testing.T) {
 	}
 }
 
-func TestStartMissingNotes(t *testing.T) {
-	d := twoSlides()
-	d.Slides = append(d.Slides, deck.Slide{ID: "s3"})
-	m, _ := newManager(d, &fakeVoice{})
-	_, err := m.Start("d1", RunOptions{}, "agent")
-	var mn *ErrMissingNotes
-	if !errors.As(err, &mn) || !reflect.DeepEqual(mn.Slides, []int{3}) {
-		t.Fatalf("err %v", err)
-	}
-	// A range that skips the empty slide is fine.
-	if _, err := m.Start("d1", RunOptions{To: 2}, "agent"); err != nil {
-		t.Fatal(err)
-	}
-	m.Stop("d1")
+func TestStartChecks(t *testing.T) {
+	m, _ := newManager(twoSlides(), &fakeVoice{})
 	if _, err := m.Start("d1", RunOptions{From: 3, To: 2}, "agent"); err == nil {
 		t.Fatal("empty range should fail")
+	}
+	if _, err := m.Start("d1", RunOptions{Script: []SlideScript{{Slide: 3, Lines: []string{"x"}}}}, "agent"); err == nil {
+		t.Fatal("a script for slide 3 of 2 should fail")
+	}
+	if _, err := m.Start("d1", RunOptions{Script: []SlideScript{{Slide: 1, Lines: make([]string, 30)}}}, "agent"); err == nil {
+		t.Fatal("a script with 30 lines should fail")
+	}
+	if m.Status("d1").Running {
+		t.Fatal("a refused start left a run going")
 	}
 }
 
@@ -262,7 +261,7 @@ func TestRunWithBuilds(t *testing.T) {
 		}
 		got = append(got, s)
 	}
-	want := []string{"started", "s1/0:Welcome.", "s2/0:Intro.", "s2/1:First point.", "s2/2:Second point.", "ended"}
+	want := []string{"started", "s1/0:Welcome everyone to the review.", "s2/0:Revenue grew 12% this quarter.", "s2/1:Costs fell 3%.", "s2/2:Margins hit 41%.", "ended"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("events\n got %q\nwant %q", got, want)
 	}

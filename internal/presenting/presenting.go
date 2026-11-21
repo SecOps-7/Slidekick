@@ -9,10 +9,18 @@
 // A step returns once the line has been heard, so the caller paces itself on
 // the narration. When no presenting screen answers, the step waits for the
 // audio's own length (or an estimate for browser voices) instead.
+//
+// The voice is the presenter: it talks about what is on the slide, never
+// about the presentation itself. Every line goes through Sanitize, and an
+// automatic run writes each slide's narration from its content, with the
+// speaker notes as talking points (see ScriptWriter and Scripter).
 package presenting
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -49,6 +57,9 @@ func (d SvcDeps) Publish(id string, ev any) { d.Svc.Publish(id, ev) }
 type Manager struct {
 	Deps  Deps
 	Voice Speaker // nil: every line uses the presenting screen's browser voice
+	// Writer writes each slide's narration for an automatic run; nil reads
+	// the sanitized notes, or a plain summary of the content (Fallback).
+	Writer ScriptWriter
 	// Slack is added to the audio length before a step stops waiting for the
 	// presenting screen; Pause is the gap after an unnarrated slide or build.
 	Slack, Pause time.Duration
@@ -95,6 +106,15 @@ type StepResult struct {
 	SpokeMs int64  `json:"spokeMs" jsonschema:"how long the narration took"`
 	Heard   bool   `json:"heard" jsonschema:"a presenting screen played the narration and confirmed it finished"`
 	Voice   string `json:"voice,omitempty" jsonschema:"'browser' when the presenting screen's own voice spoke it"`
+	Said    string `json:"said,omitempty" jsonschema:"what was spoken, after sentences about the presentation itself (slides, builds, transitions, clicks) were removed"`
+	Note    string `json:"note,omitempty"`
+}
+
+// speech is a line synthesized ahead of time (see prepare).
+type speech struct {
+	text  string
+	audio *tts.Audio
+	err   error
 }
 
 // ErrBusy means an automatic run owns the deck.
@@ -114,14 +134,20 @@ func (m *Manager) get(deckID string) *show {
 	return sh
 }
 
-// Builds is the number of build steps on a slide (its highest step).
+// Builds is the number of build steps on a slide (its highest step). Bullets
+// with buildEach reveal one item per step from their own step on.
 func Builds(s deck.Slide) int {
 	n := 0
 	for _, els := range s.Regions {
 		for _, e := range els {
-			if e.Build != nil && e.Build.Step > n {
-				n = e.Build.Step
+			if e.Build == nil {
+				continue
 			}
+			last := e.Build.Step
+			if each, _ := e.Props["buildEach"].(bool); each && e.Type == "bullets" && len(e.Items()) > 1 {
+				last += len(e.Items()) - 1
+			}
+			n = max(n, last)
 		}
 	}
 	return n
@@ -136,10 +162,12 @@ func (m *Manager) Go(ctx context.Context, deckID string, st Step, actor string) 
 	if busy {
 		return nil, ErrBusy
 	}
-	return m.step(ctx, deckID, st, actor)
+	return m.step(ctx, deckID, st, actor, nil)
 }
 
-func (m *Manager) step(ctx context.Context, deckID string, st Step, actor string) (*StepResult, error) {
+// step shows one step and speaks its line. pre, when it holds the same text,
+// is the line's audio made ahead of time.
+func (m *Manager) step(ctx context.Context, deckID string, st Step, actor string, pre *speech) (*StepResult, error) {
 	d, err := m.Deps.Get(ctx, deckID)
 	if err != nil {
 		return nil, err
@@ -166,12 +194,20 @@ func (m *Manager) step(ctx context.Context, deckID string, st Step, actor string
 	res := &StepResult{Slide: idx + 1, SlideID: slide.ID, Build: build, Builds: builds}
 	ev := map[string]any{"type": "present", "state": "step", "slideId": slide.ID, "index": idx, "build": build, "actor": actor}
 	var wait time.Duration
-	say := strings.TrimSpace(st.Say)
+	// The audience hears about the content, never about the slides moving.
+	say := Sanitize(st.Say)
+	res.Said = say
+	if say == "" && strings.TrimSpace(st.Say) != "" {
+		res.Note = "Nothing was said: the line only described the presentation (slides, builds, transitions, clicks). Speak about the content and data on the slide instead."
+	}
 	if say != "" {
 		ev["text"] = say
 		var a *tts.Audio
 		err := tts.ErrBrowserVoice
-		if m.Voice != nil {
+		switch {
+		case pre != nil && pre.text == say:
+			a, err = pre.audio, pre.err
+		case m.Voice != nil:
 			a, err = m.Voice.Speak(ctx, st.Provider, st.Voice, say)
 		}
 		switch {
@@ -260,17 +296,6 @@ func (m *Manager) Status(deckID string) Status {
 	return sh.status
 }
 
-// MissingNotes lists the slide numbers (from 1) with no speaker notes.
-func MissingNotes(d *deck.Deck) []int {
-	var out []int
-	for i, s := range d.Slides {
-		if strings.TrimSpace(s.Notes) == "" {
-			out = append(out, i+1)
-		}
-	}
-	return out
-}
-
 // Lines splits a slide's notes into what to say at each build step:
 // paragraph i (blank-line separated) is spoken at build step i, and any
 // paragraphs beyond the last build are spoken there too.
@@ -292,29 +317,33 @@ func Lines(notes string, builds int) []string {
 
 // RunOptions configures an automatic run.
 type RunOptions struct {
-	From     int // first slide, from 1 (0 = 1)
-	To       int // last slide, inclusive (0 = the end)
-	Provider string
+	From     int    // first slide, from 1 (0 = 1)
+	To       int    // last slide, inclusive (0 = the end)
+	Provider string // voice provider id
 	Voice    string
+	// AIProvider and Model pick the language model that writes the narration;
+	// "" uses the instance's default. NoAI writes it without one.
+	AIProvider, Model string
+	NoAI              bool
+	// Script is the caller's own narration for some slides (still sanitized);
+	// the others are written by the manager's ScriptWriter.
+	Script []SlideScript
 }
 
-// ErrMissingNotes means slides have nothing to say; write their notes first.
-type ErrMissingNotes struct{ Slides []int }
-
-func (e *ErrMissingNotes) Error() string {
-	nums := make([]string, len(e.Slides))
-	for i, n := range e.Slides {
-		nums[i] = fmt.Sprint(n)
-	}
-	what := "slides " + strings.Join(nums, ", ") + " have"
-	if len(nums) == 1 {
-		what = "slide " + nums[0] + " has"
-	}
-	return what + " no speaker notes; write a short spoken narration into each one's notes (blank lines split it across the slide's build steps), then start again"
+// SlideScript is the narration for one slide: a line per build step.
+type SlideScript struct {
+	Slide int      `json:"slide" jsonschema:"slide number, starting at 1"`
+	Lines []string `json:"lines" jsonschema:"what to say at each build step: the first line before any build, the next after the first build, and so on"`
 }
 
-// Start begins an automatic run through the deck in the background, speaking
-// each slide's notes. It returns once the run has started.
+const (
+	maxScriptLines = 21
+	maxScriptLine  = 4000
+)
+
+// Start begins an automatic run through the deck in the background. Each
+// slide's narration is written just before it is presented (the next one is
+// prepared while the current one speaks). It returns once the run has started.
 func (m *Manager) Start(deckID string, o RunOptions, actor string) (Status, error) {
 	d, err := m.Deps.Get(context.Background(), deckID)
 	if err != nil {
@@ -327,14 +356,18 @@ func (m *Manager) Start(deckID string, o RunOptions, actor string) (Status, erro
 	if from > to {
 		return Status{}, fmt.Errorf("nothing to present: slides %d to %d (the deck has %d)", from, to, len(d.Slides))
 	}
-	var missing []int
-	for _, n := range MissingNotes(d) {
-		if n >= from && n <= to {
-			missing = append(missing, n)
+	for _, sc := range o.Script {
+		if sc.Slide < 1 || sc.Slide > len(d.Slides) {
+			return Status{}, fmt.Errorf("script for slide %d: the deck has %d slides", sc.Slide, len(d.Slides))
 		}
-	}
-	if len(missing) > 0 {
-		return Status{}, &ErrMissingNotes{Slides: missing}
+		if len(sc.Lines) > maxScriptLines {
+			return Status{}, fmt.Errorf("script for slide %d: at most %d lines", sc.Slide, maxScriptLines)
+		}
+		for _, l := range sc.Lines {
+			if len([]rune(l)) > maxScriptLine {
+				return Status{}, fmt.Errorf("script for slide %d: a line is longer than %d characters", sc.Slide, maxScriptLine)
+			}
+		}
 	}
 
 	sh := m.get(deckID)
@@ -382,19 +415,28 @@ func (m *Manager) run(ctx context.Context, deckID string, run, from, to int, o R
 		}
 		m.Deps.Publish(deckID, ev)
 	}()
+	given := map[int][]string{}
+	for _, sc := range o.Script {
+		given[sc.Slide] = sc.Lines
+	}
+	d, err := m.Deps.Get(ctx, deckID)
+	if err != nil {
+		failure = err
+		return
+	}
+	if from > len(d.Slides) {
+		return
+	}
+	cur := m.prepare(ctx, d, from, "", o, given)
 	for n := from; n <= to; n++ {
-		// Re-read each slide: the deck may be edited while it is presented.
-		d, err := m.Deps.Get(ctx, deckID)
-		if err != nil {
-			failure = err
-			return
+		// Write and voice the next slide while this one is presented.
+		var next chan *prepared
+		if n < to && n < len(d.Slides) {
+			next = make(chan *prepared, 1)
+			go func(d *deck.Deck, prev string) { next <- m.prepare(ctx, d, n+1, prev, o, given) }(d, cur.last())
 		}
-		if n > len(d.Slides) {
-			return
-		}
-		s := d.Slides[n-1]
-		for b, line := range Lines(s.Notes, Builds(s)) {
-			if _, err := m.step(ctx, deckID, Step{SlideID: s.ID, Build: b, Say: line, Provider: o.Provider, Voice: o.Voice}, actor); err != nil {
+		for b, line := range cur.lines {
+			if _, err := m.step(ctx, deckID, Step{SlideID: cur.slideID, Build: b, Say: line, Provider: o.Provider, Voice: o.Voice}, actor, cur.audio[b]); err != nil {
 				failure = err
 				return
 			}
@@ -407,7 +449,99 @@ func (m *Manager) run(ctx context.Context, deckID string, run, from, to int, o R
 				}
 			}
 		}
+		if next == nil {
+			return
+		}
+		var p *prepared
+		select {
+		case p = <-next:
+		case <-ctx.Done():
+			failure = ctx.Err()
+			return
+		}
+		// Re-read the deck: it may be edited while it is presented. A slide
+		// that changed since it was prepared is prepared again.
+		if d, err = m.Deps.Get(ctx, deckID); err != nil {
+			failure = err
+			return
+		}
+		if n+1 > len(d.Slides) {
+			return
+		}
+		if s := d.Slides[n]; s.ID != p.slideID || slideSum(s) != p.sum {
+			p = m.prepare(ctx, d, n+1, cur.last(), o, given)
+		}
+		cur = p
 	}
+}
+
+// prepared is one slide's narration, ready to present.
+type prepared struct {
+	slideID, sum string
+	lines        []string
+	audio        []*speech // per line; nil when silent or no voice service
+}
+
+func (p *prepared) last() string {
+	for i := len(p.lines) - 1; i >= 0; i-- {
+		if p.lines[i] != "" {
+			return p.lines[i]
+		}
+	}
+	return ""
+}
+
+func slideSum(s deck.Slide) string {
+	b, _ := json.Marshal(s)
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:])
+}
+
+// fallbackWriter writes narration without AI.
+type fallbackWriter struct{}
+
+func (fallbackWriter) Script(_ context.Context, in ScriptInput) []string { return Fallback(in.Slide) }
+
+func (m *Manager) writer() ScriptWriter {
+	if m.Writer != nil {
+		return m.Writer
+	}
+	return fallbackWriter{}
+}
+
+// prepare writes slide n's narration (the caller's own script when it gave
+// one) and synthesizes its audio.
+func (m *Manager) prepare(ctx context.Context, d *deck.Deck, n int, prev string, o RunOptions, given map[int][]string) *prepared {
+	s := d.Slides[n-1]
+	want := Builds(s) + 1
+	var lines []string
+	if g, ok := given[n]; ok {
+		lines = SanitizeLines(Fit(g, want))
+		if allEmpty(lines) && !allEmpty(g) {
+			lines = nil // nothing but meta-narration: write it instead
+		}
+	}
+	if lines == nil {
+		lines = SanitizeLines(Fit(m.writer().Script(ctx, ScriptInput{
+			DeckTitle: d.Title, Slide: s, Number: n, Total: len(d.Slides), Previous: prev,
+			Provider: o.AIProvider, Model: o.Model, NoAI: o.NoAI,
+		}), want))
+	}
+	p := &prepared{slideID: s.ID, sum: slideSum(s), lines: lines, audio: make([]*speech, len(lines))}
+	if m.Voice == nil {
+		return p
+	}
+	for i, l := range lines {
+		if l == "" || ctx.Err() != nil {
+			continue
+		}
+		a, err := m.Voice.Speak(ctx, o.Provider, o.Voice, l)
+		p.audio[i] = &speech{text: l, audio: a, err: err}
+		if err != nil && !errors.Is(err, tts.ErrBrowserVoice) {
+			break // the step reports it
+		}
+	}
+	return p
 }
 
 // Stop ends an automatic run. It reports whether one was running.

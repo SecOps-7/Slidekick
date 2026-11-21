@@ -177,6 +177,56 @@ func (s *Service) Available(ctx context.Context) ([]PublicProvider, error) {
 	return out, nil
 }
 
+// ErrNoAI means no enabled AI provider with a model is set up.
+var ErrNoAI = errors.New("no AI provider is set up")
+
+// Pick resolves which provider and model to use, the way the chat picks its
+// default: the given provider (and model, else its first model), or else the
+// first enabled provider in the list that has the model asked for, or any
+// model when none is asked for.
+func (s *Service) Pick(ctx context.Context, providerID, model string) (string, string, error) {
+	ps, err := s.Available(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	for _, p := range ps {
+		if providerID != "" && p.ID != providerID {
+			continue
+		}
+		if model == "" {
+			return p.ID, p.Models[0], nil
+		}
+		for _, m := range p.Models {
+			if m == model {
+				return p.ID, m, nil
+			}
+		}
+	}
+	if providerID != "" || model != "" {
+		return "", "", fmt.Errorf("%w: %s/%s isn't an enabled provider and model", ErrValidation, providerID, model)
+	}
+	return "", "", ErrNoAI
+}
+
+// Complete sends one system + user message to a provider's model and returns
+// the reply's text. No tools are offered; the output is untrusted text.
+func (s *Service) Complete(ctx context.Context, providerID, model, system, user string) (string, error) {
+	p, lp, err := s.provider(ctx, providerID)
+	if err != nil || !p.Enabled {
+		return "", fmt.Errorf("%w: unknown AI provider", ErrValidation)
+	}
+	hc, err := s.client(lp)
+	if err != nil {
+		return "", err
+	}
+	reply, err := llm.Stream(ctx, hc, lp, llm.Request{Model: model, System: system, MaxTokens: 2000,
+		Messages: []llm.Message{{Role: "user", Text: user}}}, nil)
+	if err != nil {
+		return "", err
+	}
+	return reply.Text, nil
+}
+
 // ---- chat ----
 
 // Turn is one earlier message of the conversation, as the browser keeps it.
@@ -231,11 +281,13 @@ Work where the user can see it:
 - Prefer small precise edits (update_slide, patch_deck), keep element ids so morph transitions keep working, and fix the lint findings each write returns.
 
 Presenting: when the user asks you to present the deck (or "walk me through it", "read it out"):
-- Read the deck with get_deck and check every slide's notes: start_presentation speaks each slide's speaker notes, and blank lines split a slide's notes across its build steps.
-- If some slides have no notes, write a short spoken narration into their notes first (update_slide with fields {"notes": ...}), in the deck's language, a few natural sentences per slide, then call start_presentation. If it still lists slides without notes, fill those too and start again.
+- Call start_presentation. It presents on its own as the slide presenter: for each slide it writes what to say from the slide's content and data, using the speaker notes as talking points (not reading them out). Slides without notes are fine; don't write notes just to present.
 - The narration plays in the presenter view or on a TV. If the user names a TV ("on the living room TV"), call list_cast_devices and cast_deck with that device before starting. Otherwise tell them to open the presenter view to hear it.
-- To improvise instead of reading notes (the user asks you to explain a slide out loud), use present_slide with your own line; it returns once the line has been spoken, so call it again for the next one.
+- To explain a slide out loud yourself, use present_slide with your own line; it returns once the line has been spoken, so call it again for the next one.
+- Whatever you say out loud (present_slide's say), speak as the presenter about the content: what the text, numbers, charts and diagrams on the slide mean and why they matter. Never narrate the presentation itself: no "here is the next slide", "this point builds in now", "let's move on", "as you can see on screen", clicks, transitions or other stage directions. The audience sees the slides change.
 - stop_presentation ends a run; presentation_status says where it is.
+
+Speaker notes: when you write or improve them, write content talking points for a human presenter (the key message, the numbers to stress, the story behind the data), never stage directions or descriptions of slides moving or points appearing.
 
 When you're done, reply in a few plain sentences saying what you changed and on which slides.
 
@@ -327,6 +379,10 @@ func (s *Service) Chat(ctx context.Context, u *store.User, deckID string, req Ch
 			return nil
 		}
 		for _, call := range reply.ToolCalls {
+			if call.Name == "start_presentation" {
+				// The run writes its narration with the model the user chose here.
+				call.Args = withDefaults(call.Args, map[string]string{"ai_provider": p.ID, "ai_model": model})
+			}
 			emit(Event{Type: "tool", Tool: call.Name})
 			text, ok, changed := s.callTool(ctx, cs, deckID, call)
 			if ctx.Err() != nil {
@@ -421,6 +477,25 @@ func (s *Service) callTool(ctx context.Context, cs *mcp.ClientSession, deckID st
 	}
 	json.Unmarshal(b, &changed)
 	return truncate(string(b), MaxToolOutput), !res.IsError, changed.Changed
+}
+
+// withDefaults sets the given keys in a JSON object of tool arguments where
+// they are missing or empty. Arguments that aren't an object are left alone.
+func withDefaults(args json.RawMessage, def map[string]string) json.RawMessage {
+	var m map[string]any
+	if err := json.Unmarshal(args, &m); err != nil || m == nil {
+		return args
+	}
+	for k, v := range def {
+		if s, _ := m[k].(string); s == "" {
+			m[k] = v
+		}
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return args
+	}
+	return b
 }
 
 func summary(text string, ok bool) string {

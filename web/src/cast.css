@@ -52,6 +52,7 @@ body.sk-cast, body.sk-cast * { cursor: none !important; }
 .cast-pop button:disabled { opacity: 0.5; cursor: default; }
 .cast-pop button[aria-checked="true"] { color: var(--ed-accent, #5eead4); }
 .cast-pop button.cast-stop { color: var(--ed-err, #f87171); }
+.cast-pop button.cast-refresh { color: var(--ed-muted, #8b93ab); border-top: 1px solid var(--ed-line, #262d40); border-radius: 0 0 6px 6px; }
 .cast-pop small { color: var(--ed-muted, #8b93ab); }
 .cast-pop .cast-err { color: var(--ed-err, #f87171); }
 .cast-menu .on { border-color: var(--ed-accent, #5eead4); color: var(--ed-accent, #5eead4); }

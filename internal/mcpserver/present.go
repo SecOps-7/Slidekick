@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/SecOps-7/slidekick/internal/authz"
 	"github.com/SecOps-7/slidekick/internal/cast"
 	"github.com/SecOps-7/slidekick/internal/presenting"
 	"github.com/SecOps-7/slidekick/internal/service"
@@ -16,7 +17,7 @@ type PresentSlideIn struct {
 	Slide   int    `json:"slide,omitempty" jsonschema:"slide number as people count them, starting at 1; omit (with no slide_id) to stay on the current slide"`
 	SlideID string `json:"slide_id,omitempty" jsonschema:"slide id, instead of slide"`
 	Build   int    `json:"build,omitempty" jsonschema:"build step to show: 0 = before any build, n = after n builds (the result says how many the slide has)"`
-	Say     string `json:"say,omitempty" jsonschema:"what to say out loud at this step, a sentence or a short paragraph; omit to just move"`
+	Say     string `json:"say,omitempty" jsonschema:"what the presenter says out loud at this step, about the content and data on the slide (a sentence or a short paragraph); never about slides moving, builds, transitions or clicks. Omit to just move"`
 	Voice   string `json:"voice,omitempty" jsonschema:"voice name; omit for the instance's default voice"`
 }
 
@@ -25,6 +26,10 @@ type StartPresentationIn struct {
 	FromSlide int    `json:"from_slide,omitempty" jsonschema:"first slide to present, starting at 1 (default 1)"`
 	ToSlide   int    `json:"to_slide,omitempty" jsonschema:"last slide to present, inclusive (default: the last slide)"`
 	Voice     string `json:"voice,omitempty" jsonschema:"voice name; omit for the instance's default voice"`
+	// Script lets the caller supply its own words for some slides.
+	Script     []presenting.SlideScript `json:"script,omitempty" jsonschema:"optional: your own narration for some slides, as [{slide, lines}] with one line per build step; slides not listed are written for you. Lines are spoken as the presenter, about the content; sentences about the presentation itself are dropped"`
+	AIProvider string                   `json:"ai_provider,omitempty" jsonschema:"AI provider id that writes the narration; omit for the instance's default"`
+	AIModel    string                   `json:"ai_model,omitempty" jsonschema:"model that writes the narration; omit for the provider's default"`
 }
 
 type StartPresentationOut struct {
@@ -94,7 +99,9 @@ func (h *handlers) castTools(s *mcp.Server) {
 func (h *handlers) presentTools(s *mcp.Server) {
 	mcp.AddTool(s, action("present_slide", "Present one step out loud: show a slide (at a build step) on every screen watching the deck and speak a line in the narration voice. "+
 		"The presenter view and a cast TV play the audio; other viewers follow silently. It returns after the narration has been spoken, so call it again for the next line or build step. "+
-		"Use it to present step by step with your own words; start_presentation reads the speaker notes on its own instead."),
+		"Speak as the presenter to a live audience: explain what the content and data on the slide mean and why they matter, using the speaker notes as talking points rather than reading them out. "+
+		"Never narrate the presentation itself (\"here is the next slide\", \"this point builds in\", \"let's move on\", \"as you can see on screen\", clicks, transitions): the audience sees the slides change, and such sentences are removed before speaking. "+
+		"Use it to present step by step with your own words; start_presentation presents the whole deck on its own instead."),
 		func(ctx context.Context, req *mcp.CallToolRequest, in PresentSlideIn) (*mcp.CallToolResult, *presenting.StepResult, error) {
 			res, err := h.presenter.Go(ctx, in.DeckID, presenting.Step{Slide: in.Slide, SlideID: in.SlideID, Build: in.Build, Say: in.Say, Voice: in.Voice}, actorOf(req))
 			if err != nil {
@@ -103,12 +110,14 @@ func (h *handlers) presentTools(s *mcp.Server) {
 			return nil, res, nil
 		})
 
-	mcp.AddTool(s, action("start_presentation", "Present the deck by itself in the background: it shows each slide and speaks that slide's speaker notes, "+
-		"stepping through builds (blank lines split a slide's notes across its build steps: the first paragraph before any build, the next after the first build, and so on). "+
-		"If some slides have no notes it fails and lists them: write a spoken narration into those slides' notes with update_slide or patch_deck first, then start again. "+
-		"Returns at once; follow it with presentation_status and end it with stop_presentation."),
+	mcp.AddTool(s, action("start_presentation", "Present the deck by itself in the background, as the slide presenter: it shows each slide and its build steps and speaks about the content, "+
+		"what the text, numbers, charts and diagrams mean, using each slide's speaker notes as talking points (not read out word for word). Slides don't need notes. "+
+		"The narration is written by the instance's AI model just before each slide (without one, the notes are read, or the content summarised). "+
+		"Pass script to supply your own words for some slides. Returns at once; follow it with presentation_status and end it with stop_presentation."),
 		func(ctx context.Context, req *mcp.CallToolRequest, in StartPresentationIn) (*mcp.CallToolResult, *StartPresentationOut, error) {
-			st, err := h.presenter.Start(in.DeckID, presenting.RunOptions{From: in.FromSlide, To: in.ToSlide, Voice: in.Voice}, actorOf(req))
+			o := presenting.RunOptions{From: in.FromSlide, To: in.ToSlide, Voice: in.Voice, Script: in.Script, AIProvider: in.AIProvider, Model: in.AIModel,
+				NoAI: !h.allowed(ctx, principal(req), authz.UseAI, "")}
+			st, err := h.presenter.Start(in.DeckID, o, actorOf(req))
 			if err != nil {
 				return nil, nil, notFound(err, in.DeckID)
 			}

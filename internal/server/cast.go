@@ -9,18 +9,23 @@ import (
 	"github.com/SecOps-7/slidekick/internal/store"
 )
 
-// castRoutes: admins register Chromecasts; whoever may share a deck (its
-// owner, admins, its edit token) may cast it. Listing devices for the cast
-// menu needs an editor or admin; editors see names only, never addresses.
+// castRoutes: the server finds Chromecasts on the network and admins save
+// (or hide) them; whoever may share a deck (its owner, admins, its edit
+// token) may cast it. Listing devices for the cast menu needs an editor or
+// admin; editors see names only, never addresses.
 func (s *server) castRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/admin/cast/devices", s.require(authz.ManageSettings, false, s.listCastDevicesAdmin))
 	mux.Handle("POST /api/admin/cast/devices", s.require(authz.ManageSettings, false, s.addCastDevice))
 	mux.Handle("DELETE /api/admin/cast/devices/{did}", s.require(authz.ManageSettings, false, s.removeCastDevice))
 	mux.Handle("POST /api/admin/cast/discover", s.require(authz.ManageSettings, false, s.discoverCast))
+	mux.Handle("POST /api/admin/cast/found/{fid}/save", s.require(authz.ManageSettings, false, s.saveFoundCast))
+	mux.Handle("POST /api/admin/cast/found/{fid}/hide", s.require(authz.ManageSettings, false, s.hideFoundCast(true)))
+	mux.Handle("DELETE /api/admin/cast/found/{fid}/hide", s.require(authz.ManageSettings, false, s.hideFoundCast(false)))
 	mux.Handle("GET /api/cast/devices", s.require(authz.Create, false, s.listCastDevices))
 	mux.Handle("GET /api/decks/{id}/cast", s.require(authz.Share, true, s.castStatus))
 	mux.Handle("POST /api/decks/{id}/cast", s.require(authz.Share, true, s.startCast))
 	mux.Handle("DELETE /api/decks/{id}/cast", s.require(authz.Share, true, s.stopCast))
+	mux.Handle("POST /api/decks/{id}/cast/refresh", s.require(authz.Share, true, s.refreshCast))
 }
 
 func writeCastErr(w http.ResponseWriter, err error) {
@@ -38,6 +43,7 @@ func writeCastErr(w http.ResponseWriter, err error) {
 type castDeviceName struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	Auto bool   `json:"auto,omitempty"` // found on the network, not saved
 }
 
 func (s *server) deviceNames(r *http.Request) ([]castDeviceName, error) {
@@ -47,18 +53,31 @@ func (s *server) deviceNames(r *http.Request) ([]castDeviceName, error) {
 	}
 	out := make([]castDeviceName, len(ds))
 	for i, d := range ds {
-		out[i] = castDeviceName{d.ID, d.Name}
+		out[i] = castDeviceName{d.ID, d.Name, d.Auto}
 	}
 	return out, nil
 }
 
+// listCastDevicesAdmin: saved devices, everything discovery found (hidden
+// ones included, flagged) and how discovery is doing.
 func (s *server) listCastDevicesAdmin(w http.ResponseWriter, r *http.Request) {
 	ds, err := s.svc.CastDevices(r.Context())
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"devices": ds})
+	saved := []store.CastDevice{}
+	for _, d := range ds {
+		if !d.Auto {
+			saved = append(saved, d)
+		}
+	}
+	found, err := s.svc.FoundCastDevices(r.Context())
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"devices": saved, "found": found, "discovery": s.svc.CastDiscoveryStatus()})
 }
 
 func (s *server) addCastDevice(w http.ResponseWriter, r *http.Request) {
@@ -86,13 +105,50 @@ func (s *server) removeCastDevice(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
+// discoverCast runs discovery now and answers when it is done (a few
+// seconds); the settings page polls the admin list meanwhile for progress.
 func (s *server) discoverCast(w http.ResponseWriter, r *http.Request) {
-	found, err := s.svc.DiscoverCastDevices(r.Context())
+	found, st, err := s.svc.DiscoverCastDevices(r.Context())
 	if err != nil {
 		writeCastErr(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"devices": found})
+	writeJSON(w, 200, map[string]any{"devices": found, "discovery": st})
+}
+
+func (s *server) saveFoundCast(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Name string `json:"name"`
+	}
+	if r.ContentLength != 0 && !decode(w, r, &in) {
+		return
+	}
+	d, err := s.svc.SaveFoundCastDevice(r.Context(), r.PathValue("fid"), in.Name)
+	if err != nil {
+		writeCastErr(w, err)
+		return
+	}
+	writeJSON(w, 200, d)
+}
+
+func (s *server) hideFoundCast(hide bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := s.svc.HideFoundCastDevice(r.Context(), r.PathValue("fid"), hide); err != nil {
+			writeCastErr(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}
+}
+
+// refreshCast looks for devices again (at most every few seconds, and not
+// at all when discovery is off) and answers like castStatus.
+func (s *server) refreshCast(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.svc.RefreshCastDevices(r.Context(), false); err != nil {
+		writeCastErr(w, err)
+		return
+	}
+	s.castStatus(w, r)
 }
 
 func (s *server) listCastDevices(w http.ResponseWriter, r *http.Request) {

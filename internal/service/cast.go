@@ -2,14 +2,12 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/SecOps-7/slidekick/internal/cast"
 	"github.com/SecOps-7/slidekick/internal/deck"
@@ -18,8 +16,9 @@ import (
 
 // Casting: the server itself tells a Chromecast on the LAN to open the
 // deck's cast view (/d/{id}/present?cast=1), which follows whoever drives
-// the deck. Admins register devices; editors of a deck (and the AI presenter,
-// through StartCast) pick one of them.
+// the deck. Devices are found on the network (castdiscovery.go) or saved by
+// admins; editors of a deck (and the AI presenter, through StartCast) pick
+// one of them.
 
 // CastInputError is a request the caller can fix (bad device details, an
 // unknown device, a base URL the TV can't reach).
@@ -39,17 +38,11 @@ func (s *Service) caster() *cast.Manager {
 	return s.Cast
 }
 
-// CastDevices lists the devices admins added.
+// CastDevices lists the devices people can cast to: the ones admins saved,
+// then the ones discovery found on the network that nobody saved or hid
+// (Auto set, ids "auto-…"). Saved devices discovery sees carry LastSeen.
 func (s *Service) CastDevices(ctx context.Context) ([]store.CastDevice, error) {
-	ds, err := s.store.CastDevices(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]store.CastDevice, len(ds))
-	for i, d := range ds {
-		out[i] = *d
-	}
-	return out, nil
+	return s.mergedCastDevices(ctx)
 }
 
 var hostRE = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$`)
@@ -88,52 +81,31 @@ func (s *Service) RemoveCastDevice(ctx context.Context, id string) error {
 	return s.store.DeleteCastDevice(ctx, id)
 }
 
-// DiscoveredDevice is a device found on the LAN; Added tells whether one
-// with the same address is already registered.
-type DiscoveredDevice struct {
-	cast.Found
-	Added bool `json:"added"`
-}
-
-// DiscoverCastDevices looks for Chromecasts with mDNS for a couple of
-// seconds. It finds nothing when multicast can't reach the LAN (a Docker
-// bridge network); devices can always be added by IP.
-func (s *Service) DiscoverCastDevices(ctx context.Context) ([]DiscoveredDevice, error) {
-	found, err := cast.Discover(ctx, 2*time.Second)
+// DiscoverCastDevices looks for devices now (mDNS plus the subnet scan)
+// and lists everything discovery knows, with the run's status.
+func (s *Service) DiscoverCastDevices(ctx context.Context) ([]DiscoveredDevice, CastDiscoveryStatus, error) {
+	st, err := s.RefreshCastDevices(ctx, true)
 	if err != nil {
-		return nil, err
+		return nil, st, err
 	}
-	have, err := s.CastDevices(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]DiscoveredDevice, 0, len(found))
-	for _, f := range found {
-		dd := DiscoveredDevice{Found: f}
-		for _, h := range have {
-			if strings.EqualFold(h.Host, f.Host) && h.Port == f.Port {
-				dd.Added = true
-			}
-		}
-		out = append(out, dd)
-	}
-	return out, nil
+	found, err := s.FoundCastDevices(ctx)
+	return found, st, err
 }
 
 func (s *Service) findCastDevice(ctx context.Context, idOrName string) (*store.CastDevice, error) {
 	idOrName = strings.TrimSpace(idOrName)
-	if d, err := s.store.GetCastDevice(ctx, idOrName); err == nil {
-		return d, nil
-	} else if !errors.Is(err, store.ErrNotFound) {
-		return nil, err
-	}
-	ds, err := s.store.CastDevices(ctx)
+	ds, err := s.CastDevices(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for _, d := range ds {
-		if strings.EqualFold(d.Name, idOrName) {
-			return d, nil
+	for i := range ds {
+		if ds[i].ID == idOrName {
+			return &ds[i], nil
+		}
+	}
+	for i := range ds {
+		if strings.EqualFold(ds[i].Name, idOrName) {
+			return &ds[i], nil
 		}
 	}
 	names := make([]string, len(ds))
@@ -141,7 +113,7 @@ func (s *Service) findCastDevice(ctx context.Context, idOrName string) (*store.C
 		names[i] = d.Name
 	}
 	if len(names) == 0 {
-		return nil, &CastInputError{"no cast devices are set up yet: an admin adds them under Settings → Cast devices"}
+		return nil, &CastInputError{"no cast devices were found on the network and none are saved: an admin can add one by IP address under Settings → Cast devices"}
 	}
 	return nil, &CastInputError{fmt.Sprintf("no cast device called %q (devices: %s)", idOrName, strings.Join(names, ", "))}
 }

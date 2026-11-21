@@ -51,21 +51,23 @@ func (s *server) presentAck(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) startPresent(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		From     int    `json:"from"`
-		To       int    `json:"to"`
-		Provider string `json:"provider"`
-		Voice    string `json:"voice"`
+		From       int                      `json:"from"`
+		To         int                      `json:"to"`
+		Provider   string                   `json:"provider"` // voice provider
+		Voice      string                   `json:"voice"`
+		AIProvider string                   `json:"aiProvider"` // the model that writes the narration
+		Model      string                   `json:"model"`
+		Script     []presenting.SlideScript `json:"script"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	st, err := s.opt.Presenter.Start(r.PathValue("id"), presenting.RunOptions{From: in.From, To: in.To, Provider: in.Provider, Voice: in.Voice}, authFrom(r.Context()).p.Actor())
-	var missing *presenting.ErrMissingNotes
+	p := authFrom(r.Context()).p
+	st, err := s.opt.Presenter.Start(r.PathValue("id"), presenting.RunOptions{From: in.From, To: in.To, Provider: in.Provider, Voice: in.Voice,
+		AIProvider: in.AIProvider, Model: in.Model, Script: in.Script, NoAI: !s.policy().Can(p, authz.UseAI, nil)}, p.Actor())
 	switch {
 	case err == nil:
 		writeJSON(w, 200, st)
-	case errors.As(err, &missing):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": err.Error(), "missingNotes": missing.Slides})
 	case errors.Is(err, presenting.ErrBusy):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "a presentation is already running on this deck"})
 	default:

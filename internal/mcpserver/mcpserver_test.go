@@ -150,14 +150,15 @@ func TestPresentingToolsListed(t *testing.T) {
 	if len(tools.Tools) != 28 {
 		t.Fatalf("want 28 tools, got %d", len(tools.Tools))
 	}
-	// The server token (stdio) may present; a deck without notes says how to fix it.
+	// The server token (stdio) may present, and a deck without notes is fine.
 	res, _ := cs.CallTool(ctx, &mcp.CallToolParams{Name: "create_deck", Arguments: map[string]any{"title": "T", "slides": []any{
 		map[string]any{"layout": "title", "regions": map[string]any{"title": []any{map[string]any{"type": "heading", "props": map[string]any{"text": "Hi"}}}}}}}})
 	b, _ := json.Marshal(res.StructuredContent)
 	var out map[string]any
 	json.Unmarshal(b, &out)
 	res, _ = cs.CallTool(ctx, &mcp.CallToolParams{Name: "start_presentation", Arguments: map[string]any{"deck_id": out["deckId"]}})
-	if !res.IsError || !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "slide 1 has no speaker notes") {
+	if res.IsError {
 		t.Fatalf("start: %+v", res.Content)
 	}
+	m.Stop(out["deckId"].(string))
 }

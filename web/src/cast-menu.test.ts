@@ -58,4 +58,29 @@ describe("castMenu", () => {
     expect(m.el.querySelector("button")!.textContent).toBe("Casting to Office");
     m.el.remove();
   });
+
+  it("explains an empty list and looks for devices again on refresh", async () => {
+    const f = mockFetch(200, { casting: null, devices: [] });
+    const m = castMenu("d_x", { buttonClass: "ed-btn" });
+    document.body.append(m.el);
+    await flush();
+    await flush();
+    m.el.querySelector("button")!.click();
+    await flush();
+    await flush();
+    expect(m.el.textContent).toContain("No cast devices were found on your network");
+    expect(m.el.textContent).toContain("add one by IP address");
+    f.mockImplementation(async () => new Response(JSON.stringify({ casting: null, devices: [{ id: "auto-abc", name: "Kitchen", auto: true }] }), { status: 200 }));
+    const again = m.el.querySelector<HTMLButtonElement>(".cast-refresh")!;
+    expect(again.textContent).toBe("Refresh");
+    again.click();
+    expect(m.el.querySelector(".cast-refresh")!.textContent).toBe("Looking for devices…");
+    await flush();
+    await flush();
+    expect(f).toHaveBeenLastCalledWith("/api/decks/d_x/cast/refresh", expect.objectContaining({ method: "POST" }));
+    const item = [...m.el.querySelectorAll<HTMLButtonElement>("[role=menuitemradio]")].find((b) => b.textContent?.includes("Kitchen"));
+    expect(item).toBeTruthy();
+    expect(m.el.textContent).not.toContain("No cast devices were found");
+    m.el.remove();
+  });
 });

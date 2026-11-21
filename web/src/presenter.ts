@@ -72,7 +72,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   const aiStatus = el("span", "pr-ai-status");
   aiStatus.setAttribute("role", "status");
   [aiBtn, capBtn].forEach((b) => (b.type = "button"));
-  aiBtn.title = "An AI voice reads each slide's speaker notes and moves through the deck";
+  aiBtn.title = "An AI presenter talks through each slide's content, using the speaker notes as talking points, and moves through the deck";
   capBtn.title = "Show what the voice says over the slide";
   const can = currentMe()?.can ?? {};
   aiBtn.hidden = !(can.narrate && can["deck:share"]);
@@ -132,14 +132,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
         body: running ? undefined : JSON.stringify({ from: player.position.index >= deck.slides.length - 1 ? 1 : player.position.index + 1 }),
       });
       const data = await r.json().catch(() => ({}));
-      if (r.status === 422 && Array.isArray(data.missingNotes)) {
-        const nums: number[] = data.missingNotes;
-        const list = nums.length === 1 ? `Slide ${nums[0]} has` : `Slides ${nums.slice(0, -1).join(", ")} and ${nums[nums.length - 1]} have`;
-        await alertModal({
-          title: "Some slides have no speaker notes",
-          message: `${list} no speaker notes, so the voice has nothing to say there.\n\nWrite notes for ${nums.length === 1 ? "it" : "them"} in the editor (or ask the AI to write them), then try again. Blank lines split a slide's notes across its build steps.`,
-        });
-      } else if (!r.ok) {
+      if (!r.ok) {
         await alertModal({ title: running ? "Couldn't stop the AI voice" : "Couldn't start the AI voice", message: data.error ?? `${r.status} ${r.statusText}` });
       } else if (running) showRun(false, "AI voice stopped");
     } finally {

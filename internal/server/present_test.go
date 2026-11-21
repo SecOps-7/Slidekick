@@ -29,7 +29,7 @@ func newPresentServer(t *testing.T) (*accEnv, *presenting.Manager) {
 func notedSlides(notes ...string) []any {
 	out := make([]any, len(notes))
 	for i, n := range notes {
-		s := map[string]any{"layout": "title", "regions": map[string]any{"title": []any{map[string]any{"type": "heading", "props": map[string]any{"text": fmt.Sprint("Slide ", i+1)}}}}}
+		s := map[string]any{"layout": "title", "regions": map[string]any{"title": []any{map[string]any{"type": "heading", "props": map[string]any{"text": fmt.Sprint("Topic ", i+1)}}}}}
 		if n != "" {
 			s["notes"] = n
 		}
@@ -58,11 +58,19 @@ func TestPresentRoutes(t *testing.T) {
 
 	_, out := owner.do("POST", "/api/decks", map[string]any{"title": "No notes", "slides": notedSlides("Hello.", "", "")})
 	bare := out["deckId"].(string)
-	if code, out := owner.do("POST", "/api/decks/"+bare+"/present", map[string]any{}); code != 422 || toJSON(out["missingNotes"]) != "[2,3]" {
-		t.Fatalf("missing notes: %d %v", code, out)
+	// Slides don't need notes: the narration is written from their content.
+	if code, out := owner.do("POST", "/api/decks/"+bare+"/present", map[string]any{"script": []any{map[string]any{"slide": 2, "lines": []string{"Revenue grew."}}}}); code != 200 || out["running"] != true {
+		t.Fatalf("start without notes: %d %v", code, out)
+	}
+	if code, out := owner.do("DELETE", "/api/decks/"+bare+"/present", nil); code != 200 || out["stopped"] != true {
+		t.Fatalf("stop: %d %v", code, out)
+	}
+	if code, _ := owner.do("POST", "/api/decks/"+bare+"/present", map[string]any{"script": []any{map[string]any{"slide": 9, "lines": []string{"x"}}}}); code == 200 {
+		t.Fatal("a script for slide 9 of 3 should be refused")
 	}
 
-	_, out = owner.do("POST", "/api/decks", map[string]any{"title": "Talk", "slides": notedSlides("Welcome.", "Second slide.")})
+	// The second slide's notes are a stage direction followed by content.
+	_, out = owner.do("POST", "/api/decks", map[string]any{"title": "Talk", "slides": notedSlides("Welcome.", "Here is the second slide. Revenue grew 12%.")})
 	id := out["deckId"].(string)
 	key := e.env.Svc.ViewKey(context.Background(), id)
 	for name, c := range map[string]*client{"viewer": view, "other editor": other} {
@@ -91,7 +99,7 @@ func TestPresentRoutes(t *testing.T) {
 	if ev := nextEvent(t, ch, "present"); ev["state"] != "started" {
 		t.Fatalf("%v", ev)
 	}
-	for _, want := range []string{"Welcome.", "Second slide."} {
+	for _, want := range []string{"Welcome.", "Revenue grew 12%."} {
 		ev := nextEvent(t, ch, "present")
 		if ev["state"] != "step" || ev["text"] != want || ev["browserVoice"] != true || ev["voice"] != "Samantha" {
 			t.Fatalf("step %v", ev)
@@ -169,11 +177,11 @@ func TestPresentTools(t *testing.T) {
 	done := make(chan result, 1)
 	start := time.Now()
 	go func() {
-		o, r := call(cs, "present_slide", map[string]any{"deck_id": id, "slide": 2, "say": "Here is the second slide."})
+		o, r := call(cs, "present_slide", map[string]any{"deck_id": id, "slide": 2, "say": "Here is the second slide. Revenue grew 12% this year."})
 		done <- result{o, r}
 	}()
 	ev := nextEvent(t, ch, "present")
-	if ev["state"] != "step" || ev["index"] != float64(1) || ev["text"] != "Here is the second slide." || ev["actor"] != "agent:edna" {
+	if ev["state"] != "step" || ev["index"] != float64(1) || ev["text"] != "Revenue grew 12% this year." || ev["actor"] != "agent:edna" {
 		t.Fatalf("step %v", ev)
 	}
 	anonAck(t, e.ts.URL, id, key, ev["seq"])
@@ -185,12 +193,8 @@ func TestPresentTools(t *testing.T) {
 		t.Fatal("present_slide should return on the ack")
 	}
 
-	// start_presentation explains how to fix slides without notes.
-	_, res := call(cs, "start_presentation", map[string]any{"deck_id": id})
-	if !res.IsError || !strings.Contains(toolText(res), "slide 2 has no speaker notes") {
-		t.Fatalf("start without notes: %s", toolText(res))
-	}
-	o, res := call(cs, "start_presentation", map[string]any{"deck_id": id, "to_slide": 1})
+	// start_presentation runs without notes on slide 2, and takes the caller's script.
+	o, res := call(cs, "start_presentation", map[string]any{"deck_id": id, "script": []any{map[string]any{"slide": 1, "lines": []string{"Let's move on. Our margins doubled."}}}})
 	if res.IsError || o["status"].(map[string]any)["running"] != true {
 		t.Fatalf("start: %v %s", o, toolText(res))
 	}

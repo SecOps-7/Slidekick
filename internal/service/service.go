@@ -37,7 +37,11 @@ type Service struct {
 	// Cast drives Chromecasts (see cast.go); made on first use when nil.
 	Cast     *cast.Manager
 	castOnce sync.Once
-	mu       sync.Mutex // serialises writes inside this process
+	// CastDiscovery configures finding cast devices on the network (see
+	// castdiscovery.go); set it before StartCastDiscovery.
+	CastDiscovery CastDiscoveryConfig
+	disc          castDiscovery
+	mu            sync.Mutex // serialises writes inside this process
 }
 
 func New(st *store.Store, v *deck.Validator, cat *deck.Catalog, themes *deck.ThemeSet, h *hub.Hub, baseURL string) *Service {

@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SecOps-7/slidekick/internal/cast"
 	"github.com/SecOps-7/slidekick/internal/cast/casttest"
+	"github.com/SecOps-7/slidekick/internal/service"
 )
 
 // nextCastEvent waits for the next {"type":"cast"} event on a deck's hub.
@@ -170,5 +172,75 @@ func TestStartCastServiceAPI(t *testing.T) {
 	svc.BaseURL = "http://localhost:7410"
 	if err := svc.StartCast(ctx, res.DeckID, "Office TV", "agent"); err == nil || !strings.Contains(err.Error(), "SLIDEKICK_BASE_URL") {
 		t.Fatalf("localhost base URL: %v", err)
+	}
+}
+
+func TestFoundCastDeviceRoutes(t *testing.T) {
+	e := newAccServer(t, "")
+	admin := e.withAdmin(t)
+	owner := e.addUser(t, admin, "edna", "editor")
+	view := e.addUser(t, admin, "vera", "viewer")
+	tv := casttest.New(t)
+	const devID = "0f5a2b3c4d5e6f708192a3b4c5d6e7f8"
+	e.env.Svc.CastDiscovery = service.CastDiscoveryConfig{Find: func(ctx context.Context, progress func(int, int)) ([]cast.Found, error) {
+		return []cast.Found{{ID: devID, Name: "Kitchen", Model: "Chromecast", Host: tv.Host, Port: tv.Port}}, nil
+	}}
+	_, out := owner.do("POST", "/api/decks", map[string]any{"title": "Quarterly", "slides": oneSlide})
+	id := out["deckId"].(string)
+
+	// Nothing found yet: the menu is empty. Viewers can't refresh.
+	if code, _ := view.do("POST", "/api/decks/"+id+"/cast/refresh", nil); code != 403 {
+		t.Fatalf("viewer refresh: %d", code)
+	}
+	code, out := owner.do("POST", "/api/decks/"+id+"/cast/refresh", nil)
+	devs, _ := out["devices"].([]any)
+	if code != 200 || len(devs) != 1 || strings.Contains(fmt.Sprint(out), tv.Host) {
+		t.Fatalf("refresh: %d %v", code, out)
+	}
+	d := devs[0].(map[string]any)
+	if d["id"] != "auto-"+devID || d["name"] != "Kitchen" || d["auto"] != true {
+		t.Fatalf("found device %v", d)
+	}
+	// An editor casts to it with no admin step.
+	if code, out := owner.do("POST", "/api/decks/"+id+"/cast", map[string]any{"deviceId": "auto-" + devID}); code != 200 {
+		t.Fatalf("cast: %d %v", code, out)
+	}
+	if len(tv.Loaded()) != 1 {
+		t.Fatal("not loaded")
+	}
+	owner.do("DELETE", "/api/decks/"+id+"/cast", nil)
+
+	// Admin view: found list with discovery status.
+	if code, _ := owner.do("POST", "/api/admin/cast/discover", nil); code != 403 {
+		t.Fatalf("editor discover: %d", code)
+	}
+	code, out = admin.do("POST", "/api/admin/cast/discover", nil)
+	if code != 200 || len(out["devices"].([]any)) != 1 || out["discovery"].(map[string]any)["found"].(float64) != 1 {
+		t.Fatalf("discover: %d %v", code, out)
+	}
+	if code, _ := owner.do("POST", "/api/admin/cast/found/auto-"+devID+"/hide", nil); code != 403 {
+		t.Fatalf("editor hide: %d", code)
+	}
+	if code, _ := admin.do("POST", "/api/admin/cast/found/auto-"+devID+"/hide", nil); code != 200 {
+		t.Fatalf("hide: %d", code)
+	}
+	if _, out := owner.do("GET", "/api/decks/"+id+"/cast", nil); len(out["devices"].([]any)) != 0 {
+		t.Fatalf("hidden but listed: %v", out)
+	}
+	code, out = admin.do("GET", "/api/admin/cast/devices", nil)
+	if f := out["found"].([]any); code != 200 || len(f) != 1 || f[0].(map[string]any)["hidden"] != true || len(out["devices"].([]any)) != 0 {
+		t.Fatalf("admin list: %d %v", code, out)
+	}
+	admin.do("DELETE", "/api/admin/cast/found/auto-"+devID+"/hide", nil)
+	code, out = admin.do("POST", "/api/admin/cast/found/auto-"+devID+"/save", map[string]any{"name": "Kitchen TV"})
+	if code != 200 || out["name"] != "Kitchen TV" || out["deviceId"] != devID {
+		t.Fatalf("save: %d %v", code, out)
+	}
+	_, out = owner.do("GET", "/api/decks/"+id+"/cast", nil)
+	if devs := out["devices"].([]any); len(devs) != 1 || devs[0].(map[string]any)["name"] != "Kitchen TV" || devs[0].(map[string]any)["auto"] != nil {
+		t.Fatalf("after save: %v", out)
+	}
+	if code, _ := admin.do("POST", "/api/admin/cast/found/auto-ffff/save", nil); code != 404 {
+		t.Fatalf("save unknown: %d", code)
 	}
 }
