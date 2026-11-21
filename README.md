@@ -1,26 +1,83 @@
-<h1>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-on-dark.svg">
-    <img src="docs/brand/wordmark-on-light.svg" alt="Slidekick" height="64">
-  </picture>
-</h1>
+<p align="center">
+  <img src="docs/brand/mark.svg" alt="Slidekick logo" width="96" height="96">
+</p>
 
-**Agents write the deck. You watch it move.**
+<h1 align="center">Slidekick</h1>
 
-Slidekick is a self-hosted slideshow app for the age of agents. Your AI agent builds animated, on-brand decks through [MCP](https://modelcontextprotocol.io); you watch them come together live in the browser, edit alongside it, and present. One Go binary, one Docker image, MIT licensed.
+<p align="center">
+  <strong>Agents write the deck. You watch it move.</strong><br>
+  A self-hosted, animated slideshow app built for AI agents: a single Go binary, one Docker volume.
+</p>
 
-![Slides made by an agent in five themes](docs/img/slides.png)
+<p align="center">
+  <a href="https://github.com/SecOps-7/Slidekick/pkgs/container/slidekick"><img alt="Docker image on GHCR" src="https://img.shields.io/badge/docker-ghcr.io%2Fsecops--7%2Fslidekick-2496ED?style=flat-square&logo=docker&logoColor=white"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-6b7280?style=flat-square">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-20%20tools-7c3aed?style=flat-square">
+  <img alt="Go" src="https://img.shields.io/badge/Go-single%20binary-00ADD8?style=flat-square&logo=go&logoColor=white">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-16a34a?style=flat-square"></a>
+</p>
 
-## Why
+<p align="center">
+  <a href="#-quick-start">Quick start</a> ·
+  <a href="#-connect-an-agent">Connect an agent</a> ·
+  <a href="#-features">Features</a> ·
+  <a href="#-screenshots">Screenshots</a> ·
+  <a href="#-configuration">Configuration</a> ·
+  <a href="#-security">Security</a> ·
+  <a href="#-development">Development</a>
+</p>
 
-AI slide tools today either wrap Markdown (flat slides) or export PPTX and walk away. Slidekick is different:
+<p align="center">
+  <img src="docs/img/slides.png" alt="Slides made by an agent in five themes" width="900">
+</p>
+
+---
+
+## ✨ Why Slidekick
+
+AI slide tools today either wrap Markdown (flat slides) or export a PPTX and walk away. Slidekick is different:
 
 - **Structured, not freeform.** Agents compose elements inside layouts against a JSON Schema. They never write HTML, so the output is always valid and always looks designed.
-- **Motion is built in.** Build steps, morph transitions between slides, count-up stats, charts that draw themselves.
-- **Live and shared.** Every agent edit streams into your open browser. You can edit the same deck, undo the agent, or pin a request for it ("Send to agent").
+- **Motion is built in.** Build steps, morph transitions between slides, count-up stats and charts that draw themselves.
+- **Live and shared.** Every agent edit streams into your open browser. Edit the same deck, undo the agent, or leave it a comment to pick up.
 - **The agent can see its work.** Every write comes back with lint findings, and `render_slide` returns a screenshot, so agents fix problems before you notice them.
+- **It can present, too.** An AI walks through the deck out loud in the voice you choose, on your screen or a Chromecast, talking about what is on each slide.
 
-## Quick start
+---
+
+## 🚀 Quick start
+
+```yaml
+# compose.yaml
+services:
+  slidekick:
+    image: ghcr.io/secops-7/slidekick:1-render
+    restart: unless-stopped
+    user: "1000:1000"
+    ports: ["7410:7410"]
+    env_file: [./slidekick.env]          # SLIDEKICK_TOKEN=... (chmod 600)
+    environment:
+      SLIDEKICK_BASE_URL: http://192.168.1.10:7410   # the address people (and TVs) use
+    volumes: ["./data:/data"]
+    read_only: true
+    tmpfs: ["/tmp:size=512m"]           # Chromium scratch space
+    shm_size: 256m
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+```
+
+```bash
+echo "SLIDEKICK_TOKEN=$(openssl rand -hex 24)" > slidekick.env && chmod 600 slidekick.env
+docker compose up -d
+docker compose logs slidekick | grep -i setup   # the one-time code for /setup
+```
+
+Open `http://<server>:7410/setup`, create the first admin with the code from the log, and you are in.
+
+<details>
+<summary><strong>One-line <code>docker run</code></strong></summary>
+
+<br>
 
 ```bash
 read -rsp "admin password: " PW
@@ -30,57 +87,226 @@ docker run -d --name slidekick -p 7410:7410 \
   ghcr.io/secops-7/slidekick:latest-render
 ```
 
-Sign in at http://localhost:7410, create a personal agent token on the **Account** page, and connect Claude Code (other clients: [docs/agents.md](docs/agents.md)):
+`SLIDEKICK_ADMIN_*` creates the first admin on first run and is ignored afterwards.
+
+</details>
+
+<details>
+<summary><strong>Which image?</strong></summary>
+
+<br>
+
+| Tag | Size | What it adds |
+|---|---|---|
+| `:<version>-render` | larger | Chromium, for `render_slide` screenshots and PDF/PNG export. Recommended. |
+| `:<version>` | slim, distroless | Everything else. Agents can still build and lint decks; screenshots and PDF/PNG export are unavailable. |
+
+Both are built for amd64 and arm64.
+
+</details>
+
+<details>
+<summary><strong>Build from source</strong></summary>
+
+<br>
 
 ```bash
-claude mcp add --transport http slidekick http://localhost:7410/mcp \
+git clone https://github.com/SecOps-7/Slidekick.git && cd Slidekick
+docker build --target render -t slidekick:local-render .
+```
+
+Or without Docker (Go and Node 24):
+
+```bash
+npm --prefix web ci && npm --prefix web run build
+go run ./cmd/slidekick serve      # http://localhost:7410
+```
+
+</details>
+
+---
+
+## 🤖 Connect an agent
+
+Sign in, create a personal agent token on the **Account** page, and add Slidekick to your MCP client. For Claude Code:
+
+```bash
+claude mcp add --transport http slidekick http://<server>:7410/mcp \
   --header "Authorization: Bearer skp_..."
 ```
 
-Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each slide with render_slide, and give me the link."*
+Then ask: *"Use Slidekick to make a 6-slide deck about our Q3 launch, check each slide with render_slide, and give me the link."* Open the link and watch it being built.
 
-## What you get
+Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agents.md](docs/agents.md).
+
+---
+
+## 🧭 Features
+
+### At a glance
 
 | | |
-| --- | --- |
-| **For agents** | 20 MCP tools: create and patch decks (RFC 6902), lint, screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links. Plus the schema, catalogues and a design guide as resources. |
-| **Elements** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, 99 icons, shapes, embeds, and a sandboxed HTML escape hatch. 8 layouts. |
-| **Motion** | 28 build presets (fades and slides from any side, zoom, pop, drop, bounce, 3D flips, swing, blur, reveal, iris, highlight, typewriter, line drawing…) with spring physics, and 18 transitions (fade, slide, push, zoom, cover, uncover, wipe, split, iris, blur, 3D flip and cube, swap and **morph**); respects `prefers-reduced-motion`. |
-| **AI** | Built-in chat in the editor with OpenAI, Anthropic, Google or any OpenAI-compatible (local) model. It edits as you, with your permissions; Stop and Undo any time. |
-| **Accounts** | Admin, editor and viewer roles; password sign-in and single sign-on (OpenID Connect: Entra, Google, Authentik, Keycloak); personal agent tokens. |
-| **Sharing** | New decks are private: signed-in people and private (keyed) links. Owners can make a deck public. Per-deck edit tokens for agents or colleagues. |
-| **Themes** | 18 themes, from corporate Boardroom and editorial Magazine to Synthwave, Terminal, Chalkboard and an accessibility-first High Contrast theme, all with self-hosted OFL fonts. Write your own: [docs/themes.md](docs/themes.md). |
-| **Editor** | Follows the agent as it works; slide sorter, inline text editing, property panel, build timeline, undo/redo across agent and human edits. |
-| **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer; audience window and remote viewers follow along. |
-| **Export** | Standalone HTML that plays offline with every animation, PDF, or PNGs. |
+|---|---|
+| 🤖 **Built for agents** | 20 MCP tools over streamable HTTP or stdio: create and patch decks (RFC 6902 JSON Patch), lint, `render_slide` screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links. The schema, element catalogues and a design guide are resources, and `outline_to_deck`, `polish_deck` and `restyle_deck` are prompts. Every write returns the new version, lint findings and the number of open human comments. |
+| 🧱 **Elements and layouts** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, icons, shapes, embeds, and a sandboxed HTML escape hatch that lint always flags. 8 layouts, styled with theme tokens only. |
+| 🎬 **Motion** | 28 build presets (fades and slides from any side, zoom, pop, bounce, 3D flips, iris, typewriter, line drawing...) with spring physics and stagger, per-item bullet builds, count-up stats and charts that draw in. 18 transitions, including **morph** between slides. All respect reduced motion. |
+| 🎨 **Themes** | 18 themes, from corporate Boardroom and editorial Magazine to Synthwave, Terminal, Chalkboard and an accessibility-first High Contrast, all with self-hosted fonts. Tests lint every example deck in every theme and enforce contrast. [Write your own](docs/themes.md). |
+| 🗣️ **AI presenting** | The built-in AI or any MCP agent presents a deck out loud: it moves through the slides and build steps and speaks about each slide's content, with the speaker notes as talking points. It never narrates the mechanics ("next slide..."); a filter removes that before anything is spoken. Each step waits until the line has been heard. |
+| 🔊 **Voices** | Text-to-speech through Fish Audio, ElevenLabs, OpenAI, Cartesia, Deepgram Aura or any OpenAI-compatible server (Kokoro, Piper, LocalAI), plus free browser voices. Keys are encrypted; pick a default narration voice and try samples under Settings → Voices. |
+| 📺 **Casting** | Cast a deck to a Chromecast from the editor, the presenter view or an agent. Devices on your network are found automatically; the TV shows a full-screen, sign-in-free view that follows the presenter and plays the narration, while the laptop stays muted unless you unmute it. |
+| 💬 **AI chat** | A chat panel in the editor that works with OpenAI, Anthropic, Google or any OpenAI-compatible (local) model. It edits only the open deck, through Slidekick's own tools as the signed-in user, so roles, validation and lint apply. Stop and Undo at any time. |
+| ✏️ **Editor** | Follows the agent as it works: slide sorter, inline text editing, property panel, build timeline, undo/redo across agent and human edits, and a schema check on every change. |
+| 🎤 **Presenter** | Speaker notes, next slide, timer, build progress, laser pointer, an audience window and remote followers. |
+| 📚 **Library** | Every deck shown as a live miniature of its first slide in its own theme, with search, sort, All/Mine and quick actions. |
+| 🔐 **Accounts** | Admin, editor and viewer roles, enforced on every route, the live WebSocket and MCP. Password sign-in (argon2id) and single sign-on with OpenID Connect (Entra, Google, Authentik, Keycloak), several providers at once. Personal agent tokens and per-deck edit tokens. |
+| 🔗 **Sharing** | New decks are private: signed-in people and holders of the private (keyed) link can watch. Owners can make a deck public or rotate its link. |
+| 📦 **Export** | Standalone HTML that plays offline with every animation, PDF, or PNGs. |
+| ℹ️ **About** | Settings → About shows the build, the system it runs on, these release notes, and every Go module, web library and font in the build with its licence. |
 
-![The 13 newest themes, four slides each](docs/img/themes.jpg)
+<details>
+<summary><strong>How an agent builds a deck</strong></summary>
 
-![The editor: slide sorter, canvas, property panel and build timeline](docs/img/editor.png)
+<br>
 
-![Presenter view with next slide, notes, timer and laser pointer](docs/img/presenter.png)
+1. The agent reads the schema and design guide (MCP resources) and calls `create_deck` with an outline, or `patch_deck` with JSON Patch operations.
+2. Slidekick validates the change against the schema, stores a new version and streams it to every open browser, which morphs to the result.
+3. The reply carries lint findings (overflowing text, low contrast, too many bullets, missing alt text) and the number of comments people have left.
+4. `render_slide` returns a screenshot so the agent can check the slide the way a person sees it, then fix and repeat.
+5. `focus_slide` brings the slide it is working on into your view, and you can undo any agent edit from the editor.
 
-![The AI assistant adding a slide in the editor](docs/img/ai-chat.png)
+</details>
 
-## Run it for real
+<details>
+<summary><strong>How AI presenting works</strong></summary>
 
-Docker Compose, TLS on the LAN, configuration and the security model: [docs/self-hosting.md](docs/self-hosting.md). Settled design decisions: [docs/decisions.md](docs/decisions.md).
+<br>
 
-| Variable | Default | |
-| --- | --- | --- |
+- **Automatic run.** **Present with AI voice** in the presenter view, `start_presentation` over MCP, or asking the AI chat to present. Just before each slide the configured model writes one to four sentences per build step from the slide's content (text, numbers, chart data, diagram labels, image descriptions), using the notes as intent. The next slide is prepared while the current one is spoken, so there are no gaps.
+- **Step by step.** Agents can drive it themselves with `present_slide` (a slide, a build step and a line to say); it returns once the line has been heard.
+- **Without an AI provider** the run reads the notes, split across build steps by blank lines.
+- **Where it plays.** On the presenter view and a cast TV. Viewers and the editor follow silently with captions and can unmute. While casting, the presenter laptop is muted by default and the TV paces the run.
+
+</details>
+
+<details>
+<summary><strong>Keyboard shortcuts</strong></summary>
+
+<br>
+
+| Key | Where | Action |
+|---|---|---|
+| `→` `Space` `PageDown` | Viewer, presenter | Next build step or slide |
+| `←` `PageUp` | Viewer, presenter | Previous |
+| `Home` `End` | Viewer, presenter | First or last slide |
+| `F` | Viewer, presenter | Full screen |
+| `L` | Presenter | Laser pointer |
+| `T` | Presenter | Reset the timer |
+| `Ctrl+Z` `Ctrl+Shift+Z` | Editor | Undo, redo (agent and human edits alike) |
+
+</details>
+
+---
+
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td colspan="2"><img src="docs/img/themes.jpg" alt="Themes"><p align="center"><sub>Themes, four slides each</sub></p></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/img/editor.png" alt="Editor"><p align="center"><sub>Editor: slide sorter, canvas, property panel and build timeline</sub></p></td>
+    <td width="50%"><img src="docs/img/presenter.png" alt="Presenter view"><p align="center"><sub>Presenter view with notes, timer and laser pointer</sub></p></td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/ai-chat.png" alt="AI chat"><p align="center"><sub>The AI chat adding a slide</sub></p></td>
+    <td><img src="docs/img/settings-users.png" alt="Users and roles"><p align="center"><sub>Users and roles</sub></p></td>
+  </tr>
+</table>
+
+---
+
+## 🔧 Configuration
+
+Most things are configured in the web UI (**Settings**): users and roles, single sign-on, AI providers, voices, cast devices and instance options. They are stored under `/data`, the only mount, alongside the SQLite database and uploaded files.
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SLIDEKICK_TOKEN` | empty | The server token: an all-powerful emergency key, kept in an owner-only env file. Also accepted as the setup code. At least 24 characters. |
 | `SLIDEKICK_ADMIN_USERNAME`, `SLIDEKICK_ADMIN_PASSWORD` | empty | Create the first admin on first run (or use `/setup`). |
-| `SLIDEKICK_TOKEN` | empty | Server token: an all-powerful emergency key, kept in the owner-only env file. At least 24 characters. |
-| `SLIDEKICK_TRUSTED_PROXIES` | empty | Address of your TLS proxy, so cookies are `Secure` over https. |
-| `SLIDEKICK_SECRET_KEY` | key file in the data folder | Encrypts stored SSO and AI secrets. |
-| `SLIDEKICK_BASE_URL` | `http://localhost:7410` | Public URL used in share links |
-| `SLIDEKICK_DATA` | `/data` | SQLite database and uploads |
-| `SLIDEKICK_ADDR` | `:7410` | Listen address |
+| `SLIDEKICK_BASE_URL` | `http://localhost:7410` | The URL people use, in share links and SSO redirects. Must be reachable from a cast TV, so use the LAN address rather than `localhost`. |
+| `SLIDEKICK_TRUSTED_PROXIES` | empty | Addresses of your TLS reverse proxy. Only these may set the client address and https headers. |
+| `SLIDEKICK_SECRET_KEY` | key file in `/data` | 32 bytes that encrypt stored SSO, AI and voice secrets. Back it up with the data. |
+| `SLIDEKICK_CAST_SUBNETS` | derived | Private subnets to search for Chromecasts, such as a separate IoT VLAN (`192.168.20.0/24`). Default: the server's own LAN. |
+| `SLIDEKICK_CAST_DISCOVERY` | on | `off` stops the automatic background search for cast devices. |
+| `SLIDEKICK_ADDR` | `:7410` | Listen address. |
+| `SLIDEKICK_DATA` | `/data` | SQLite database and uploads. |
+| `SLIDEKICK_CHROME` | auto | Path to Chromium if it isn't on `PATH`. |
+| `SLIDEKICK_S3_*` | empty | Keep uploaded and exported files in an S3-compatible bucket (AWS S3, MinIO...) instead of `/data`. |
 
-Files can live in an S3-compatible bucket instead of the data folder: see the `SLIDEKICK_S3_*` variables in [docs/self-hosting.md](docs/self-hosting.md#configuration).
+The full reference, with the S3 settings, roles, single sign-on and casting across VLANs, is in [docs/self-hosting.md](docs/self-hosting.md). Settled design decisions are in [docs/decisions.md](docs/decisions.md).
 
-Two images: `-render` (with Chromium, for screenshots and PDF/PNG export) and a slim distroless one. Both for amd64 and arm64.
+<details>
+<summary><strong>Command line</strong></summary>
 
-## Develop
+<br>
+
+```text
+slidekick serve              run the server (the default)
+slidekick stdio              MCP over stdio, for a local agent
+slidekick admin <username>   create or reset an admin from the host (password from
+                             SLIDEKICK_ADMIN_PASSWORD or the first line of stdin)
+slidekick version            print the version
+```
+
+</details>
+
+---
+
+## 🔒 Security
+
+Slidekick is built for your **local network**. It serves plain HTTP; terminate TLS at a reverse proxy if you need it.
+
+- **Roles everywhere.** Admin, editor and viewer roles are enforced on every REST route, the live WebSocket and MCP. Decks have one owner; only the owner or an admin changes one.
+- **New decks are private.** A private deck answers 404 without its 96-bit link key, so its id can't even be confirmed. Rotating the key disconnects old viewers.
+- **First-run setup needs a code.** Until an account exists, `/setup` needs a one-time code from the server log (or the server token).
+- **Sign-in is hardened.** argon2id passwords, 14-day session cookies with CSRF protection, and lockout per address and per username. Single sign-on checks PKCE, state, nonce, issuer and audience.
+- **Secrets at rest** (SSO client secrets, AI and voice keys) are encrypted with AES-256-GCM, never sent to the browser and never logged. Tokens are stored as hashes.
+- **Agent content is untrusted.** Rendering in Chromium reaches only public addresses and Slidekick itself, uploads are served with a sandboxing CSP, and the `html` element runs in a sandboxed frame with no scripts.
+- **Casting stays on the LAN.** The server talks to the TV directly; no port forward, tunnel or public URL is used.
+- **Never expose it directly to the internet.** For remote access use a VPN or an authenticating proxy.
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+---
+
+## 🧩 How it works
+
+```
+Agents (MCP: HTTP /mcp or stdio)        Browsers (editor, viewer, presenter, TV)
+            │                                        │  REST + live WebSocket
+            └──────────────┬─────────────────────────┘
+                           │
+  internal/server      HTTP routes, sessions, CSRF, the live hub
+  internal/mcpserver   the 20 MCP tools, resources and prompts
+  internal/service     one place for every deck operation, with authz checks
+  internal/deck        the JSON Schema contract, validation and JSON Patch
+  internal/lint        design lint returned with every write
+  internal/store       SQLite (pure Go): decks, versions, users, settings
+  internal/render      headless Chromium for render_slide and PDF/PNG
+  internal/presenting  AI presenting: script writing and pacing
+  internal/tts         text-to-speech engines     internal/cast   Chromecast
+  internal/ai, llm     the AI chat and its providers
+                           │
+  web/src              Preact + TypeScript, built with Vite and embedded in the binary
+```
+
+The browser and the server share one contract: the TypeScript types and the editor's validator are generated from the JSON Schema in `schema/`.
+
+---
+
+## 💻 Development
 
 ```bash
 npm --prefix web ci && npm --prefix web run build
@@ -88,8 +314,18 @@ go test ./... && npm --prefix web test
 go run ./cmd/slidekick serve      # http://localhost:7410
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues privately: [SECURITY.md](SECURITY.md).
+Golden screenshots of every example deck are compared in CI. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the local setup and the project's conventions.
 
-## License
+---
 
-MIT. Fonts are SIL Open Font License (see `themes/fonts/licenses`); icons are [Tabler Icons](https://tabler.io/icons) (MIT).
+## 🤝 Contributing
+
+Issues and pull requests are welcome, from typo fixes to new themes. Check the [open issues](https://github.com/SecOps-7/Slidekick/issues) first, and open one before a large change so the approach can be agreed. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## 📄 License
+
+MIT, see [LICENSE](LICENSE). Fonts are under the SIL Open Font License (see `themes/fonts/licenses`); icons are [Tabler Icons](https://tabler.io/icons) (MIT). Every bundled library and its licence is listed on the About page.
+
+<p align="center"><sub>Built with the help of <a href="https://claude.ai">Claude</a> by Anthropic.</sub></p>

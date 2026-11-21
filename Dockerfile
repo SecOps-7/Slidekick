@@ -42,7 +42,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s CMD ["/usr/local/bin/s
 ENTRYPOINT ["/usr/local/bin/slidekick"]
 CMD ["serve"]
 
-LABEL org.opencontainers.image.source="https://github.com/SecOps-7/slidekick" org.opencontainers.image.licenses="MIT" \
+LABEL org.opencontainers.image.source="https://github.com/SecOps-7/Slidekick" org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.description="Slidekick with headless Chromium for render_slide and PDF/PNG export"
 
 # ---- default: minimal distroless image (render_slide reports Chromium is missing)
@@ -54,5 +54,5 @@ EXPOSE 7410
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s CMD ["/usr/local/bin/slidekick", "health"]
 ENTRYPOINT ["/usr/local/bin/slidekick"]
 CMD ["serve"]
-LABEL org.opencontainers.image.source="https://github.com/SecOps-7/slidekick" org.opencontainers.image.licenses="MIT" \
+LABEL org.opencontainers.image.source="https://github.com/SecOps-7/Slidekick" org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.description="Slidekick: agents author animated slide decks over MCP; humans watch, edit and present live"

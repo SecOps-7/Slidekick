@@ -250,7 +250,7 @@ export function About({ embedded = false }: { embedded?: boolean }) {
             )}
           </div>
           <div class="ab-actions">
-            <a href="https://github.com/SecOps-7/slidekick/issues" target="_blank" rel="noopener noreferrer" class="ab-inline-link">
+            <a href="https://github.com/SecOps-7/Slidekick/issues" target="_blank" rel="noopener noreferrer" class="ab-inline-link">
               <Ico name="bug" cls="ab-act-ico" />
               Report a bug or idea
             </a>
