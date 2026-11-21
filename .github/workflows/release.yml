@@ -57,7 +57,11 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          build-args: VERSION=${{ github.ref_name }}
+          # The same version string as the binaries (1.0.0, not v1.0.0), and the commit
+          # for the about page.
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=image

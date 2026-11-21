@@ -2,7 +2,7 @@
 
 Each release lists its changes by type: New, Changed, Fixed and Internal (also Security, Removed and Deprecated when a release has them). The about page badges every note with its type.
 
-## 1.0.0 (unreleased)
+## 1.0.0 (2026-11-21)
 
 First public release.
 
