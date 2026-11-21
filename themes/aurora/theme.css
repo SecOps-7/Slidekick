@@ -28,3 +28,9 @@
 @media (prefers-reduced-motion: reduce) {
   .sk-theme-aurora .sk-slide::before { animation: none; }
 }
+/* PDF export and printing: gradient-clipped text becomes a gradient box in
+   PDF viewers that drop the text clip (a bar where the words should be), so
+   print it in solid colours. Screens and PNG screenshots keep the gradient. */
+@media print {
+  .sk-theme-aurora .sk-layout-title .sk-region-title .sk-el-heading { background: none; color: var(--sk-text); }
+}

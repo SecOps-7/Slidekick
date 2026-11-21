@@ -51,6 +51,7 @@ First public release.
 - Diagrams use Mermaid 12, pinned to its classic look and dagre layout so existing diagrams keep their shape; the full standalone export grows to about 7 MB as a result.
 
 ### Fixed
+- PDF export: gradient headings and big numbers (Aurora, Ember, Sunset and Ocean) could show as an empty bar in some PDF viewers, which drop the clip that shapes the gradient into letters. PDFs and printouts now use the theme's solid colours for that text; the screen and PNG screenshots keep the gradient.
 - Copy link did nothing on plain-HTTP network addresses, and copied a private deck's bare address, which only works for people who sign in. It now copies the private link and works everywhere.
 - The AI presenter read stage directions aloud ("the first point builds in now"); a filter now removes talk about slides, builds and transitions before anything is spoken.
 - Cast discovery mistook the container's own Docker network for the LAN; it now searches only the network the server is on.
