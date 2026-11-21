@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/SecOps-7/slidekick/internal/about"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -36,6 +37,8 @@ type Options struct {
 	Accounts *accounts.Service
 	AI       *ai.Service        // nil: no AI chat
 	TTS      *narration.Service // nil: no text-to-speech providers
+	// About is the build, shown on the about page (with the runtime and release notes).
+	About about.Build
 	// Presenter runs AI-narrated presentations; nil: no presenting routes.
 	Presenter *presenting.Manager
 	// TrustedProxies are the addresses of a TLS-terminating reverse proxy.
@@ -68,6 +71,7 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	// Every route states the action it needs; authz.Policy decides (see access.go).
 	// Deck ids are share links: listing needs a signed-in user (a deck token sees only its deck).
 	mux.Handle("GET /api/decks", s.require(authz.ListDecks, false, s.listDecks))
+	mux.Handle("GET /api/about", s.require(authz.ListDecks, false, s.about))
 	mux.Handle("POST /api/decks", s.require(authz.Create, false, s.createDeck))
 	mux.HandleFunc("GET /api/decks/{id}", s.viewGate(s.getDeck))
 	mux.HandleFunc("GET /api/decks/{id}/history", s.viewGate(s.history))
@@ -163,6 +167,18 @@ func writeErr(w http.ResponseWriter, err error) {
 	default:
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
+}
+
+// about is the about page: build, runtime, release notes and the Go modules
+// in the binary. Anyone who may list decks may see it (it names versions, so
+// not anonymous callers once accounts exist).
+func (s *server) about(w http.ResponseWriter, r *http.Request) {
+	decks := 0
+	if rows, err := s.svc.List(r.Context()); err == nil {
+		decks = len(rows)
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, 200, about.Collect(s.opt.About, decks))
 }
 
 func (s *server) listDecks(w http.ResponseWriter, r *http.Request) {

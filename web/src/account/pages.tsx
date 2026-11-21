@@ -668,12 +668,21 @@ function General() {
   );
 }
 
-export async function mountAccountPage(host: HTMLElement, page: "login" | "setup" | "account" | "settings") {
+export async function mountAccountPage(host: HTMLElement, page: "login" | "setup" | "account" | "settings" | "about") {
   document.body.classList.add("acc-page");
-  document.title = { login: "Sign in", setup: "Set up", account: "Account", settings: "Settings" }[page] + " · Slidekick";
+  document.title = { login: "Sign in", setup: "Set up", account: "Account", settings: "Settings", about: "About" }[page] + " · Slidekick";
   if (page === "login") return render(<Login />, host);
   if (page === "setup") return render(<Setup />, host);
   const m = await me();
+  if (page === "about") {
+    // Anyone signed in may see it, and everyone while no accounts exist yet.
+    if (!m.user && !m.openMode) {
+      location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
+      return;
+    }
+    const { About } = await import("./about");
+    return render(<About />, host);
+  }
   if (!m.user) {
     location.href = `/login?next=${encodeURIComponent(location.pathname + location.hash)}`;
     return;

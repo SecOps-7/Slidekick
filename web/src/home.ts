@@ -292,6 +292,7 @@ function accountButton(who: Me): HTMLElement {
   const initial = (u.name || u.username).trim().charAt(0).toUpperCase().replace(/[<&>"]/g, "");
   const items: Item[] = [["Account", () => location.assign("/account")]];
   if (who.can["manage-users"]) items.push(["Settings", () => location.assign("/settings")]);
+  items.push(["About Slidekick", () => location.assign("/about")]);
   items.push(["Sign out", () => signOut()]);
   const m = menu(`Account menu for ${u.username}`, `<span class="dk-avatar">${initial}</span>`, items);
   m.classList.add("dk-account");

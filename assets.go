@@ -13,6 +13,16 @@ var Schema embed.FS
 //go:embed themes
 var Themes embed.FS
 
+// Changelog is CHANGELOG.md, shown as the release notes on the about page.
+//
+//go:embed CHANGELOG.md
+var Changelog string
+
+// License is the LICENSE file, shown on the about page.
+//
+//go:embed LICENSE
+var License string
+
 //go:embed all:web/dist
 var webDist embed.FS
 

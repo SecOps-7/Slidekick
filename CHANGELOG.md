@@ -4,6 +4,24 @@
 
 First public release.
 
+### Presenting with an AI voice
+- The built-in AI and MCP agents can present a deck on their own: `start_presentation` runs the whole deck, `present_slide` drives it step by step, and each step waits until the line has been heard before moving on.
+- The presenter writes what to say from each slide's content and data, with the speaker notes as talking points; a filter removes any talk about slides, builds or transitions before it is spoken.
+- The voice plays on the presenter screen and the cast TV; viewers and the editor follow silently with captions and can unmute.
+
+### Voices
+- Text-to-speech through Fish Audio, ElevenLabs, OpenAI, Cartesia, Deepgram Aura or any OpenAI-compatible server (Kokoro, Piper, LocalAI), plus free browser voices; keys stored encrypted, managed under Settings > Voices with a sample player.
+
+### Casting
+- Cast a deck to a Chromecast on the network from the editor, the presenter or an agent (`cast_deck`); the TV shows a full-screen, sign-in-free view that follows the presenter.
+- Cast devices on the server's network are found automatically and appear in the Cast menu; others can be added by address under Settings > Cast devices.
+
+### Library and app
+- A new home page: every deck is a live miniature of its first slide in its own theme, with search, sort, an All/Mine filter and a menu for copying links and deleting.
+- Slidekick's own dialogs replace the browser's pop-ups everywhere, with clear actions and Cancel focused for anything destructive.
+- Copy link works on plain-HTTP network addresses and copies a private deck's working link.
+- An About page with the build, the system it runs on, these release notes and every library and font in the build with its licence.
+
 ### Agents (MCP)
 - 20 tools over streamable HTTP (`/mcp`, bearer token) or stdio: create and edit decks, JSON Patch, lint, `render_slide` screenshots, uploads, HTML/PDF/PNG export, comments, history and undo.
 - Every write returns the new version, lint findings and the number of open human comments.

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/SecOps-7/slidekick/internal/about"
 	"log/slog"
 	"net"
 	"net/http"
@@ -38,7 +39,12 @@ import (
 	"github.com/SecOps-7/slidekick/internal/store"
 )
 
-var version = "0.1.0-dev"
+var (
+	version = "0.1.0-dev"
+	// commit and built are stamped by the image build (-ldflags -X); empty in a local build.
+	commit, built string
+	started       = time.Now()
+)
 
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
@@ -189,7 +195,7 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		}
 		return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
 	}
-	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, Accounts: acc, TrustedProxies: trusted,
+	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, About: about.Build{Version: version, Commit: commit, Built: built, Changelog: slidekick.Changelog, Licence: slidekick.License, Started: started}, Accounts: acc, TrustedProxies: trusted,
 		AI:  aiSvc,
 		TTS: voices, Presenter: presenter, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
 

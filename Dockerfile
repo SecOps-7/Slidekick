@@ -24,7 +24,9 @@ RUN go mod download
 COPY . .
 COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=0.1.0-dev
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/slidekick ./cmd/slidekick
+# COMMIT is optional (the build context has no .git); the build date is stamped here.
+ARG COMMIT=
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.built=$(date -u +%Y-%m-%d)" -o /out/slidekick ./cmd/slidekick
 
 # ---- render: adds headless Chromium for render_slide (tag: slidekick:<ver>-render)
 FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS render
