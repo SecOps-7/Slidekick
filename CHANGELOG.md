@@ -9,6 +9,9 @@ Each release lists its changes by type: New, Changed, Fixed and Internal (also S
 - Live slides: a ninth layout, Live (a headline figure, a chart and a status line), whose content an agent changes while the deck is shown, for network or home stats. `update_live` (or `POST /api/decks/<id>/live`) sets new values, adds and removes elements; each change is checked like an edit, kept as the slide's current content without adding versions, limited to 5 a second per slide, and applied in place on the viewer, audience window, presenter view and cast TV: no redraw, the presenter keeps their place, values just change (or animate with `animate`), added and removed elements ease in and out, and a small last-updated time shows unless the slide hides it. Off by default (Settings > General); only the deck's owner, an admin or the deck's edit token can send updates.
 - Sharing: viewer links can be embedded in other sites an admin lists (Settings > General, off by default). Only viewer link pages relax framing, for exactly those sites; everything else stays unframeable.
 
+### Fixed
+- Charts: long or many x-axis labels on bar and line charts no longer run into each other. Labels that fit are unchanged; otherwise a line chart shows every 2nd or 3rd label (always the first and the last), and a bar chart, or a line chart that would hide too much, angles its labels at 35° and makes room below; a label still too long is shortened with an ellipsis, its full text kept for hover and screen readers. The layout depends only on the labels, so it's the same on every screen and export, and a live update that changes only values never moves them.
+
 ## 1.0.0 (2026-11-21)
 
 First public release.

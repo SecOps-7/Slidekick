@@ -1,6 +1,7 @@
 // Data charts as plain SVG (no chart library): bar, line and pie, coloured
 // from theme tokens, with a draw-in animation when the chart appears.
 import type { ColorToken, Element } from "./types";
+import { layoutLabels, leftExtra } from "./chartlabels";
 
 const NS = "http://www.w3.org/2000/svg";
 const PALETTE: ColorToken[] = ["accent", "accent2", "text", "muted", "surface"];
@@ -50,7 +51,10 @@ export function renderChart(e: Element): HTMLElement {
   fig.append(svg);
 
   if (kind === "pie") drawPie(svg, labels, series[0], unit, showValues);
-  else drawXY(svg, kind, labels, series, unit, showValues);
+  else if (drawXY(svg, kind, labels, series, unit, showValues)) {
+    // Some labels are hidden or shortened on screen: screen readers still get them all.
+    svg.setAttribute("aria-label", `${caption || `${kind} chart`}. Labels: ${labels.join(", ")}`);
+  }
 
   if (series.length > 1 || kind === "pie") {
     const legend = document.createElement("div");
@@ -73,9 +77,24 @@ export function renderChart(e: Element): HTMLElement {
   return fig;
 }
 
-function drawXY(svg: SVGSVGElement, kind: string, labels: string[], series: Series[], unit: string, showValues: boolean) {
-  const padL = 90, padR = 20, padT = 30, padB = 60;
-  const iw = W - padL - padR, ih = H - padT - padB;
+/** Draws a bar or line chart. Returns whether some labels are hidden or shortened. */
+function drawXY(svg: SVGSVGElement, kind: string, labels: string[], series: Series[], unit: string, showValues: boolean): boolean {
+  const padR = 20, padT = 30;
+  let padL = 90;
+  const n = labels.length;
+  // The labels decide the room under the plot and, for a long first label set
+  // at an angle, to its left, so the layout depends only on the labels: new
+  // values never move them.
+  let band = (W - padL - padR) / Math.max(1, n);
+  let lay = layoutLabels(labels, band, padL, H, { thin: kind === "line" });
+  const extra = leftExtra(lay, labels, band, padL, H);
+  if (extra) {
+    padL += extra;
+    band = (W - padL - padR) / Math.max(1, n);
+    lay = layoutLabels(labels, band, padL, H, { thin: kind === "line" });
+  }
+  const padB = lay.bottom;
+  const ih = H - padT - padB;
   const all = series.flatMap((s) => s.values);
   const hi = Math.max(0, ...all);
   const lo = Math.min(0, ...all);
@@ -84,7 +103,6 @@ function drawXY(svg: SVGSVGElement, kind: string, labels: string[], series: Seri
   const min = Math.floor(lo / stepV) * stepV;
   const ticks = Math.round((max - min) / stepV);
   const y = (v: number) => padT + ih - ((v - min) / (max - min || 1)) * ih;
-  const n = labels.length;
 
   const grid = svgEl("g", { class: "sk-chart-grid" });
   for (let k = 0; k <= ticks; k++) {
@@ -97,12 +115,22 @@ function drawXY(svg: SVGSVGElement, kind: string, labels: string[], series: Seri
   }
   svg.append(grid);
 
-  const band = iw / Math.max(1, n);
-  labels.forEach((l, i) => {
-    const t = svgEl("text", { x: padL + band * (i + 0.5), y: H - padB + 38, "text-anchor": "middle", class: "sk-chart-axis" });
-    t.textContent = l;
-    svg.append(t);
-  });
+  const axis = svgEl("g", { class: `sk-chart-xlabels sk-chart-xlabels-${lay.mode}` });
+  for (const pl of lay.labels) {
+    const x = padL + band * (pl.index + 0.5);
+    const t = lay.angle
+      ? svgEl("text", { x, y: H - padB + 22, "text-anchor": "end", class: "sk-chart-axis", transform: `rotate(${-lay.angle} ${x.toFixed(1)} ${H - padB + 22})` })
+      : svgEl("text", { x, y: H - padB + 38, "text-anchor": "middle", class: "sk-chart-axis" });
+    t.textContent = pl.text;
+    if (pl.text !== pl.full) {
+      const title = svgEl("title");
+      title.textContent = pl.full; // hover shows the whole label
+      t.append(title);
+    }
+    axis.append(t);
+  }
+  svg.append(axis);
+  const altered = lay.labels.length < n || lay.shortened;
 
   if (kind === "line") {
     series.forEach((s, si) => {
@@ -122,7 +150,7 @@ function drawXY(svg: SVGSVGElement, kind: string, labels: string[], series: Seri
         }
       });
     });
-    return;
+    return altered;
   }
 
   // Grouped bars.
@@ -144,6 +172,7 @@ function drawXY(svg: SVGSVGElement, kind: string, labels: string[], series: Seri
       }
     });
   });
+  return altered;
 }
 
 function drawPie(svg: SVGSVGElement, labels: string[], s: Series | undefined, unit: string, showValues: boolean) {
