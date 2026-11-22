@@ -740,7 +740,7 @@ function General() {
         </label>
         <p class="acc-muted">
           Slides with the Live layout show values an agent keeps up to date (the <code>update_live</code> tool, or <code>POST /api/decks/&lt;id&gt;/live</code>): new
-          values, and elements added or removed, change in place on every screen. Only a deck's owner or an admin can send updates. While this is off, updates are
+          values, and elements added or removed, change in place on every screen. Only a deck's owner, an admin or the deck's edit token can send updates. While this is off, updates are
           refused and live slides keep their last values. Slidekick never fetches data itself.
         </p>
       </section>

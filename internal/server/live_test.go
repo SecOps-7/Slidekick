@@ -36,7 +36,7 @@ func TestLiveUpdatesWhoMay(t *testing.T) {
 		t.Fatalf("enable: %d %v", code, out)
 	}
 
-	// The owner and admins may; other editors, deck tokens and links may not.
+	// The owner, admins and the deck's edit token may; other editors and links may not.
 	if code, out := owner.do("POST", path, body); code != 200 || out["elementId"] != "e_temp" {
 		t.Fatalf("owner: %d %v", code, out)
 	}
@@ -52,7 +52,7 @@ func TestLiveUpdatesWhoMay(t *testing.T) {
 	}
 	deckTok := e.client(t)
 	deckTok.bear = tok
-	if code, _ := deckTok.do("POST", path, body); code != 403 {
+	if code, _ := deckTok.do("POST", path, body); code != 200 {
 		t.Fatalf("deck token: %d", code)
 	}
 	viewKey := e.env.Svc.ViewKey(context.Background(), id)

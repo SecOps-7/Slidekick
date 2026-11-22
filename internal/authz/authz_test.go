@@ -59,7 +59,8 @@ func TestPolicy(t *testing.T) {
 		{"server token updates live", Principal{Kind: KindServer}, LiveUpdate, mine, true},
 		{"other editor updates live", other, LiveUpdate, mine, false},
 		{"viewer updates live", view, LiveUpdate, mine, false},
-		{"deck token updates live", deckTok, LiveUpdate, mine, false},
+		{"deck token updates live", deckTok, LiveUpdate, mine, true},
+		{"deck token updates another deck live", deckTok, LiveUpdate, unowned, false},
 		{"presenter link updates live", Principal{Kind: KindPresenter, Deck: "d1"}, LiveUpdate, mine, false},
 		{"anonymous updates live", anon, LiveUpdate, mine, false},
 	}

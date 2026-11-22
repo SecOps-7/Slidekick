@@ -62,7 +62,7 @@ Editors and admins can also use the **✦ AI** panel in the editor, which drives
 | `get_history`, `restore_version` | Version history and undo |
 | `get_share_url` | Live link for the user (carries the view key when the deck is private) |
 | `focus_slide` | Bring a slide into view in the user's editor and viewer; call it before working on a slide or when the user names one |
-| `update_live` | Change a live slide (layout `live`) while the deck is shown: `op` `set` (a new value: a number for a stat, text for text, `{labels, series}` for a chart), `add` (a stat, chart, text or heading into `title`, `figure`, `chart` or `status`) or `remove`; `animate: true` plays a value change. Needs the deck's owner or an admin, and live slides allowed under Settings > General |
+| `update_live` | Change a live slide (layout `live`) while the deck is shown: `op` `set` (a new value: a number for a stat, text for text, `{labels, series}` for a chart), `add` (a stat, chart, text or heading into `title`, `figure`, `chart` or `status`) or `remove`; `animate: true` plays a value change. Needs the deck's owner, an admin or the deck's edit token, and live slides allowed under Settings > General |
 | `set_deck_access` | Make a deck public or private again (new decks start private); rotate the key |
 
 Resources: the deck JSON Schema, layout, element, icon, animation and theme catalogues, a design guide for agents, and `slidekick://decks/{id}/comments`. Prompts: `outline_to_deck`, `polish_deck`, `restyle_deck`.

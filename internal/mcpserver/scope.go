@@ -66,7 +66,7 @@ var toolActions = map[string]authz.Action{
 	"restore_version": authz.Edit,
 	"set_deck_access": authz.Share,
 	"focus_slide":     authz.Edit,       // moves everyone's view, so only for people who may change the deck
-	"update_live":     authz.LiveUpdate, // the deck's owner or an admin only
+	"update_live":     authz.LiveUpdate, // the deck's owner, an admin or its deck token
 	"get_share_url":   authz.View,
 	// Presenting and casting show the deck on screens and TVs, so they need
 	// the right to share it; speaking also needs the narrate permission.

@@ -551,7 +551,7 @@ func (h *handlers) tools(s *mcp.Server) {
 		"op add puts a new stat, chart, text or heading into a region (title, figure, chart, status) at position; op remove takes an element off. "+
 		"Every screen changes only that element, in place, without redrawing the slide: adds and removes ease in and out, and animate: true also plays a value change "+
 		"(a stat counts from the old value, a chart draws in, text fades in). Changes are checked like any edit and kept as the slide's live content (no new deck version); "+
-		"a deck edit to the slide replaces it. At most 5 updates a second per slide. Needs the deck's owner or an admin, and an admin must allow live slides under Settings > General."),
+		"a deck edit to the slide replaces it. At most 5 updates a second per slide. Needs the deck's owner, an admin or the deck's edit token, and an admin must allow live slides under Settings > General."),
 		func(ctx context.Context, req *mcp.CallToolRequest, in UpdateLiveIn) (*mcp.CallToolResult, *service.LiveResult, error) {
 			r, err := h.svc.UpdateLive(ctx, in.DeckID, in.LiveUpdate)
 			if err != nil {

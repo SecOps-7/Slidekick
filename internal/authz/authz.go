@@ -91,7 +91,7 @@ const (
 	Export         Action = "export"
 	Share          Action = "share"      // private toggle, view key and shared links
 	Drive          Action = "drive"      // a presentation's extras on a deck: the AI voice and casting
-	LiveUpdate     Action = "live"       // set new values on a live slide (the deck's owner or an admin only)
+	LiveUpdate     Action = "live"       // change a live slide: the deck's owner, an admin, or the deck's edit token
 	MintDeckToken  Action = "deck-token" // create or revoke a deck's edit token
 	Delete         Action = "delete"     // remove a deck for good
 	Create         Action = "create"
@@ -128,7 +128,7 @@ func (pol Policy) Can(p Principal, a Action, d *Deck) bool {
 			return false
 		}
 		switch a {
-		case View, Present, Comment, Edit, Export, Share, Drive:
+		case View, Present, Comment, Edit, Export, Share, Drive, LiveUpdate:
 			return true
 		}
 		return false
