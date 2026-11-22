@@ -308,10 +308,20 @@ function Account({ m }: { m: Me }) {
 // ---- admin settings ----
 
 const baseTabs = [
+  { id: "general", label: "General" },
   { id: "users", label: "Users" },
   { id: "sso", label: "Sign-in providers" },
-  { id: "general", label: "General" },
 ];
+
+// The tab order: instance-wide settings, then people and how they sign in,
+// then the AI and presenting features in the order they build on each other
+// (a model writes the narration, a voice speaks it, a TV shows it), then
+// About. Tabs other modules add without a place here go before About.
+const tabOrder = ["general", "users", "sso", "ai", "voices", "cast"];
+const rank = (id: string) => {
+  const i = tabOrder.indexOf(id);
+  return i < 0 ? tabOrder.length : i;
+};
 
 let extraTabs: { id: string; label: string; render: () => ComponentChildren }[] = [];
 /** Lets other features (AI providers) add a settings tab. */
@@ -328,12 +338,12 @@ function AboutTab() {
 }
 
 function Settings({ m }: { m: Me }) {
-  const [tab, setTab] = useState<string>(location.hash.slice(1) || "users");
+  const [tab, setTab] = useState<string>(location.hash.slice(1) || "general");
   useEffect(() => {
     history.replaceState(null, "", `#${tab}`);
   }, [tab]);
-  // About is always the last tab, after the ones settings modules add.
-  const tabs = [...baseTabs, ...extraTabs.map(({ id, label }) => ({ id, label })), { id: "about", label: "About" }];
+  // About is always the last tab.
+  const tabs = [...[...baseTabs, ...extraTabs.map(({ id, label }) => ({ id, label }))].sort((a, b) => rank(a.id) - rank(b.id)), { id: "about", label: "About" }];
   const extra = extraTabs.find((t) => t.id === tab);
   return (
     <Shell title="Settings" wide>
