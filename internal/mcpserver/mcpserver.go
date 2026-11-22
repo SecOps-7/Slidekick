@@ -247,8 +247,9 @@ type UploadOut struct {
 }
 
 type ExportIn struct {
-	DeckID string `json:"deck_id"`
-	Format string `json:"format,omitempty" jsonschema:"html (default; one self-contained file), pdf (one page per slide) or png (zip of slide images)"`
+	DeckID   string `json:"deck_id"`
+	Format   string `json:"format,omitempty" jsonschema:"html (default; one self-contained file), pdf (one page per slide) or png (zip of slide images)"`
+	TimeZone string `json:"timezone,omitempty" jsonschema:"pdf and png: IANA time zone for times shown on slides (a live slide's last-updated time), e.g. Europe/Berlin; default the server's"`
 }
 
 type ExportOut struct {
@@ -392,7 +393,7 @@ func (h *handlers) tools(s *mcp.Server) {
 				if err != nil {
 					return nil, nil, notFound(err, in.DeckID)
 				}
-				a, err := h.files(ctx, d, in.Format)
+				a, err := h.files(render.WithTimeZone(ctx, in.TimeZone), d, in.Format)
 				if err != nil {
 					return nil, nil, err
 				}

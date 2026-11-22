@@ -29,6 +29,7 @@ import (
 	"github.com/SecOps-7/slidekick/internal/localtls"
 	"github.com/SecOps-7/slidekick/internal/narration"
 	"github.com/SecOps-7/slidekick/internal/presenting"
+	"github.com/SecOps-7/slidekick/internal/render"
 	"github.com/SecOps-7/slidekick/internal/service"
 	"github.com/SecOps-7/slidekick/internal/store"
 )
@@ -668,7 +669,10 @@ func (s *server) exportFile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "export not configured", http.StatusNotImplemented)
 		return
 	}
-	a, err := s.opt.Files(r.Context(), r.PathValue("id"), r.URL.Query().Get("format"))
+	// tz is the requester's time zone (the editor sends its own), so times on
+	// the slides read as they do on their screen; otherwise the server's.
+	ctx := render.WithTimeZone(r.Context(), r.URL.Query().Get("tz"))
+	a, err := s.opt.Files(ctx, r.PathValue("id"), r.URL.Query().Get("format"))
 	if err != nil {
 		writeErr(w, err)
 		return

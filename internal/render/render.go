@@ -14,7 +14,10 @@ import (
 	"os/exec"
 	"sync"
 	"time"
+	_ "time/tzdata" // time-zone names are checked even where the system has no zoneinfo
 
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/chromedp"
 )
 
@@ -152,6 +155,30 @@ func (r *Renderer) Slide(ctx context.Context, deckID string, slide, step, width,
 	return out, err
 }
 
+type tzKey struct{}
+
+// WithTimeZone makes renders under ctx show times (a live slide's "Updated")
+// in the IANA time zone tz, like Europe/Berlin: the zone of the person who
+// asked for the export. An invalid or empty tz is ignored, and the render
+// uses the server's own zone (TZ).
+func WithTimeZone(ctx context.Context, tz string) context.Context {
+	if tz = ValidTimeZone(tz); tz == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, tzKey{}, tz)
+}
+
+// ValidTimeZone returns tz when it names a time zone, else "".
+func ValidTimeZone(tz string) string {
+	if tz == "" || len(tz) > 64 || tz == "Local" {
+		return ""
+	}
+	if _, err := time.LoadLocation(tz); err != nil {
+		return ""
+	}
+	return tz
+}
+
 // withPage opens u in a new tab at the given viewport, waits for the page to
 // set window.__skReady, then runs fn.
 func (r *Renderer) withPage(ctx context.Context, u string, width, height int, timeout time.Duration, fn func(context.Context) error) error {
@@ -175,7 +202,18 @@ func (r *Renderer) withPage(ctx context.Context, u string, width, height int, ti
 	stop := context.AfterFunc(ctx, cancel)
 	defer stop()
 
-	if err := chromedp.Do(tctx, chromedp.EmulateViewport(int64(width), int64(height)), chromedp.Navigate(u)); err != nil {
+	// The requester's time zone (WithTimeZone), set before the page loads.
+	setTZ := chromedp.Func(func(c context.Context, t *chromedp.Target) error {
+		tz, _ := ctx.Value(tzKey{}).(string)
+		if tz == "" {
+			return nil
+		}
+		if _, err := cdp.Call(c, t, emulation.SetTimezoneOverride, emulation.SetTimezoneOverrideParams{TimezoneID: tz}); err != nil {
+			return fmt.Errorf("time zone %s: %w", tz, err)
+		}
+		return nil
+	})
+	if err := chromedp.Do(tctx, setTZ, chromedp.EmulateViewport(int64(width), int64(height)), chromedp.Navigate(u)); err != nil {
 		r.resetIfDead()
 		return fmt.Errorf("load viewer: %w", err)
 	}

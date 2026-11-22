@@ -10,6 +10,7 @@ Each release lists its changes by type: New, Changed, Fixed and Internal (also S
 - Sharing: viewer links can be embedded in other sites an admin lists (Settings > General, off by default). Only viewer link pages relax framing, for exactly those sites; everything else stays unframeable.
 
 ### Fixed
+- Exports: PDF and PNG exports showed a live slide's last-updated time in the server's time zone (UTC in the container). Exports from the editor now use the browser's time zone, `export_deck` takes a `timezone`, and the server's `TZ` is the fallback.
 - Charts: long or many x-axis labels on bar and line charts no longer run into each other. Labels that fit are unchanged; otherwise a line chart shows every 2nd or 3rd label (always the first and the last), and a bar chart, or a line chart that would hide too much, angles its labels at 35° and makes room below; a label still too long is shortened with an ellipsis, its full text kept for hover and screen readers. The layout depends only on the labels, so it's the same on every screen and export, and a live update that changes only values never moves them.
 
 ## 1.0.0 (2026-11-21)

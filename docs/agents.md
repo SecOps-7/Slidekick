@@ -57,7 +57,7 @@ Editors and admins can also use the **✦ AI** panel in the editor, which drives
 | `lint_deck` | Overflow, density, contrast, alt text, chart and animation checks |
 | `render_slide` | PNG of a slide at any build step (needs Chromium, which the image includes) |
 | `upload_asset` | Store an image or video, get a `/files/...` url |
-| `export_deck` | `html` (self-contained, offline), `pdf` or `png` (zip) |
+| `export_deck` | `html` (self-contained, offline), `pdf` or `png` (zip); `timezone` (e.g. `Europe/Berlin`) sets the zone for times shown on slides in a PDF or PNG |
 | `list_comments`, `resolve_comment` | Requests humans pinned in the editor ("Send to agent") |
 | `get_history`, `restore_version` | Version history and undo |
 | `get_share_url` | Live link for the user (carries the view key when the deck is private) |

@@ -82,7 +82,9 @@ export class Api {
   comments = async (all = false) => (await this.req<{ comments: Comment[] }>("GET", `${this.base}/comments${all ? "?all=1" : ""}`)).comments;
   addComment = (slideId: string, elementId: string, text: string) => this.req<Comment>("POST", `${this.base}/comments`, { slideId, elementId, text });
   resolve = (id: string, reply = "") => this.req<{ ok: boolean }>("POST", `${this.base}/comments/${encodeURIComponent(id)}/resolve`, { reply });
-  exportFile = (format: "pdf" | "png") => this.req<{ url: string; name: string; bytes: number }>("POST", `${this.base}/export?format=${format}`);
+  // tz: times on the slides (a live slide's "Updated") read in this browser's time zone.
+  exportFile = (format: "pdf" | "png") =>
+    this.req<{ url: string; name: string; bytes: number }>("POST", `${this.base}/export?format=${format}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone ?? "")}`);
   me = () => this.req<{ can: Record<string, boolean>; user?: { username: string; role: string } }>("GET", `/api/me?deck=${encodeURIComponent(this.deckId)}`);
   access = () => this.req<Access>("GET", `${this.base}/access`);
   setAccess = (priv: boolean, rotate = false) => this.req<Access>("POST", `${this.base}/access`, { private: priv, rotate });
