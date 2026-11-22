@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/SecOps-7/Slidekick/pkgs/container/slidekick"><img alt="Docker image on GHCR" src="https://img.shields.io/badge/docker-ghcr.io%2Fsecops--7%2Fslidekick-2496ED?style=flat-square&logo=docker&logoColor=white"></a>
   <img alt="Platforms" src="https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-6b7280?style=flat-square">
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-20%20tools-7c3aed?style=flat-square">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-29%20tools-7c3aed?style=flat-square">
   <img alt="Go" src="https://img.shields.io/badge/Go-single%20binary-00ADD8?style=flat-square&logo=go&logoColor=white">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-16a34a?style=flat-square"></a>
 </p>
