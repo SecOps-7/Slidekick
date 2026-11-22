@@ -69,6 +69,9 @@ type server struct {
 // New returns the root handler.
 func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler {
 	s := &server{svc: svc, acc: opt.Accounts, opt: opt, fails: newFailLimiter(), conns: newConnLimiter(50, 500), exports: newExportCache(2, 8)}
+	if opt.Accounts != nil && svc.LiveAllowed == nil {
+		svc.LiveAllowed = opt.Accounts.LiveAllowed // Settings > General, off by default
+	}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok\n") })
@@ -103,6 +106,7 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	s.ttsRoutes(mux)
 	s.presentRoutes(mux)
 	s.tlsRoutes(mux)
+	mux.Handle("POST /api/decks/{id}/live", s.require(authz.LiveUpdate, true, s.updateLive))
 	mux.HandleFunc("GET /files/{name}", s.serveFile)
 	mux.HandleFunc("GET /ws/decks/{id}", s.ws)
 	mux.HandleFunc("GET /schema/deck.schema.json", func(w http.ResponseWriter, r *http.Request) {
@@ -264,13 +268,15 @@ func (s *server) cover(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) getDeck(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	_, raw, ver, err := s.svc.Get(r.Context(), id)
+	d, raw, ver, err := s.svc.Get(r.Context(), id)
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
 	issues, _, _ := s.svc.Lint(r.Context(), id)
-	writeJSON(w, 200, map[string]any{"version": ver, "deck": json.RawMessage(raw), "lint": issues, "viewers": s.svc.Hub.Count(id)})
+	// live: the last values agents set on live slides, keyed by element id;
+	// screens show them in place of the saved props.
+	writeJSON(w, 200, map[string]any{"version": ver, "deck": json.RawMessage(raw), "lint": issues, "viewers": s.svc.Hub.Count(id), "live": s.svc.LiveValues(r.Context(), d)})
 }
 
 func (s *server) history(w http.ResponseWriter, r *http.Request) {
@@ -624,7 +630,14 @@ func (s *server) exportHTML(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	key := fmt.Sprintf("%s@%d", d.ID, ver)
+	// The file has no live connection: live slides carry their last values,
+	// and a new value makes a new file.
+	var lastLive int64
+	for _, v := range s.svc.LiveValues(r.Context(), d) {
+		lastLive = max(lastLive, v.At.UnixNano())
+	}
+	raw = s.svc.WithLive(r.Context(), d, raw)
+	key := fmt.Sprintf("%s@%d/%d", d.ID, ver, lastLive)
 	out, ok := s.exports.get(key)
 	if !ok {
 		select {

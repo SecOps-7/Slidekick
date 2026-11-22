@@ -91,6 +91,7 @@ const (
 	Export         Action = "export"
 	Share          Action = "share"      // private toggle, view key and shared links
 	Drive          Action = "drive"      // a presentation's extras on a deck: the AI voice and casting
+	LiveUpdate     Action = "live"       // set new values on a live slide (the deck's owner or an admin only)
 	MintDeckToken  Action = "deck-token" // create or revoke a deck's edit token
 	Delete         Action = "delete"     // remove a deck for good
 	Create         Action = "create"
@@ -156,8 +157,9 @@ func (pol Policy) Can(p Principal, a Action, d *Deck) bool {
 				return false
 			}
 			return (d.Owner != "" && d.Owner == p.UserID) || (pol.EditorsEditAll != nil && pol.EditorsEditAll())
-		case Delete:
-			// Only the owner: "editors can edit every deck" doesn't extend to deleting.
+		case Delete, LiveUpdate:
+			// Only the owner: "editors can edit every deck" doesn't extend to
+			// deleting a deck or feeding its live slides.
 			return d != nil && d.Owner != "" && d.Owner == p.UserID
 		}
 	case RoleViewer:

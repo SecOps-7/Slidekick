@@ -8,6 +8,7 @@
 // line is acknowledged: see onNarrate. Captions are off (the room hears the
 // voice); add &captions=1 to the cast URL to show them.
 import { applyPatch } from "../runtime/patch";
+import type { LiveEvent, LiveMap } from "../runtime/live";
 import { Player } from "../runtime/player";
 import type { Catalog, Deck, PatchEvent } from "../runtime/types";
 import { viewFetch } from "./key";
@@ -41,12 +42,12 @@ export async function mountCast(host: HTMLElement, deckId: string) {
   const load = async () => {
     const r = await viewFetch(deckURL);
     if (!r.ok) throw new Error(String(r.status));
-    return (await r.json()) as { version: number; deck: Deck };
+    return (await r.json()) as { version: number; deck: Deck; live?: LiveMap };
   };
 
   // The TV may come up before the network: keep trying rather than give up.
   let catalog: Catalog | null = null;
-  let initial: { version: number; deck: Deck } | null = null;
+  let initial: { version: number; deck: Deck; live?: LiveMap } | null = null;
   for (let wait = 1000; !initial; wait = Math.min(wait * 2, 15000)) {
     try {
       catalog ??= (await (await fetch("/api/catalog", { cache: "no-store" })).json()) as Catalog;
@@ -61,7 +62,7 @@ export async function mountCast(host: HTMLElement, deckId: string) {
   document.title = deck.title;
   host.replaceChildren();
   const player = new Player(host, catalog!);
-  player.setDeck(deck);
+  player.setDeck(deck, { live: initial.live });
   const laser = new Laser(player.stage);
   const m = /^#(\d+)(?:\.(\d+))?$/.exec(location.hash);
   await player.goto(m ? Number(m[1]) - 1 : 0, m?.[2] ? Number(m[2]) : 0, { animate: false });
@@ -79,14 +80,15 @@ export async function mountCast(host: HTMLElement, deckId: string) {
     if (!r) return;
     deck = r.deck;
     version = r.version;
-    player.setDeck(deck, { keepSlideId: player.slideId });
+    player.setDeck(deck, { keepSlideId: player.slideId, live: r.live ?? {} });
     await player.refresh();
   };
 
   const onPatch = async (ev: PatchEvent) => {
     if (ev.version <= version) return;
     try {
-      if (ev.baseVersion !== version) throw new Error("gap");
+      // An edit to a slide with live content replaces that content: fetch the deck afresh.
+      if (ev.baseVersion !== version || player.touchesLive(ev.changed)) throw new Error("gap");
       deck = applyPatch(deck, ev.ops);
       version = ev.version;
     } catch {
@@ -113,6 +115,9 @@ export async function mountCast(host: HTMLElement, deckId: string) {
         break;
       case "patch":
         await onPatch(msg as unknown as PatchEvent);
+        break;
+      case "live":
+        await player.live(msg as unknown as LiveEvent);
         break;
       case "present":
         if (isNarration(msg)) onNarrate(msg);

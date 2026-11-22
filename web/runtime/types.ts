@@ -48,6 +48,8 @@ export interface Slide {
   transition?: S.Transition;
   notes?: string;
   background?: S.Background;
+  /** Live slides only: hide the small last-updated time. */
+  hideUpdated?: boolean;
 }
 
 export interface Element {

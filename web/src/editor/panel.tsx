@@ -292,6 +292,21 @@ function SlidePanel({ cat, slide, index, commit }: { cat: Cat; slide: Slide; ind
         }
       />
       <p class="ed-note">{cat.layouts[slide.layout]?.description}</p>
+      {slide.layout === "live" && (
+        <label class="ed-check">
+          <input
+            type="checkbox"
+            checked={!slide.hideUpdated}
+            onChange={(e) =>
+              commit(
+                e.currentTarget.checked ? (slide.hideUpdated ? [{ op: "remove", path: `${path}/hideUpdated` }] : []) : [{ op: "add", path: `${path}/hideUpdated`, value: true }],
+                "Last-updated time",
+              )
+            }
+          />{" "}
+          Show when the live values last changed
+        </label>
+      )}
       <div class="ed-row">
         <Select
           label="Transition"

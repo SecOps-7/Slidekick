@@ -2,6 +2,7 @@
 // per page at the deck's native size. Signals window.__skReady when drawn.
 import { applyTheme, renderSlide, STAGE, themeReady } from "../runtime/render";
 import type { Catalog, Deck } from "../runtime/types";
+import { applyLive, liveStamp, type LiveMap } from "../runtime/live";
 import { viewFetch } from "./key";
 
 export async function mountPrint(host: HTMLElement, deckId: string) {
@@ -9,9 +10,10 @@ export async function mountPrint(host: HTMLElement, deckId: string) {
   w.__skReduced = true;
   const [catalog, data] = await Promise.all([
     fetch("/api/catalog").then((r) => r.json() as Promise<Catalog>),
-    viewFetch(`/api/decks/${encodeURIComponent(deckId)}`).then((r) => r.json() as Promise<{ deck: Deck }>),
+    viewFetch(`/api/decks/${encodeURIComponent(deckId)}`).then((r) => r.json() as Promise<{ deck: Deck; live?: LiveMap }>),
   ]);
   const deck = data.deck;
+  const liveAt = applyLive(deck, data.live); // live slides print their current content
   const theme = catalog.themes[deck.theme];
   applyTheme(document.documentElement, theme);
   const [sw, sh] = STAGE[deck.aspect] ?? STAGE["16:9"];
@@ -34,6 +36,8 @@ export async function mountPrint(host: HTMLElement, deckId: string) {
     page.className = "sk-print-page";
     const r = renderSlide(deck, slide, catalog.layouts[slide.layout]?.regions ?? []);
     pending.push(...r.pending);
+    const stamp = liveStamp(slide, liveAt.get(slide.id));
+    if (stamp) r.el.append(stamp);
     page.append(r.el);
     host.append(page);
   }

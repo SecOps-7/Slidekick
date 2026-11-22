@@ -142,8 +142,9 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
 
 | | |
 |---|---|
-| 🤖 **Built for agents** | 28 MCP tools over streamable HTTP or stdio: create and patch decks (RFC 6902 JSON Patch), lint, `render_slide` screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links, and presenting: run the deck out loud, step through it, and cast it to a TV. The schema, element catalogues and a design guide are resources, and `outline_to_deck`, `polish_deck` and `restyle_deck` are prompts. Every write returns the new version, lint findings and the number of open human comments. |
-| 🧱 **Elements and layouts** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, icons, shapes, embeds, and a sandboxed HTML escape hatch that lint always flags. 8 layouts, styled with theme tokens only. |
+| 🤖 **Built for agents** | 29 MCP tools over streamable HTTP or stdio: create and patch decks (RFC 6902 JSON Patch), lint, `render_slide` screenshots, uploads, HTML/PDF/PNG export, comments, history and undo, private links, and presenting: run the deck out loud, step through it, and cast it to a TV. The schema, element catalogues and a design guide are resources, and `outline_to_deck`, `polish_deck` and `restyle_deck` are prompts. Every write returns the new version, lint findings and the number of open human comments. |
+| 🧱 **Elements and layouts** | Headings, rich text, bullets, images, code (Shiki), big-number stats, quotes, bar/line/pie charts, Mermaid diagrams, icons, shapes, embeds, and a sandboxed HTML escape hatch that lint always flags. 9 layouts, styled with theme tokens only. |
+| 📡 **Live slides** | A Live layout (a headline figure, a chart and a status line) whose content an agent keeps up to date while the deck is shown, for network or home stats: new values, and elements added or removed, change in place on every screen without redrawing the slide (`update_live`, or `POST /api/decks/<id>/live`). Off until an admin allows it; only the deck's owner or an admin can send updates. |
 | 🎬 **Motion** | 28 build presets (fades and slides from any side, zoom, pop, bounce, 3D flips, iris, typewriter, line drawing...) with spring physics and stagger, per-item bullet builds, count-up stats and charts that draw in. 18 transitions, including **morph** between slides. All respect reduced motion. |
 | 🎨 **Themes** | 18 themes, from corporate Boardroom and editorial Magazine to Synthwave, Terminal, Chalkboard and an accessibility-first High Contrast, all with self-hosted fonts. Tests lint every example deck in every theme and enforce contrast. [Write your own](docs/themes.md). |
 | 🗣️ **AI presenting** | The built-in AI or any MCP agent presents a deck out loud: it moves through the slides and build steps and speaks about each slide's content, with the speaker notes as talking points. It never narrates the mechanics ("next slide..."); a filter removes that before anything is spoken. Each step waits until the line has been heard. |
@@ -291,7 +292,7 @@ Agents (MCP: HTTP /mcp or stdio)        Browsers (editor, viewer, presenter, TV)
             └──────────────┬─────────────────────────┘
                            │
   internal/server      HTTP routes, sessions, CSRF, the live hub
-  internal/mcpserver   the 28 MCP tools, resources and prompts
+  internal/mcpserver   the 29 MCP tools, resources and prompts
   internal/service     one place for every deck operation, with authz checks
   internal/deck        the JSON Schema contract, validation and JSON Patch
   internal/lint        design lint returned with every write

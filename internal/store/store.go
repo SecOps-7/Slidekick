@@ -96,6 +96,15 @@ CREATE TABLE IF NOT EXISTS deck_access (
   present_key TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS deck_access_edit ON deck_access(edit_hash);
+-- A live slide's current content as agents left it (update_live): one row
+-- per slide, overwritten in place, so live updates never add versions.
+CREATE TABLE IF NOT EXISTS live_slides (
+  deck_id    TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+  slide_id   TEXT NOT NULL,
+  regions    TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (deck_id, slide_id)
+);
 `
 
 // Open opens (creating if needed) the database at dir/slidekick.db.

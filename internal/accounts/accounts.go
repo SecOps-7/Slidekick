@@ -37,6 +37,7 @@ const (
 	settingEditAll  = "editors_edit_all"
 	settingEmbed    = "embed_viewer"         // "1": viewer link pages may be framed by EmbedOrigins
 	settingOrigins  = "embed_viewer_origins" // JSON list of origins
+	settingLive     = "live_slides"          // "1": agents may send live slide updates
 	maxEmbedOrigins = 20
 	maxHashParallel = 2
 )
@@ -484,14 +485,23 @@ type Settings struct {
 	// origins in EmbedOrigins may (frame-ancestors). Off by default.
 	EmbedViewer  bool     `json:"embedViewer"`
 	EmbedOrigins []string `json:"embedOrigins"`
+	// LiveSlides lets agents update live slides (update_live). Off by default;
+	// while off, live slides show their last values.
+	LiveSlides bool `json:"liveSlides"`
 }
 
 func (s *Service) Settings(ctx context.Context) Settings {
-	v := Settings{EditorsEditAll: s.Store.Setting(ctx, settingEditAll) == "1", EmbedViewer: s.Store.Setting(ctx, settingEmbed) == "1", EmbedOrigins: []string{}}
+	v := Settings{EditorsEditAll: s.Store.Setting(ctx, settingEditAll) == "1", EmbedViewer: s.Store.Setting(ctx, settingEmbed) == "1", EmbedOrigins: []string{},
+		LiveSlides: s.Store.Setting(ctx, settingLive) == "1"}
 	if raw := s.Store.Setting(ctx, settingOrigins); raw != "" {
 		json.Unmarshal([]byte(raw), &v.EmbedOrigins)
 	}
 	return v
+}
+
+// LiveAllowed reports whether agents may update live slides right now.
+func (s *Service) LiveAllowed(ctx context.Context) bool {
+	return s.Store.Setting(ctx, settingLive) == "1"
 }
 
 // EmbedOrigins are the origins allowed to frame viewer link pages right now
@@ -532,7 +542,7 @@ func (s *Service) SaveSettings(ctx context.Context, v Settings) error {
 		return "0"
 	}
 	list, _ := json.Marshal(origins)
-	for k, val := range map[string]string{settingEditAll: flag(v.EditorsEditAll), settingOrigins: string(list), settingEmbed: flag(v.EmbedViewer)} {
+	for k, val := range map[string]string{settingEditAll: flag(v.EditorsEditAll), settingOrigins: string(list), settingEmbed: flag(v.EmbedViewer), settingLive: flag(v.LiveSlides)} {
 		if err := s.Store.SetSetting(ctx, k, val); err != nil {
 			return err
 		}

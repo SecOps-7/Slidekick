@@ -26,6 +26,8 @@ type Slide struct {
 	Transition *Transition          `json:"transition,omitempty"`
 	Notes      string               `json:"notes,omitempty"`
 	Background *Background          `json:"background,omitempty"`
+	// HideUpdated hides a live slide's last-updated time.
+	HideUpdated bool `json:"hideUpdated,omitempty"`
 }
 
 type Transition struct {

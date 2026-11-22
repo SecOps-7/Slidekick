@@ -3,6 +3,7 @@
 // laptop, so its small heads-up bar shows the title, position and connection
 // and offers only Fullscreen: no editing, presenting or narration controls.
 import { applyPatch } from "../runtime/patch";
+import type { LiveEvent, LiveMap } from "../runtime/live";
 import { Player, type Position } from "../runtime/player";
 import type { Catalog, Deck, LintIssue, PatchEvent } from "../runtime/types";
 import { Laser } from "./laser";
@@ -12,6 +13,7 @@ import { followTo, Narrator, slideIndex } from "./narrate";
 
 interface DeckResponse {
   version: number;
+  live?: LiveMap;
   deck: Deck;
   lint: LintIssue[];
   viewers: number;
@@ -53,7 +55,7 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
   if (looping) follow = false;
 
   const player = new Player(host, catalog);
-  player.setDeck(deck);
+  player.setDeck(deck, { live: initial.live });
   document.title = `${deck.title} · Slidekick`;
 
   // Headless render mode (used by render_slide): no chrome, no live sync,
@@ -158,13 +160,14 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
     const r = await getJSON<DeckResponse>(`/api/decks/${encodeURIComponent(deckId)}`);
     deck = r.deck;
     version = r.version;
-    player.setDeck(deck, { keepSlideId: player.slideId });
+    player.setDeck(deck, { keepSlideId: player.slideId, live: r.live ?? {} });
     title.textContent = deck.title;
     await player.refresh();
   };
 
   const onPatch = async (ev: PatchEvent) => {
-    if (ev.baseVersion !== version) {
+    // An edit to a slide with live content replaces that content: fetch the deck afresh.
+    if (ev.baseVersion !== version || player.touchesLive(ev.changed)) {
       await reload();
       return;
     }
@@ -238,6 +241,7 @@ export async function mountViewer(host: HTMLElement, deckId: string) {
       else if (audience && msg.type === "audience-ping") conn.local({ type: "audience", state: "open" });
       else if (msg.type === "hello" && msg.version !== version) await reload();
       else if (msg.type === "patch") await onPatch(msg as unknown as PatchEvent);
+      else if (msg.type === "live") await player.live(msg as unknown as LiveEvent);
       else if (narrator.handle(msg)) return;
       else if (msg.type === "present") await followPresenter(msg as unknown as PresentMsg);
       else if (msg.type === "denied") say("This link has expired or was replaced: ask for a new one");

@@ -6,6 +6,7 @@ Each release lists its changes by type: New, Changed, Fixed and Internal (also S
 
 ### New
 - Local HTTPS: Slidekick can serve HTTPS itself on the local network (Settings > General, off by default), on `SLIDEKICK_HTTPS_ADDR` (`:7443`) next to plain HTTP, with your own certificate or one from its own name-constrained certificate authority, which you download and trust on your devices. Generated certificates renew themselves; private keys are stored encrypted. Plain HTTP stays available for proxies and cast TVs, and casting uses it.
+- Live slides: a ninth layout, Live (a headline figure, a chart and a status line), whose content an agent changes while the deck is shown, for network or home stats. `update_live` (or `POST /api/decks/<id>/live`) sets new values, adds and removes elements; each change is checked like an edit, kept as the slide's current content without adding versions, limited to 5 a second per slide, and applied in place on the viewer, audience window, presenter view and cast TV: no redraw, the presenter keeps their place, values just change (or animate with `animate`), added and removed elements ease in and out, and a small last-updated time shows unless the slide hides it. Off by default (Settings > General); only the deck's owner or an admin can send updates.
 - Sharing: viewer links can be embedded in other sites an admin lists (Settings > General, off by default). Only viewer link pages relax framing, for exactly those sites; everything else stays unframeable.
 
 ## 1.0.0 (2026-11-21)

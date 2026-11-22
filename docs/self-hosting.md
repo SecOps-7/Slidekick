@@ -202,6 +202,17 @@ Slidekick can serve HTTPS itself on your network, without a reverse proxy. It's 
 - **Casting stays on HTTP.** A Chromecast has no way to add a private certificate authority, so it can't open a page whose certificate it doesn't already trust. When the base URL points at the local HTTPS port, the TV is sent the same host over plain HTTP on `SLIDEKICK_ADDR` instead. (A base URL on a reverse proxy with a publicly trusted certificate is used as is.)
 - **LAN only:** no ACME or other certificate service, no public DNS, no tunnel, no port forward.
 
+## Live slides
+
+A slide with the **Live** layout shows data an agent keeps up to date while the deck is shown: say, a router's throughput or a home's temperatures. Every other slide works as before. It's **off by default**: an admin turns on **Settings > General > Live slides**.
+
+- **The layout:** regions `title`, `figure` (a stat), `chart` and `status` (text lines). Make and edit live slides like any other, in the editor or with the deck tools.
+- **Updates come only from an agent:** the MCP tool `update_live`, or `POST /api/decks/<id>/live` with the same fields (`slide_id`, `op`, `element_id`, `value`, `props`, `region`, `position`, `element`, `animate`) for scripts that don't speak MCP. `set` puts a new value on a stat, chart or text element; `add` puts a stat, chart, text or heading into a region; `remove` takes one off. Slidekick never fetches data itself: there are no timers, data sources or stored credentials.
+- **Who:** the deck's owner or an admin (their session, personal agent token, or the server token). Other editors, deck tokens, viewer links and presenter links can see the values but not change them. While the setting is off, updates are refused and live slides show their last values.
+- **Checked and limited:** each change is validated like a deck edit (a stat takes a number, a chart its labels and series), only on live slides, at most 5 a second per slide with short bursts of 10 (`429` beyond).
+- **Kept without filling history:** a live slide's current content is stored as one row per slide, overwritten by each change, so a reopened deck, the PDF and HTML exports and `render_slide` show the last values, and no version is added. A deck edit to the slide itself (in the editor or by an agent) replaces its live content.
+- **On screen:** the viewer, audience window, presenter view and cast TV change only that element, in place: no slide redraw, no animation replay, and the presenter keeps their place. A new value just appears; with `animate: true` a stat counts from the old value, a chart draws in and text fades in. Added and removed elements ease in and out while the others glide to their new places (instant with reduced motion). A small **Updated** time sits in the corner; untick **Show when the live values last changed** on the slide to hide it.
+
 ## Embedding viewer links in other sites
 
 Every page refuses to be shown in another site's frame (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). To show viewer links inside another web app on your network, an admin turns on **Settings > General > Embed viewer links** and lists the sites allowed to, one origin each (`https://dashboard.example:8443`: scheme, host and port, no path or wildcards). It's **off by default**.

@@ -32,6 +32,9 @@ type Service struct {
 	// CastBaseURL, when set, is the base a cast TV opens instead of BaseURL
 	// (see CastURL).
 	CastBaseURL string
+	// LiveAllowed reports whether an admin allows live slides (nil: allowed).
+	LiveAllowed func(context.Context) bool
+	live        liveLimiter
 	// FilesDir holds uploaded assets on disk; empty disables uploads unless
 	// Blobs is set.
 	FilesDir string
@@ -322,6 +325,8 @@ func (s *Service) mutate(ctx context.Context, id string, base *int, actor string
 		return nil, err
 	}
 	changed, focus := changedIDs(cur, d, ops)
+	// An edit to a live slide replaces its live content, so the edit shows.
+	s.store.DeleteLiveSlides(ctx, id, changed)
 	ev := Event{Type: "patch", DeckID: id, Version: ver + 1, BaseVersion: ver, Actor: actor, Ops: ops, Changed: changed, FocusSlide: focus}
 	if msg, err := json.Marshal(ev); err == nil {
 		s.Hub.Publish(id, msg)

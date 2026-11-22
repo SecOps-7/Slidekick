@@ -295,6 +295,11 @@ function renderElement(e: Element, units: BuildUnit[], pending: Promise<unknown>
   return wrap;
 }
 
+/** Renders one element on its own (a live slide's element changing in place). */
+export function renderElementAlone(e: Element): HTMLElement {
+  return renderElement(e, [], []);
+}
+
 /** Renders one slide. regionOrder lists the layout's regions in display order. */
 export function renderSlide(_deck: Deck, slide: Slide, regionOrder: string[]): Rendered {
   const el = h("section", `sk-slide sk-layout-${slide.layout}`);

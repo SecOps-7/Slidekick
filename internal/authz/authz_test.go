@@ -54,6 +54,14 @@ func TestPolicy(t *testing.T) {
 		{"viewer deletes", view, Delete, mine, false},
 		{"deck token deletes", deckTok, Delete, mine, false},
 		{"admin deletes", admin, Delete, unowned, true},
+		{"owner updates live", ed, LiveUpdate, mine, true},
+		{"admin updates live", admin, LiveUpdate, unowned, true},
+		{"server token updates live", Principal{Kind: KindServer}, LiveUpdate, mine, true},
+		{"other editor updates live", other, LiveUpdate, mine, false},
+		{"viewer updates live", view, LiveUpdate, mine, false},
+		{"deck token updates live", deckTok, LiveUpdate, mine, false},
+		{"presenter link updates live", Principal{Kind: KindPresenter, Deck: "d1"}, LiveUpdate, mine, false},
+		{"anonymous updates live", anon, LiveUpdate, mine, false},
 	}
 	for _, tc := range cases {
 		if got := pol.Can(tc.p, tc.a, tc.d); got != tc.want {
@@ -66,6 +74,9 @@ func TestPolicy(t *testing.T) {
 	}
 	if pol.Can(other, Delete, mine) {
 		t.Error("editors-edit-all must not allow deleting others' decks")
+	}
+	if pol.Can(other, LiveUpdate, mine) {
+		t.Error("editors-edit-all must not let other editors update live slides")
 	}
 }
 

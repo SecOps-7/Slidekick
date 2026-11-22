@@ -101,6 +101,12 @@ export function slideTemplate(layout: string): Omit<Slide, "id"> {
       c: [{ type: "icon", props: { name: "bolt" } }, h("Three", 3), t("Short detail")],
     },
     "full-bleed": { content: [h("Anything goes", 1)] },
+    live: {
+      title: [h("Network right now")],
+      figure: [{ type: "stat", props: { value: 0, suffix: " Mbps", label: "Download" } }],
+      chart: [{ type: "chart", props: { kind: "line", labels: ["-4m", "-3m", "-2m", "-1m", "now"], series: [{ name: "Mbps", values: [0, 0, 0, 0, 0] }] } }],
+      status: [t("Waiting for the first update")],
+    },
   }[layout] ?? { title: [h("New slide")] };
   return { layout, regions: regions as Slide["regions"], transition: { type: "fade" } };
 }

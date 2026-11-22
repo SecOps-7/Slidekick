@@ -54,8 +54,8 @@ func TestAgentLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 24 { // the presenting tools need Options.Presenter
-		t.Fatalf("want 24 tools, got %d", len(tools.Tools))
+	if len(tools.Tools) != 25 { // the presenting tools need Options.Presenter
+		t.Fatalf("want 25 tools, got %d", len(tools.Tools))
 	}
 
 	var deck map[string]any
@@ -147,8 +147,8 @@ func TestPresentingToolsListed(t *testing.T) {
 			t.Errorf("missing tool %s", n)
 		}
 	}
-	if len(tools.Tools) != 28 {
-		t.Fatalf("want 28 tools, got %d", len(tools.Tools))
+	if len(tools.Tools) != 29 {
+		t.Fatalf("want 29 tools, got %d", len(tools.Tools))
 	}
 	// The server token (stdio) may present, and a deck without notes is fine.
 	res, _ := cs.CallTool(ctx, &mcp.CallToolParams{Name: "create_deck", Arguments: map[string]any{"title": "T", "slides": []any{

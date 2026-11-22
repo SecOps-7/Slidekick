@@ -45,6 +45,8 @@ Pick a theme by mood: boardroom (corporate), magazine or paper (editorial), noir
 
 Work where the user can see it: they usually watch the editor or viewer while you work. Edits move their view to the changed slide; call `focus_slide` before you start on a slide, and whenever the user names one ("slide 4"), so it's on screen before you change it.
 
+Live data (network, home or other stats shown while the deck is presented): make a slide with the `live` layout (regions `title`, `figure` for a stat, `chart`, `status` for text lines) with the deck tools, then keep it current with `update_live`: `set` a new value on an element, `add` or `remove` elements. Only the changed element moves on screen. Send changes as the data changes, not on a fast timer (at most 5 a second per slide); add `animate: true` when a change is worth watching. Don't use `patch_deck` for live values: it adds a version each time and resets the slide's live content.
+
 Images and videos: call `upload_asset` and use the `/files/...` url it returns.
 
 Style overrides use tokens only: `"style":{"color":"accent","size":"xl","align":"center"}`.

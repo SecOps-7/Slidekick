@@ -107,6 +107,18 @@
 
 .sk-layout-full-bleed { grid-template: "content" 1fr / 1fr; padding: 80px; }
 
+/* Live: a headline figure beside a chart, a status line below; an agent
+   updates the values in place (update_live). */
+.sk-layout-live { grid-template: "title title" auto "figure chart" 1fr "status status" auto / minmax(0, 1fr) minmax(0, 1.7fr); column-gap: 64px; row-gap: 36px; }
+.sk-layout-live .sk-region-figure { align-self: center; }
+.sk-layout-live .sk-region-figure .sk-stat-value { font-size: var(--sk-fs, calc(var(--sk-size-xxl) * 1.2)); white-space: nowrap; }
+.sk-layout-live .sk-region-chart { align-self: stretch; min-height: 0; }
+.sk-layout-live .sk-region-status { --sk-fs: var(--sk-size-md); color: var(--sk-muted); }
+.sk-live-stamp {
+  position: absolute; right: 48px; bottom: 32px; font-size: 22px; letter-spacing: 0.02em;
+  color: var(--sk-muted); opacity: 0.8; font-variant-numeric: tabular-nums; pointer-events: none;
+}
+
 /* ---- elements ---- */
 .sk-el { position: relative; min-width: 0; }
 .sk-el p { margin: 0; }

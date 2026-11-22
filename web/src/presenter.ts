@@ -5,6 +5,7 @@ import { Player, type Position } from "../runtime/player";
 import { renderSlide, STAGE } from "../runtime/render";
 import type { Catalog, Deck, PatchEvent } from "../runtime/types";
 import { applyPatch } from "../runtime/patch";
+import type { LiveEvent, LiveMap } from "../runtime/live";
 import { authHeaders, currentMe, ensureAuth, me } from "./auth";
 import { presentKey, withKey } from "./key";
 import { castMenu } from "./cast-menu";
@@ -31,7 +32,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   const deckFetch = () => fetch(withKey(`/api/decks/${encodeURIComponent(deckId)}`), { cache: "no-store" });
   const [catalog, data] = await Promise.all([
     fetch("/api/catalog").then((r) => r.json() as Promise<Catalog>),
-    deckFetch().then((r) => (r.ok ? (r.json() as Promise<{ version: number; deck: Deck }>) : null)),
+    deckFetch().then((r) => (r.ok ? (r.json() as Promise<{ version: number; deck: Deck; live?: LiveMap }>) : null)),
   ]);
   if (!data) {
     host.textContent = "Deck not found.";
@@ -88,7 +89,7 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   host.append(root);
 
   const player = new Player(current, catalog);
-  player.setDeck(deck);
+  player.setDeck(deck, { live: data.live });
   const laser = new Laser(player.stage);
 
   // ---- AI narration: this screen plays the voice and reports each line heard ----
@@ -197,18 +198,22 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
       cast.onEvent(m);
       // A TV that just started casting opens on slide 1: tell it where we are once it has loaded.
       if (m.type === "cast" && m.state === "started") [4000, 8000, 15000].forEach((ms) => setTimeout(() => send(player.position), ms));
+      if (m.type === "live") return player.live(m as unknown as LiveEvent);
       if (m.type !== "patch") return;
       const ev = m as unknown as PatchEvent;
       if (ev.version <= version) return;
+      let live: LiveMap | undefined;
       try {
-        if (ev.baseVersion !== version) throw new Error("gap");
+        // An edit to a slide with live content replaces that content: fetch the deck afresh.
+        if (ev.baseVersion !== version || player.touchesLive(ev.changed)) throw new Error("refetch");
         deck = applyPatch(deck, ev.ops);
       } catch {
         const r = await deckFetch().then((x) => x.json());
         deck = r.deck;
+        live = r.live ?? {};
       }
       version = ev.version;
-      player.setDeck(deck, { keepSlideId: player.slideId });
+      player.setDeck(deck, { keepSlideId: player.slideId, live });
       await player.refresh();
     },
     (s) => (status.textContent = s === "live" ? "live · viewers follow you" : "offline: audience windows on this machine still follow"),

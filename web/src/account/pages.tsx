@@ -712,6 +712,7 @@ function SSO() {
 
 interface InstanceSettings {
   editorsEditAll: boolean;
+  liveSlides: boolean;
   embedViewer: boolean;
   embedOrigins: string[];
 }
@@ -730,6 +731,18 @@ function General() {
           can edit every deck, not only their own
         </label>
         <p class="acc-muted">Everyone signed in can always view, present and comment on every deck. Changing a deck needs its owner, an admin, or this setting.</p>
+      </section>
+      <section>
+        <h2>Live slides</h2>
+        <label class="acc-check">
+          <input type="checkbox" checked={s.liveSlides} onChange={async (e) => setS(await api("PUT", "/api/admin/settings", { ...s, liveSlides: e.currentTarget.checked }))} /> Let agents
+          update live slides while decks are shown
+        </label>
+        <p class="acc-muted">
+          Slides with the Live layout show values an agent keeps up to date (the <code>update_live</code> tool, or <code>POST /api/decks/&lt;id&gt;/live</code>): new
+          values, and elements added or removed, change in place on every screen. Only a deck's owner or an admin can send updates. While this is off, updates are
+          refused and live slides keep their last values. Slidekick never fetches data itself.
+        </p>
       </section>
       <EmbedSettings s={s} onSaved={setS} />
       <LocalHTTPS />

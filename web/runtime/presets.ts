@@ -189,7 +189,7 @@ export const builds: Record<BuildPreset, Preset> = {
 };
 
 /** Counts a stat up from zero. */
-export function countUp(node: HTMLElement, o: MotionOpts, format: (v: number) => string) {
+export function countUp(node: HTMLElement, o: MotionOpts, format: (v: number) => string, from = 0) {
   const target = Number(node.dataset.value ?? 0);
   if (o.reduced || !Number.isFinite(target)) {
     node.textContent = format(target);
@@ -200,10 +200,10 @@ export function countUp(node: HTMLElement, o: MotionOpts, format: (v: number) =>
   const tick = (t: number) => {
     const p = Math.min(1, (t - t0) / dur);
     const eased = 1 - Math.pow(1 - p, 3);
-    node.textContent = format(p === 1 ? target : target * eased);
+    node.textContent = format(p === 1 ? target : from + (target - from) * eased);
     if (p < 1) requestAnimationFrame(tick);
   };
-  node.textContent = format(0);
+  node.textContent = format(from);
   requestAnimationFrame(tick);
 }
 

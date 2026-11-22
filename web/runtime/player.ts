@@ -1,7 +1,8 @@
 // The player owns the stage: which slide and build step are showing, how the
 // stage scales to the window, and every animation between states.
 import { animateChart } from "./chart";
-import { applyTheme, formatStat, renderSlide, STAGE, themeReady, type Rendered } from "./render";
+import { applyTheme, formatStat, renderElementAlone, renderSlide, STAGE, themeReady, type Rendered } from "./render";
+import { applyLive, applyLiveEvent, liveStamp, stampText, type LiveEvent, type LiveMap } from "./live";
 import { staggerDelays } from "./motion";
 import { builds, countUp, flipDelta, motionFor, prefersReducedMotion, transitions } from "./presets";
 import type { Catalog, Deck, Element, TransitionType } from "./types";
@@ -24,6 +25,8 @@ export class Player {
   private step = 0;
   private running: Animation[] = [];
   private busy: Promise<void> = Promise.resolve();
+  /** When each live slide's content last changed (ms). */
+  private liveAt = new Map<string, number>();
   onChange: (p: Position) => void = () => {};
 
   constructor(host: HTMLElement, private catalog: Catalog) {
@@ -45,9 +48,14 @@ export class Player {
     return this.deck?.slides[this.index]?.id;
   }
 
-  /** Loads or replaces the deck. Keeps the current slide (by id) when possible. */
-  setDeck(deck: Deck, opts: { keepSlideId?: string } = {}) {
+  /**
+   * Loads or replaces the deck. Keeps the current slide (by id) when possible.
+   * live is the deck's live slides' current content (from GET /api/decks/<id>),
+   * put in place of their saved regions.
+   */
+  setDeck(deck: Deck, opts: { keepSlideId?: string; live?: LiveMap } = {}) {
     const prevTheme = this.deck?.theme;
+    if (opts.live) this.liveAt = applyLive(deck, opts.live);
     this.deck = deck;
     const theme = this.catalog.themes[deck.theme];
     if (theme && theme.name !== prevTheme) applyTheme(document.documentElement, theme);
@@ -75,7 +83,102 @@ export class Player {
 
   private render(index: number): Rendered | null {
     const slide = this.deck.slides[index];
-    return slide ? renderSlide(this.deck, slide, this.regions(slide.layout)) : null;
+    if (!slide) return null;
+    const r = renderSlide(this.deck, slide, this.regions(slide.layout));
+    const stamp = liveStamp(slide, this.liveAt.get(slide.id));
+    if (stamp) r.el.append(stamp);
+    return r;
+  }
+
+  /** Whether a deck edit touches a slide that has live content (screens reload then). */
+  touchesLive(changed: string[] | undefined): boolean {
+    return (changed ?? []).some((id) => this.liveAt.has(id));
+  }
+
+  /**
+   * Applies a live event: only the changed element changes, in place. A new
+   * value just appears (or animates with ev.animate); added and removed
+   * elements ease in and out while the others glide to their new places.
+   * Build state, the step and the slide are left as they are.
+   */
+  async live(ev: LiveEvent): Promise<void> {
+    await this.busy;
+    const e = applyLiveEvent(this.deck, ev);
+    const at = Date.parse(ev.at);
+    if (at) this.liveAt.set(ev.slideId, at);
+    const root = this.current?.el;
+    if (!root || root.dataset.slideId !== ev.slideId) return;
+    const reduced = prefersReducedMotion();
+    const m = motionFor(document.documentElement, "base");
+    const byId = (id: string) => [...root.querySelectorAll<HTMLElement>(".sk-el")].find((n) => n.dataset.elId === id);
+
+    if (ev.op === "set" && e) {
+      const wrap = byId(e.id);
+      if (wrap) {
+        const old = Number(wrap.querySelector<HTMLElement>(".sk-stat-value")?.dataset.value);
+        const fresh = renderElementAlone(e);
+        const pending = wrap.classList.contains("sk-pending");
+        wrap.className = fresh.className;
+        wrap.classList.toggle("sk-pending", pending);
+        wrap.setAttribute("style", fresh.getAttribute("style") ?? "");
+        wrap.replaceChildren(...fresh.childNodes);
+        if (ev.animate && !reduced) {
+          const v = wrap.querySelector<HTMLElement>(".sk-stat-value");
+          const fig = wrap.querySelector<HTMLElement>(".sk-chart");
+          if (v) countUp(v, { ...motionFor(document.documentElement, "slow"), reduced }, (n) => formatStat(e, n), Number.isFinite(old) ? old : 0);
+          else if (fig) animateChart(fig, m.duration, m.easing, reduced);
+          else wrap.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: m.duration, easing: m.easing });
+        }
+      }
+    } else if (ev.op === "add" && e && ev.region) {
+      let region = root.querySelector<HTMLElement>(`.sk-region-${CSS.escape(ev.region)}`);
+      const node = renderElementAlone(e);
+      this.glide(root, () => {
+        if (!region) {
+          region = document.createElement("div");
+          region.className = `sk-region sk-region-${ev.region}`;
+          region.style.gridArea = ev.region!;
+          root.append(region);
+        }
+        region.insertBefore(node, region.children[ev.index ?? region.children.length] ?? null);
+      });
+      if (!reduced) node.animate([{ opacity: 0, transform: "scale(0.96)" }, { opacity: 1, transform: "none" }], { duration: m.duration, easing: m.easing });
+    } else if (ev.op === "remove" && ev.elementId) {
+      const wrap = byId(ev.elementId);
+      if (wrap) {
+        if (!reduced) await wrap.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(0.96)" }], { duration: m.duration * 0.7, easing: m.easing, fill: "forwards" }).finished.catch(() => {});
+        this.glide(root, () => wrap.remove());
+      }
+    }
+    this.stampNow(root, ev.slideId);
+  }
+
+  /** Runs a DOM change, then slides every element from its old place to its new one (FLIP). */
+  private glide(root: HTMLElement, change: () => void) {
+    const nodes = [...root.querySelectorAll<HTMLElement>(".sk-el")];
+    const before = new Map(nodes.map((n) => [n, n.getBoundingClientRect()]));
+    change();
+    if (prefersReducedMotion()) return;
+    const scale = this.stage.getBoundingClientRect().width / (this.stage.offsetWidth || 1) || 1;
+    const m = motionFor(document.documentElement, "base");
+    for (const [n, b] of before) {
+      if (!n.isConnected) continue;
+      const a = n.getBoundingClientRect();
+      const dx = (b.left - a.left) / scale;
+      const dy = (b.top - a.top) / scale;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) n.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: m.duration, easing: m.easing });
+    }
+  }
+
+  private stampNow(root: HTMLElement, slideId: string) {
+    const slide = this.deck.slides.find((s) => s.id === slideId);
+    const at = this.liveAt.get(slideId);
+    let stamp = root.querySelector<HTMLElement>(".sk-live-stamp");
+    if (!slide || slide.hideUpdated || !at) return stamp?.remove();
+    if (!stamp) {
+      stamp = liveStamp(slide, at);
+      if (stamp) root.append(stamp);
+    } else stamp.textContent = stampText(at);
   }
 
   private finishRunning() {

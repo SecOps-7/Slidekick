@@ -57,6 +57,15 @@
       "regions": {
         "content": 500
       }
+    },
+    "live": {
+      "description": "Live data an agent keeps up to date while the deck is shown: a headline figure (stat), a chart and a status line (text) under a title. Only this layout takes live updates (update_live); everything else about it is a normal slide.",
+      "regions": {
+        "title": 80,
+        "figure": 40,
+        "chart": 0,
+        "status": 160
+      }
     }
   },
   "transitions": {

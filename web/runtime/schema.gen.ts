@@ -62,7 +62,7 @@ export interface Slide {
   /**
    * Layout preset; see the layout catalogue resource for each layout's region names.
    */
-  layout: "title" | "title-body" | "two-column" | "hero-image" | "big-number" | "quote" | "grid-3" | "full-bleed";
+  layout: "title" | "title-body" | "two-column" | "hero-image" | "big-number" | "quote" | "grid-3" | "full-bleed" | "live";
   /**
    * Map of region name to the elements placed in it, in order.
    */
@@ -78,6 +78,10 @@ export interface Slide {
    */
   notes?: string;
   background?: Background;
+  /**
+   * Live slides only: hide the small last-updated time in the corner.
+   */
+  hideUpdated?: boolean;
 }
 /**
  * Overrides limited to theme tokens.
