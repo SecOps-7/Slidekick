@@ -28,7 +28,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/img/slides.png" alt="Slides made by an agent in five themes" width="900">
+  <img src="docs/img/demo.webp" alt="An agent builds a four-slide deck over MCP while a viewer link shows each slide appear live, then a presenter plays the build animations" width="900"><br>
+  <sub>Recorded live: an agent adds slides over MCP and the open viewer follows each edit, then the deck is presented with its builds.</sub>
 </p>
 
 ---
@@ -206,6 +207,9 @@ Other clients (Claude Desktop, Cursor, VS Code, stdio) are covered in [docs/agen
 ## 📸 Screenshots
 
 <table>
+  <tr>
+    <td colspan="2"><img src="docs/img/slides.png" alt="Slides made by an agent in five themes"><p align="center"><sub>Slides made by an agent, in five themes</sub></p></td>
+  </tr>
   <tr>
     <td colspan="2"><img src="docs/img/themes.jpg" alt="Themes"><p align="center"><sub>Themes, four slides each</sub></p></td>
   </tr>
