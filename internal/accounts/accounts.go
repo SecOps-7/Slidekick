@@ -10,9 +10,13 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +35,9 @@ const (
 	APITokenPrefix  = "skp_"
 	MinPassword     = 10
 	settingEditAll  = "editors_edit_all"
+	settingEmbed    = "embed_viewer"         // "1": viewer link pages may be framed by EmbedOrigins
+	settingOrigins  = "embed_viewer_origins" // JSON list of origins
+	maxEmbedOrigins = 20
 	maxHashParallel = 2
 )
 
@@ -473,16 +480,101 @@ func (s *Service) DeleteUser(ctx context.Context, id, transferTo string) error {
 
 type Settings struct {
 	EditorsEditAll bool `json:"editorsEditAll"`
+	// EmbedViewer lets other sites show viewer links in a frame; only the
+	// origins in EmbedOrigins may (frame-ancestors). Off by default.
+	EmbedViewer  bool     `json:"embedViewer"`
+	EmbedOrigins []string `json:"embedOrigins"`
 }
 
 func (s *Service) Settings(ctx context.Context) Settings {
-	return Settings{EditorsEditAll: s.Store.Setting(ctx, settingEditAll) == "1"}
+	v := Settings{EditorsEditAll: s.Store.Setting(ctx, settingEditAll) == "1", EmbedViewer: s.Store.Setting(ctx, settingEmbed) == "1", EmbedOrigins: []string{}}
+	if raw := s.Store.Setting(ctx, settingOrigins); raw != "" {
+		json.Unmarshal([]byte(raw), &v.EmbedOrigins)
+	}
+	return v
+}
+
+// EmbedOrigins are the origins allowed to frame viewer link pages right now
+// (none while embedding is off).
+func (s *Service) EmbedOrigins(ctx context.Context) []string {
+	if s.Store.Setting(ctx, settingEmbed) != "1" {
+		return nil
+	}
+	return s.Settings(ctx).EmbedOrigins
 }
 
 func (s *Service) SaveSettings(ctx context.Context, v Settings) error {
-	val := "0"
-	if v.EditorsEditAll {
-		val = "1"
+	origins := make([]string, 0, len(v.EmbedOrigins))
+	seen := map[string]bool{}
+	for _, raw := range v.EmbedOrigins {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		o, err := NormalizeOrigin(raw)
+		if err != nil {
+			return fmt.Errorf("%w: %s", ErrValidation, err.Error())
+		}
+		if !seen[o] {
+			seen[o] = true
+			origins = append(origins, o)
+		}
 	}
-	return s.Store.SetSetting(ctx, settingEditAll, val)
+	if len(origins) > maxEmbedOrigins {
+		return fmt.Errorf("%w: at most %d sites may embed viewer links", ErrValidation, maxEmbedOrigins)
+	}
+	if v.EmbedViewer && len(origins) == 0 {
+		return fmt.Errorf("%w: list at least one site (like https://dashboard.example:8443) that may embed viewer links", ErrValidation)
+	}
+	flag := func(b bool) string {
+		if b {
+			return "1"
+		}
+		return "0"
+	}
+	list, _ := json.Marshal(origins)
+	for k, val := range map[string]string{settingEditAll: flag(v.EditorsEditAll), settingOrigins: string(list), settingEmbed: flag(v.EmbedViewer)} {
+		if err := s.Store.SetSetting(ctx, k, val); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var originHost = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]*[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$`)
+
+// NormalizeOrigin checks a site origin for frame-ancestors and returns it in
+// canonical form: scheme://host[:port], lower case, without a default port.
+// No paths, wildcards, user info or anything that could break out of the
+// header.
+func NormalizeOrigin(raw string) (string, error) {
+	s := strings.TrimSpace(raw)
+	u, err := url.Parse(s)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil ||
+		(u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" {
+		return "", fmt.Errorf("%q isn't a site origin: use the scheme, host and port only, like https://dashboard.example:8443", raw)
+	}
+	host, port := strings.ToLower(u.Hostname()), u.Port()
+	if ip, err := netip.ParseAddr(host); err == nil {
+		if ip.Is6() {
+			host = "[" + ip.String() + "]"
+		} else {
+			host = ip.String()
+		}
+	} else if !originHost.MatchString(host) {
+		return "", fmt.Errorf("%q isn't a site origin: the host may only use letters, digits, dots and dashes (no wildcards)", raw)
+	}
+	if port != "" {
+		n, err := strconv.Atoi(port)
+		if err != nil || n < 1 || n > 65535 {
+			return "", fmt.Errorf("%q has an invalid port", raw)
+		}
+		if (u.Scheme == "https" && n == 443) || (u.Scheme == "http" && n == 80) {
+			port = ""
+		}
+	}
+	out := u.Scheme + "://" + host
+	if port != "" {
+		out += ":" + port
+	}
+	return out, nil
 }

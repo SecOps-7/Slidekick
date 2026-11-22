@@ -14,6 +14,7 @@ services:
     user: "1000:1000"
     ports:
       - "7410:7410"
+      - "7443:7443" # optional local HTTPS (Settings > General); nothing listens until an admin turns it on
     env_file:
       - /opt/slidekick/slidekick.env
     environment:

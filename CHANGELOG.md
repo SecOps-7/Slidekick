@@ -2,6 +2,12 @@
 
 Each release lists its changes by type: New, Changed, Fixed and Internal (also Security, Removed and Deprecated when a release has them). The about page badges every note with its type.
 
+## 1.1.0 (unreleased)
+
+### New
+- Local HTTPS: Slidekick can serve HTTPS itself on the local network (Settings > General, off by default), on `SLIDEKICK_HTTPS_ADDR` (`:7443`) next to plain HTTP, with your own certificate or one from its own name-constrained certificate authority, which you download and trust on your devices. Generated certificates renew themselves; private keys are stored encrypted. Plain HTTP stays available for proxies and cast TVs, and casting uses it.
+- Sharing: viewer links can be embedded in other sites an admin lists (Settings > General, off by default). Only viewer link pages relax framing, for exactly those sites; everything else stays unframeable.
+
 ## 1.0.0 (2026-11-21)
 
 First public release.

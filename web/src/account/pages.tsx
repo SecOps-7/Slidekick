@@ -700,19 +700,229 @@ function SSO() {
   );
 }
 
+interface InstanceSettings {
+  editorsEditAll: boolean;
+  embedViewer: boolean;
+  embedOrigins: string[];
+}
+
 function General() {
-  const [s, setS] = useState<{ editorsEditAll: boolean } | null>(null);
+  const [s, setS] = useState<InstanceSettings | null>(null);
   useEffect(() => {
-    api<{ editorsEditAll: boolean }>("GET", "/api/admin/settings").then(setS);
+    api<InstanceSettings>("GET", "/api/admin/settings").then(setS);
   }, []);
   if (!s) return null;
   return (
+    <>
+      <section>
+        <label class="acc-check">
+          <input type="checkbox" checked={s.editorsEditAll} onChange={async (e) => setS(await api("PUT", "/api/admin/settings", { ...s, editorsEditAll: e.currentTarget.checked }))} /> Editors
+          can edit every deck, not only their own
+        </label>
+        <p class="acc-muted">Everyone signed in can always view, present and comment on every deck. Changing a deck needs its owner, an admin, or this setting.</p>
+      </section>
+      <EmbedSettings s={s} onSaved={setS} />
+      <LocalHTTPS />
+    </>
+  );
+}
+
+// ---- embedding viewer links in other sites ----
+
+function EmbedSettings({ s, onSaved }: { s: InstanceSettings; onSaved: (v: InstanceSettings) => void }) {
+  const [on, setOn] = useState(s.embedViewer);
+  const [text, setText] = useState(s.embedOrigins.join("\n"));
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
+  const save = async (e: Event) => {
+    e.preventDefault();
+    setErr("");
+    setOk("");
+    try {
+      const v = await api<InstanceSettings>("PUT", "/api/admin/settings", { ...s, embedViewer: on, embedOrigins: text.split(/[\s,]+/).filter(Boolean) });
+      onSaved(v);
+      setOn(v.embedViewer);
+      setText(v.embedOrigins.join("\n"));
+      setOk(v.embedViewer ? "Saved. Viewer links can be embedded by these sites now." : "Saved. Viewer links can't be embedded anywhere.");
+    } catch (x) {
+      setErr((x as Error).message);
+    }
+  };
+  return (
     <section>
-      <label class="acc-check">
-        <input type="checkbox" checked={s.editorsEditAll} onChange={async (e) => setS(await api("PUT", "/api/admin/settings", { ...s, editorsEditAll: e.currentTarget.checked }))} /> Editors
-        can edit every deck, not only their own
-      </label>
-      <p class="acc-muted">Everyone signed in can always view, present and comment on every deck. Changing a deck needs its owner, an admin, or this setting.</p>
+      <h2>Embed viewer links</h2>
+      <form class="acc-form" onSubmit={save}>
+        <label class="acc-check">
+          <input type="checkbox" checked={on} onChange={(e) => setOn(e.currentTarget.checked)} /> Let these sites show viewer links in a frame
+        </label>
+        <label>
+          Sites (one per line)
+          <textarea rows={3} value={text} placeholder="https://dashboard.example:8443" onInput={(e) => setText(e.currentTarget.value)} spellcheck={false} />
+          <small>
+            The scheme, host and port the other site is served from, like <code>https://dashboard.example:8443</code>. Only viewer links can be framed, only by these sites, and
+            only while this is on; the editor, presenter view, presenter links and sign-in never can. Turning it off or removing a site applies at once. Use a viewer link with its key
+            (Share → Viewer link) as the frame's address, and add <code>allow="fullscreen"</code> to the frame for its Fullscreen button.
+          </small>
+        </label>
+        <Err msg={err} />
+        {ok && <p class="acc-ok">{ok}</p>}
+        <button class="acc-primary">Save</button>
+      </form>
+    </section>
+  );
+}
+
+// ---- local HTTPS ----
+
+interface CertInfo {
+  subject: string;
+  names: string[];
+  notAfter: string;
+  fingerprint: string;
+}
+interface TLSStatus {
+  available?: boolean;
+  enabled: boolean;
+  mode: "generate" | "provided";
+  names: string[];
+  addr: string;
+  listening: boolean;
+  error?: string;
+  cert?: CertInfo;
+  ca?: CertInfo;
+}
+
+const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+
+function LocalHTTPS() {
+  const [st, setSt] = useState<TLSStatus | null>(null);
+  const [on, setOn] = useState(false);
+  const [mode, setMode] = useState<"generate" | "provided">("generate");
+  const [names, setNames] = useState("");
+  const [cert, setCert] = useState("");
+  const [key, setKey] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = (v: TLSStatus) => {
+    setSt(v);
+    setOn(v.enabled);
+    setMode(v.mode ?? "generate");
+    setNames((v.names?.length ? v.names : [location.hostname]).join("\n"));
+  };
+  useEffect(() => {
+    api<TLSStatus>("GET", "/api/admin/tls").then(load);
+  }, []);
+  if (!st) return null;
+  if (st.available === false) return null;
+  const port = st.addr.split(":").pop();
+  const run = async (f: () => Promise<TLSStatus>) => {
+    setErr("");
+    setBusy(true);
+    try {
+      load(await f());
+      setCert("");
+      setKey("");
+    } catch (x) {
+      setErr((x as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const save = (e: Event) => {
+    e.preventDefault();
+    run(() => api<TLSStatus>("PUT", "/api/admin/tls", { enabled: on, mode, names: names.split(/[\s,]+/).filter(Boolean), ...(cert || key ? { cert, key } : {}) }));
+  };
+  const rotate = async () => {
+    if (
+      await confirmModal({
+        title: "Replace the certificate authority?",
+        message: "Slidekick makes a new certificate authority and certificate. Devices that trusted the old one stop trusting Slidekick until you install the new one on them.",
+        confirm: "Replace",
+        danger: true,
+      })
+    )
+      run(() => api<TLSStatus>("POST", "/api/admin/tls/ca"));
+  };
+  return (
+    <section>
+      <h2>Local HTTPS</h2>
+      <p class="acc-muted">
+        Serve Slidekick over HTTPS on your network, on port {port}, next to plain HTTP. Plain HTTP stays available: a reverse proxy in front keeps working, and cast TVs keep
+        using it, because a Chromecast can't be told to trust a private certificate.
+      </p>
+      <form class="acc-form" onSubmit={save}>
+        <label class="acc-check">
+          <input type="checkbox" checked={on} onChange={(e) => setOn(e.currentTarget.checked)} /> Serve HTTPS on port {port}
+        </label>
+        <fieldset>
+          <legend>Certificate</legend>
+          <label class="acc-check">
+            <input type="radio" name="tls-mode" checked={mode === "generate"} onChange={() => setMode("generate")} /> Let Slidekick make one (its own certificate authority)
+          </label>
+          <label class="acc-check">
+            <input type="radio" name="tls-mode" checked={mode === "provided"} onChange={() => setMode("provided")} /> Use my own certificate
+          </label>
+        </fieldset>
+        {mode === "generate" ? (
+          <label>
+            Host names and IP addresses (one per line)
+            <textarea rows={3} value={names} onInput={(e) => setNames(e.currentTarget.value)} placeholder="192.168.1.10" spellcheck={false} />
+            <small>The addresses people type to reach Slidekick, like 192.168.1.10 or slides.lan. Private addresses only; the certificate is renewed by itself a month before it expires.</small>
+          </label>
+        ) : (
+          <>
+            <label>
+              Certificate (PEM, its chain may follow)
+              <textarea rows={4} value={cert} onInput={(e) => setCert(e.currentTarget.value)} placeholder={st.cert && st.mode === "provided" ? "Stored. Paste a new one to replace it." : "-----BEGIN CERTIFICATE-----"} spellcheck={false} />
+            </label>
+            <label>
+              Private key (PEM)
+              <textarea rows={4} value={key} onInput={(e) => setKey(e.currentTarget.value)} placeholder={st.cert && st.mode === "provided" ? "Stored encrypted. Paste a new one to replace it." : "-----BEGIN PRIVATE KEY-----"} spellcheck={false} />
+              <small>Stored encrypted. You renew it yourself: paste a new pair before this one expires.</small>
+            </label>
+          </>
+        )}
+        <Err msg={err || st.error || ""} />
+        <button class="acc-primary" disabled={busy}>
+          {busy ? "Saving…" : "Save"}
+        </button>
+      </form>
+      <p class={st.listening ? "acc-ok" : "acc-muted"}>
+        {st.listening ? (
+          <>
+            Serving HTTPS on port {port}: <a href={`https://${location.hostname}:${port}${location.pathname}`}>{`https://${location.hostname}:${port}`}</a>
+          </>
+        ) : (
+          "HTTPS is off."
+        )}
+      </p>
+      {st.cert && (
+        <p class="acc-muted">
+          Certificate for {st.cert.names.join(", ")}, valid until {day(st.cert.notAfter)}.
+        </p>
+      )}
+      {st.mode === "generate" && st.ca && (
+        <div class="acc-fresh">
+          <p>
+            <strong>Trust Slidekick on your devices.</strong> Install the certificate authority once on each device that opens Slidekick over HTTPS (on phones and tablets, open this
+            link there). It can only vouch for private addresses and the names above.
+          </p>
+          <p>
+            <a class="acc-sso-btn" href="/tls/ca.crt" download="slidekick-local-ca.crt">
+              Download the certificate authority
+            </a>
+          </p>
+          <small>
+            SHA-256 fingerprint: <code>{st.ca.fingerprint}</code>
+          </small>
+          <button type="button" class="acc-link danger" onClick={rotate} disabled={busy}>
+            Replace the certificate authority
+          </button>
+        </div>
+      )}
+      <p class="acc-muted">
+        Share links use the base URL (<code>SLIDEKICK_BASE_URL</code>); set it to the HTTPS address to hand out HTTPS links, and to sign in with single sign-on over HTTPS.
+      </p>
     </section>
   );
 }

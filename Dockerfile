@@ -40,7 +40,7 @@ COPY --from=build /out/slidekick /usr/local/bin/slidekick
 ENV SLIDEKICK_ADDR=:7410 SLIDEKICK_DATA=/data SLIDEKICK_CHROME=/usr/bin/chromium HOME=/tmp
 USER 65532:65532
 VOLUME /data
-EXPOSE 7410
+EXPOSE 7410 7443
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s CMD ["/usr/local/bin/slidekick", "health"]
 ENTRYPOINT ["/usr/local/bin/slidekick"]
 CMD ["serve"]

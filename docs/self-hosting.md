@@ -10,7 +10,7 @@ services:
     image: ghcr.io/secops-7/slidekick:latest
     restart: unless-stopped
     user: "1000:1000"
-    ports: ["7410:7410"]
+    ports: ["7410:7410", "7443:7443"]   # 7443: optional local HTTPS (Settings > General)
     env_file: [./slidekick.env]          # SLIDEKICK_TOKEN=... (chmod 600)
     environment:
       SLIDEKICK_BASE_URL: https://slides.example.com
@@ -34,7 +34,8 @@ Create the token with `openssl rand -hex 24`. Slidekick refuses to start with a 
 | `SLIDEKICK_ADMIN_PASSWORD` | empty | Password for that first admin (at least 10 characters). A secret: keep it in the `env_file`. |
 | `SLIDEKICK_SECRET_KEY` | key file | 32 bytes (`openssl rand -hex 32`) that encrypt stored secrets: SSO client secrets and AI provider keys. Without it Slidekick creates `SLIDEKICK_DATA/secret.key` (mode 600) on first run; back it up with the data, because the stored secrets can't be decrypted without it. |
 | `SLIDEKICK_BASE_URL` | `http://localhost:<port>` | The URL people use, in share and download links and SSO redirect URLs: `https://<internal hostname>` once TLS is set up. |
-| `SLIDEKICK_ADDR` | `:7410` | Listen address. |
+| `SLIDEKICK_ADDR` | `:7410` | Listen address for plain HTTP, which is always served. |
+| `SLIDEKICK_HTTPS_ADDR` | `:7443` | Listen address for [local HTTPS](#local-https), once an admin turns it on (off by default). Publish the port in Compose to reach it. |
 | `SLIDEKICK_DATA` | `/data` | SQLite database and uploaded files. Back this folder up. |
 | `SLIDEKICK_CHROME` | auto | Path to Chromium if it isn't on `PATH`. |
 | `SLIDEKICK_CAST_SUBNETS` | derived | Private IPv4 subnets (comma-separated CIDRs) to scan for Chromecasts. Default: the /24 of the base URL's LAN address and of the machine's own LAN interfaces. At most 1024 addresses; public ranges are refused. See [Casting to a TV](#casting-to-a-tv). |
@@ -171,7 +172,7 @@ An AI can present a deck out loud: it moves through the slides and their build s
 
 ## TLS on the LAN
 
-Slidekick speaks plain HTTP. Serve it over https through a TLS-terminating reverse proxy on your home network (decided 2026-11-20 for the reference deployment: the existing Nginx Proxy Manager, an internal hostname, **nothing exposed to the internet**: no public DNS record, no tunnel, no port forward).
+Slidekick speaks plain HTTP (it can also serve HTTPS itself: see [Local HTTPS](#local-https)). Serve it over https through a TLS-terminating reverse proxy on your home network (decided 2026-11-20 for the reference deployment: the existing Nginx Proxy Manager, an internal hostname, **nothing exposed to the internet**: no public DNS record, no tunnel, no port forward).
 
 1. **LAN DNS:** an internal record for the hostname (e.g. `slides.<your domain>`) pointing at the proxy's LAN address, in your LAN's DNS server only. A wildcard certificate the proxy already has covers it without any new public record.
 2. **Proxy host:** forward `https://<hostname>` to `http://<slidekick host>:7410` with WebSockets enabled, force https, and attach an access list that allows only private address ranges and denies everything else, so the name answers on the LAN only even if the proxy also serves the internet.
@@ -187,6 +188,28 @@ Direct `http://<host>:7410` keeps working on the LAN, without `Secure` cookies; 
 
 Without `SLIDEKICK_TRUSTED_PROXIES`, every client behind a proxy shares the proxy's address, so a burst of bad sign-ins locks everyone out for five minutes.
 
+## Local HTTPS
+
+Slidekick can serve HTTPS itself on your network, without a reverse proxy. It's **off by default**; an admin turns it on under **Settings > General > Local HTTPS**. Plain HTTP keeps working either way.
+
+- **Where:** `SLIDEKICK_HTTPS_ADDR` (default `:7443`), next to plain HTTP on `SLIDEKICK_ADDR`. Publish the port (`"7443:7443"` in Compose). Nothing listens on it until the setting is on, and switching it on or off takes effect at once, without a restart.
+- **The certificate, one of two ways:**
+  - **Let Slidekick make one.** List the host names and IP addresses people use (like `192.168.1.10` or `slides.lan`). Slidekick creates its own certificate authority once and signs a certificate for those names, valid for 397 days and renewed by itself a month before it expires. **Download the certificate authority** (the button in the settings, or `/tls/ca.crt` while it's in use) and install it as trusted on each device that opens Slidekick over HTTPS; its SHA-256 fingerprint is shown so you can check the download. The authority is *name-constrained*: it can only vouch for private IP addresses (10/8, 172.16/12, 192.168/16, loopback, link-local, fc00::/7), the local suffixes `.lan`, `.local`, `.home.arpa`, `.internal` and `localhost`, and the names listed when it was made, so even a stolen copy of its key can't impersonate other websites to your devices. Public IP addresses are refused. Adding a name outside those later means **Replace the certificate authority** (and trusting the new one).
+  - **Use your own.** Paste a certificate (its chain may follow it) and its private key in PEM. Slidekick checks that they match and are valid now; renewing is up to you.
+- **Storage:** the certificates live in the database; private keys are encrypted with `SLIDEKICK_SECRET_KEY` (or the key file) like the other stored secrets. No new volume.
+- **HTTP stays available; it doesn't redirect.** A reverse proxy in front forwards to plain HTTP as before, cast TVs need it (below), and devices that don't trust the certificate yet can still get in. Requests over HTTPS get `Secure` cookies as through a proxy; trusted-proxy handling is unchanged, so a proxy in front keeps working whether the setting is on or off.
+- **Links:** share links, SSO redirects and the base URL come from `SLIDEKICK_BASE_URL`, which this setting doesn't change. Set it to the HTTPS address (`https://192.168.1.10:7443`) to hand out HTTPS links; single sign-on over HTTPS needs that too, because the sign-in cookies are `Secure`.
+- **Casting stays on HTTP.** A Chromecast has no way to add a private certificate authority, so it can't open a page whose certificate it doesn't already trust. When the base URL points at the local HTTPS port, the TV is sent the same host over plain HTTP on `SLIDEKICK_ADDR` instead. (A base URL on a reverse proxy with a publicly trusted certificate is used as is.)
+- **LAN only:** no ACME or other certificate service, no public DNS, no tunnel, no port forward.
+
+## Embedding viewer links in other sites
+
+Every page refuses to be shown in another site's frame (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). To show viewer links inside another web app on your network, an admin turns on **Settings > General > Embed viewer links** and lists the sites allowed to, one origin each (`https://dashboard.example:8443`: scheme, host and port, no path or wildcards). It's **off by default**.
+
+- Only **viewer link pages** (`/d/<id>`, with or without `?k=`) relax framing, and only for exactly the listed sites (`frame-ancestors` names them). The editor, the presenter view, presenter links (`?p=`), sign-in, settings and the API stay `DENY`.
+- Turning it off or removing a site applies to the next page load of every viewer link. Viewer links themselves are unchanged: **Make new links** still revokes their keys.
+- Use a viewer link with its key (**Share > Viewer link**, with **Loop** for a kiosk) as the frame's `src`, and add `allow="fullscreen"` to the `<iframe>` for its Fullscreen button. A signed-in session isn't used inside another site's frame, so a private deck needs its key in the link.
+
 ## Security model
 
 - **Accounts and roles** decide who can list, edit, share, export and administer (see above). Signed-in people of any role can view every deck.
@@ -199,6 +222,7 @@ Without `SLIDEKICK_TRUSTED_PROXIES`, every client behind a proxy shares the prox
 - **Stored secrets** (SSO client secrets, AI and voice provider keys) are encrypted with AES-256-GCM under `SLIDEKICK_SECRET_KEY` or the key file, are never sent to the browser and never logged.
 - **Rendering is sandboxed from your network**: headless Chromium reaches only public internet addresses and Slidekick itself, so deck content can't read internal services through `render_slide`.
 - **Uploads** are content-addressed, type-checked and served with a sandboxing Content-Security-Policy. Their URLs are unguessable (80-bit hashes) but not tied to a deck, so a private deck's images are as private as their links.
+- **Framing:** every page is `DENY`, except viewer link pages for the sites an admin lists (see [Embedding](#embedding-viewer-links-in-other-sites)).
 - **The `html` element** (an escape hatch for agents) renders in a sandboxed frame: no scripts, no same-origin access, no forms, and its own CSP allows only https images and fonts.
 
 See [SECURITY.md](../SECURITY.md) to report a vulnerability.

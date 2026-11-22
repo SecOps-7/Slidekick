@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -30,6 +31,7 @@ import (
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
 	"github.com/SecOps-7/slidekick/internal/hub"
+	"github.com/SecOps-7/slidekick/internal/localtls"
 	"github.com/SecOps-7/slidekick/internal/mcpserver"
 	"github.com/SecOps-7/slidekick/internal/narration"
 	"github.com/SecOps-7/slidekick/internal/presenting"
@@ -146,6 +148,8 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 	defer st.Close()
 
 	svc := service.New(st, v, cat, themes, hub.New(), baseURL)
+	httpsAddr := env("SLIDEKICK_HTTPS_ADDR", ":7443")
+	svc.CastBaseURL = castBase(baseURL, addr, httpsAddr)
 	svc.FilesDir = filepath.Join(data, "files")
 	if svc.Blobs, err = openBlobs(ctx, data, log); err != nil {
 		return err
@@ -195,9 +199,15 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 		}
 		return export.MakeFile(ctx, rnd, d, format, svc.SaveGenerated)
 	}
+	localTLS := &localtls.Manager{Store: st, Box: acc.Box, Addr: httpsAddr, Log: log}
 	handler := server.New(svc, mcpSrv, server.Options{Token: token, BaseURL: baseURL, About: about.Build{Version: version, Commit: commit, Built: built, Changelog: slidekick.Changelog, Licence: slidekick.License, Started: started}, Accounts: acc, TrustedProxies: trusted,
 		AI:  aiSvc,
-		TTS: voices, Presenter: presenter, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files})
+		TTS: voices, Presenter: presenter, SchemaFS: slidekick.Schema, Web: slidekick.Web(), Log: log, Exporter: exp, Files: files, LocalTLS: localTLS})
+	// Local HTTPS (Settings > General, off by default) serves the same handler
+	// next to plain HTTP, which always stays up for proxies and cast TVs.
+	localTLS.Handler = handler
+	go localTLS.Run(ctx)
+	defer localTLS.Close()
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 2 * time.Minute, IdleTimeout: 2 * time.Minute}
 	httpErr := make(chan error, 1)
@@ -233,6 +243,24 @@ func run(ctx context.Context, cmd, addr, data, baseURL, token string, log *slog.
 	case err := <-httpErr:
 		return err
 	}
+}
+
+// castBase is the base URL a cast TV opens when it can't use baseURL: when
+// baseURL points at the local HTTPS port, whose certificate a Chromecast can't
+// be told to trust, the TV opens the same host over plain HTTP instead. A
+// reverse proxy with a publicly trusted certificate (any other port) is used
+// as is. "" means baseURL.
+func castBase(baseURL, httpAddr, httpsAddr string) string {
+	u, err := url.Parse(baseURL)
+	if err != nil || u.Scheme != "https" {
+		return ""
+	}
+	_, tlsPort, _ := net.SplitHostPort(httpsAddr)
+	_, httpPort, _ := net.SplitHostPort(httpAddr)
+	if tlsPort == "" || httpPort == "" || u.Port() != tlsPort {
+		return ""
+	}
+	return "http://" + net.JoinHostPort(u.Hostname(), httpPort)
 }
 
 func shutdown(srv *http.Server) {

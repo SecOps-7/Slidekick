@@ -54,7 +54,7 @@ services:
     image: ghcr.io/secops-7/slidekick:latest
     restart: unless-stopped
     user: "1000:1000"
-    ports: ["7410:7410"]
+    ports: ["7410:7410", "7443:7443"]   # 7443: optional local HTTPS (Settings > General)
     env_file: [./slidekick.env]          # SLIDEKICK_TOKEN=... (chmod 600)
     environment:
       SLIDEKICK_BASE_URL: http://192.168.1.10:7410   # the address people (and TVs) use
@@ -238,7 +238,8 @@ Most things are configured in the web UI (**Settings**): users and roles, single
 | `SLIDEKICK_SECRET_KEY` | key file in `/data` | 32 bytes that encrypt stored SSO, AI and voice secrets. Back it up with the data. |
 | `SLIDEKICK_CAST_SUBNETS` | derived | Private subnets to search for Chromecasts, such as a separate IoT VLAN (`192.168.20.0/24`). Default: the server's own LAN. |
 | `SLIDEKICK_CAST_DISCOVERY` | on | `off` stops the automatic background search for cast devices. |
-| `SLIDEKICK_ADDR` | `:7410` | Listen address. |
+| `SLIDEKICK_ADDR` | `:7410` | Listen address. Plain HTTP is always served here. |
+| `SLIDEKICK_HTTPS_ADDR` | `:7443` | Where local HTTPS is served once an admin turns it on under Settings > General (off by default). Publish this port to use it. |
 | `SLIDEKICK_DATA` | `/data` | SQLite database and uploads. |
 | `SLIDEKICK_CHROME` | auto | Path to Chromium if it isn't on `PATH`. |
 | `SLIDEKICK_S3_*` | empty | Keep uploaded and exported files in an S3-compatible bucket (AWS S3, MinIO...) instead of `/data`. |
@@ -274,6 +275,8 @@ Slidekick is built for your **local network**. It serves plain HTTP; terminate T
 - **Secrets at rest** (SSO client secrets, AI and voice keys) are encrypted with AES-256-GCM, never sent to the browser and never logged. Tokens are stored as hashes.
 - **Agent content is untrusted.** Rendering in Chromium reaches only public addresses and Slidekick itself, uploads are served with a sandboxing CSP, and the `html` element runs in a sandboxed frame with no scripts.
 - **Casting stays on the LAN.** The server talks to the TV directly; no port forward, tunnel or public URL is used.
+- **Framing is refused** on every page. An admin can let listed sites embed viewer links (Settings > General); the editor, presenter view, presenter links and sign-in are never frameable.
+- **Local HTTPS without a proxy** (optional, off by default): Slidekick can serve HTTPS itself with your certificate or one from its own certificate authority, which is limited to private addresses and local names. Nothing is requested from the internet.
 - **Never expose it directly to the internet.** For remote access use a VPN or an authenticating proxy.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).

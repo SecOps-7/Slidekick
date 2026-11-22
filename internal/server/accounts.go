@@ -338,7 +338,7 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.acc.SaveSettings(r.Context(), body); err != nil {
-		writeErr(w, err)
+		writeAccErr(w, err)
 		return
 	}
 	writeJSON(w, 200, s.acc.Settings(r.Context()))

@@ -29,6 +29,9 @@ type Service struct {
 	Themes  *deck.ThemeSet
 	Hub     *hub.Hub
 	BaseURL string
+	// CastBaseURL, when set, is the base a cast TV opens instead of BaseURL
+	// (see CastURL).
+	CastBaseURL string
 	// FilesDir holds uploaded assets on disk; empty disables uploads unless
 	// Blobs is set.
 	FilesDir string

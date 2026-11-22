@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/SecOps-7/slidekick/internal/authz"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
+	"github.com/SecOps-7/slidekick/internal/localtls"
 	"github.com/SecOps-7/slidekick/internal/narration"
 	"github.com/SecOps-7/slidekick/internal/presenting"
 	"github.com/SecOps-7/slidekick/internal/service"
@@ -51,6 +53,8 @@ type Options struct {
 	Exporter       *export.Exporter
 	// Files makes a binary export (pdf or png) and stores it; see export.MakeFile.
 	Files func(ctx context.Context, deckID, format string) (*store.Asset, error)
+	// LocalTLS serves HTTPS on the LAN when an admin turns it on (nil: not offered).
+	LocalTLS *localtls.Manager
 }
 
 type server struct {
@@ -98,6 +102,7 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	s.castRoutes(mux)
 	s.ttsRoutes(mux)
 	s.presentRoutes(mux)
+	s.tlsRoutes(mux)
 	mux.HandleFunc("GET /files/{name}", s.serveFile)
 	mux.HandleFunc("GET /ws/decks/{id}", s.ws)
 	mux.HandleFunc("GET /schema/deck.schema.json", func(w http.ResponseWriter, r *http.Request) {
@@ -136,17 +141,41 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	mux.Handle("/mcp/", s.mcpAuth(mcpCapped))
 
 	mux.Handle("/", s.spa())
-	return s.proxyHeaders(securityHeaders(mux))
+	return s.proxyHeaders(s.securityHeaders(mux))
 }
 
-func securityHeaders(next http.Handler) http.Handler {
+type framersKey struct{}
+
+// securityHeaders forbids framing everywhere, except that a viewer link page
+// may be framed by the sites an admin listed (Settings > General), while that
+// setting is on. The setting is read on every request, so turning it off or
+// removing a site takes effect at once.
+func (s *server) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
-		h.Set("X-Frame-Options", "DENY")
+		if origins := s.viewerFramers(r); len(origins) > 0 {
+			// The page's CSP (spa) names exactly these sites in frame-ancestors;
+			// X-Frame-Options can't list sites, so it's left off this page only.
+			r = r.WithContext(context.WithValue(r.Context(), framersKey{}, origins))
+		} else {
+			h.Set("X-Frame-Options", "DENY")
+		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+var viewerPath = regexp.MustCompile(`^/d/[A-Za-z0-9_-]+/?$`)
+
+// viewerFramers are the sites allowed to frame this request: only the viewer
+// page itself (/d/<id>), never the editor, presenter, presenter links (?p=),
+// sign-in or API, and only while embedding is on.
+func (s *server) viewerFramers(r *http.Request) []string {
+	if s.acc == nil || (r.Method != http.MethodGet && r.Method != http.MethodHead) || !viewerPath.MatchString(r.URL.Path) || r.URL.Query().Has("p") {
+		return nil
+	}
+	return s.acc.EmbedOrigins(r.Context())
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -529,7 +558,11 @@ func (s *server) spa() http.Handler {
 				}
 			}
 		}
-		w.Header().Set("Content-Security-Policy", appCSP)
+		csp := appCSP
+		if origins, _ := r.Context().Value(framersKey{}).([]string); len(origins) > 0 {
+			csp = strings.Replace(csp, "frame-ancestors 'none'", "frame-ancestors "+strings.Join(origins, " "), 1)
+		}
+		w.Header().Set("Content-Security-Policy", csp)
 		idx, err := fs.ReadFile(s.opt.Web, "index.html")
 		if err != nil {
 			http.Error(w, "web app not built (run: npm --prefix web run build)", http.StatusServiceUnavailable)

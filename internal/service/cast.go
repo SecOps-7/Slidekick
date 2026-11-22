@@ -119,21 +119,27 @@ func (s *Service) findCastDevice(ctx context.Context, idOrName string) (*store.C
 }
 
 // CastURL is the page the TV opens: the deck's presenting view in cast mode,
-// carrying the view key so a private deck opens without signing in.
+// carrying the view key so a private deck opens without signing in. It uses
+// CastBaseURL when set: plain HTTP when the base URL is Slidekick's own local
+// HTTPS listener, whose certificate a Chromecast can't be told to trust.
 func (s *Service) CastURL(ctx context.Context, deckID string) (string, error) {
-	u, err := url.Parse(s.BaseURL)
+	base := s.BaseURL
+	if s.CastBaseURL != "" {
+		base = s.CastBaseURL
+	}
+	u, err := url.Parse(base)
 	if err != nil || u.Host == "" {
 		return "", &CastInputError{"SLIDEKICK_BASE_URL isn't set to a valid URL, so the TV can't be told where the deck is"}
 	}
 	h := u.Hostname()
 	if ip := net.ParseIP(h); h == "localhost" || strings.HasSuffix(h, ".localhost") || (ip != nil && ip.IsLoopback()) {
-		return "", &CastInputError{fmt.Sprintf("SLIDEKICK_BASE_URL is %s, which a TV can't open: set it to an address the TV can reach on your network, like http://192.168.1.10:7410", s.BaseURL)}
+		return "", &CastInputError{fmt.Sprintf("SLIDEKICK_BASE_URL is %s, which a TV can't open: set it to an address the TV can reach on your network, like http://192.168.1.10:7410", base)}
 	}
 	q := "?"
 	if k := s.ViewKey(ctx, deckID); k != "" {
 		q += "k=" + url.QueryEscape(k) + "&"
 	}
-	return s.BaseURL + "/d/" + url.PathEscape(deckID) + "/present" + q + "cast=1", nil
+	return base + "/d/" + url.PathEscape(deckID) + "/present" + q + "cast=1", nil
 }
 
 func castEvent(state, device, deviceID, actor string) map[string]any {
