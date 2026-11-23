@@ -21,7 +21,20 @@ func isHTTPS(r *http.Request) bool {
 	return v
 }
 
-func (s *server) trusted(remote string) bool {
+// proxies are the trusted proxies: SLIDEKICK_TRUSTED_PROXIES plus those an
+// admin listed in Settings > General.
+func (s *server) proxies(ctx context.Context) []netip.Prefix {
+	if s.acc == nil {
+		return s.opt.TrustedProxies
+	}
+	set := s.acc.Public(ctx).Proxies
+	if len(set) == 0 {
+		return s.opt.TrustedProxies
+	}
+	return append(append([]netip.Prefix(nil), s.opt.TrustedProxies...), set...)
+}
+
+func (s *server) trusted(ctx context.Context, remote string) bool {
 	host, _, err := net.SplitHostPort(remote)
 	if err != nil {
 		host = remote
@@ -31,12 +44,28 @@ func (s *server) trusted(remote string) bool {
 		return false
 	}
 	ip = ip.Unmap()
-	for _, p := range s.opt.TrustedProxies {
+	for _, p := range s.proxies(ctx) {
 		if p.Contains(ip) {
 			return true
 		}
 	}
 	return false
+}
+
+// arrival records how a request reached Slidekick, for the public-access
+// check in Settings: the peer that connected, whether it sent forwarding
+// headers and whether it is trusted.
+type arrival struct {
+	Peer      string `json:"peer"`
+	Forwarded bool   `json:"forwarded"`
+	Trusted   bool   `json:"trusted"`
+}
+
+type arrivalKey struct{}
+
+func arrivalOf(r *http.Request) arrival {
+	a, _ := r.Context().Value(arrivalKey{}).(arrival)
+	return a
 }
 
 // forwardedClient picks the client address a trusted proxy reports:
@@ -59,7 +88,14 @@ func forwardedClient(r *http.Request) (netip.Addr, bool) {
 // the lockout) or claim https.
 func (s *server) proxyHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if len(s.opt.TrustedProxies) == 0 || !s.trusted(r.RemoteAddr) {
+		peer, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			peer = r.RemoteAddr
+		}
+		fwd := r.Header.Get("X-Forwarded-Proto") != "" || r.Header.Get("X-Real-IP") != "" || r.Header.Get("X-Forwarded-For") != ""
+		trusted := s.trusted(r.Context(), r.RemoteAddr)
+		r = r.WithContext(context.WithValue(r.Context(), arrivalKey{}, arrival{Peer: peer, Forwarded: fwd, Trusted: trusted}))
+		if !trusted {
 			if r.Header.Get("X-Forwarded-Proto") != "" || r.Header.Get("X-Real-IP") != "" {
 				s.noteUntrustedProxy(r.RemoteAddr)
 			}
@@ -80,7 +116,7 @@ var untrustedSeen sync.Map
 
 // noteUntrustedProxy logs, once per address, a peer that sends forwarding
 // headers without being trusted: usually a newly set-up proxy whose address
-// belongs in SLIDEKICK_TRUSTED_PROXIES.
+// belongs in the trusted proxies (Settings > General).
 func (s *server) noteUntrustedProxy(remote string) {
 	host, _, err := net.SplitHostPort(remote)
 	if err != nil {
@@ -89,7 +125,7 @@ func (s *server) noteUntrustedProxy(remote string) {
 	if _, seen := untrustedSeen.LoadOrStore(host, true); seen || s.opt.Log == nil {
 		return
 	}
-	s.opt.Log.Info("ignoring forwarding headers from an untrusted peer; if this is your TLS proxy, add it to SLIDEKICK_TRUSTED_PROXIES", "peer", host)
+	s.opt.Log.Info("ignoring forwarding headers from an untrusted peer; if this is your reverse proxy or tunnel, add it to the trusted proxies in Settings > General", "peer", host)
 }
 
 // ParseTrustedProxies reads a comma-separated list of addresses or CIDR ranges.

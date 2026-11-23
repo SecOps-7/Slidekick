@@ -36,7 +36,7 @@ import (
 
 type Options struct {
 	Token    string // server token (SLIDEKICK_TOKEN): full access for automation and recovery
-	BaseURL  string // public URL: Secure cookies when https, SSO redirect URLs, origin checks
+	BaseURL  string // SLIDEKICK_BASE_URL: links (unless an admin set a public URL), cast TVs, SSO redirects, origin checks
 	Accounts *accounts.Service
 	AI       *ai.Service        // nil: no AI chat
 	TTS      *narration.Service // nil: no text-to-speech providers
@@ -72,6 +72,9 @@ func New(svc *service.Service, mcpServer *mcp.Server, opt Options) http.Handler 
 	s := &server{svc: svc, acc: opt.Accounts, opt: opt, fails: newFailLimiter(), conns: newConnLimiter(50, 500), exports: newExportCache(2, 8)}
 	if opt.Accounts != nil && svc.LiveAllowed == nil {
 		svc.LiveAllowed = opt.Accounts.LiveAllowed // Settings > General, off by default
+	}
+	if opt.Accounts != nil && svc.PublicURL == nil {
+		svc.PublicURL = func(ctx context.Context) string { return opt.Accounts.Public(ctx).URL } // Settings > General
 	}
 	mux := http.NewServeMux()
 

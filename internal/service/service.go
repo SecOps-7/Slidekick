@@ -34,6 +34,10 @@ type Service struct {
 	CastBaseURL string
 	// LiveAllowed reports whether an admin allows live slides (nil: allowed).
 	LiveAllowed func(context.Context) bool
+	// PublicURL is the address an admin set for reaching Slidekick from
+	// outside (Settings > General), or "" (nil: none). Links handed out use
+	// it; cast TVs keep using BaseURL on the local network.
+	PublicURL func(context.Context) string
 	live        liveLimiter
 	// FilesDir holds uploaded assets on disk; empty disables uploads unless
 	// Blobs is set.
@@ -78,6 +82,18 @@ const MaxDeckBytes = 2 << 20
 
 // ErrNotFound is returned for unknown decks.
 var ErrNotFound = store.ErrNotFound
+
+// LinkBase is the base of every link Slidekick hands out (share and
+// presenter links, export and upload URLs): the public URL when an admin set
+// one, else BaseURL.
+func (s *Service) LinkBase(ctx context.Context) string {
+	if s.PublicURL != nil {
+		if u := s.PublicURL(ctx); u != "" {
+			return u
+		}
+	}
+	return s.BaseURL
+}
 
 // ShareURL is the live viewer link for a deck, carrying the view key when
 // the deck is private.

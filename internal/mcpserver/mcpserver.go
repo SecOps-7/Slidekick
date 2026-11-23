@@ -380,7 +380,7 @@ func (h *handlers) tools(s *mcp.Server) {
 			if err != nil {
 				return nil, nil, err
 			}
-			return nil, &UploadOut{ID: a.ID, URL: a.URL(), AbsoluteURL: h.svc.BaseURL + a.URL(), MIME: a.MIME, Size: a.Size}, nil
+			return nil, &UploadOut{ID: a.ID, URL: a.URL(), AbsoluteURL: h.svc.LinkBase(ctx) + a.URL(), MIME: a.MIME, Size: a.Size}, nil
 		})
 
 	mcp.AddTool(s, read("export_deck", "Export a deck: html (one self-contained file that plays offline with all animations), pdf or png. Returns a download link."),
@@ -397,7 +397,7 @@ func (h *handlers) tools(s *mcp.Server) {
 				if err != nil {
 					return nil, nil, err
 				}
-				return nil, &ExportOut{URL: h.svc.BaseURL + a.URL(), Filename: a.Name, Bytes: int(a.Size),
+				return nil, &ExportOut{URL: h.svc.LinkBase(ctx) + a.URL(), Filename: a.Name, Bytes: int(a.Size),
 					Note: "Every slide fully built. The link is unguessable and can be shared as is."}, nil
 			}
 			if in.Format != "" && in.Format != "html" {
@@ -415,7 +415,7 @@ func (h *handlers) tools(s *mcp.Server) {
 				return nil, nil, err
 			}
 			name := export.Filename(d.Title)
-			return nil, &ExportOut{URL: h.svc.BaseURL + "/api/decks/" + in.DeckID + "/export.html?download=1" + keyParam(h.svc.ViewKey(ctx, in.DeckID)), Filename: name, Bytes: len(out),
+			return nil, &ExportOut{URL: h.svc.LinkBase(ctx) + "/api/decks/" + in.DeckID + "/export.html?download=1" + keyParam(h.svc.ViewKey(ctx, in.DeckID)), Filename: name, Bytes: len(out),
 				Note: "Self-contained: runtime, theme and uploaded images are inlined. Web fonts and remote images load from the internet when online."}, nil
 		})
 

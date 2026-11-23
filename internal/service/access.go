@@ -130,7 +130,7 @@ func (s *Service) MintLink(ctx context.Context, id, kind string, ttl time.Durati
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	base := s.BaseURL + "/d/" + id
+	base := s.LinkBase(ctx) + "/d/" + id
 	var key, param string
 	switch kind {
 	case LinkView:
@@ -250,7 +250,7 @@ func (s *Service) ViewKey(ctx context.Context, id string) string {
 }
 
 func (s *Service) shareURL(id string, a store.Access) string {
-	u := s.BaseURL + "/d/" + id
+	u := s.LinkBase(context.Background()) + "/d/" + id
 	if a.Private && a.ViewKey != "" {
 		u += "?k=" + url.QueryEscape(a.ViewKey)
 	}

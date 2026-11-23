@@ -109,6 +109,9 @@ type meOut struct {
 	SetupNeeded bool            `json:"setupNeeded"`
 	OpenMode    bool            `json:"openMode"`
 	Can         map[string]bool `json:"can"`
+	// LinkBase is the public URL, when an admin set one, for links people
+	// copy to hand out (signed-in callers only).
+	LinkBase string `json:"linkBase,omitempty"`
 }
 
 func (s *server) me(w http.ResponseWriter, r *http.Request) {
@@ -125,6 +128,9 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 				out.Can["deck:"+string(act)] = pol.Can(a.p, act, d)
 			}
 		}
+	}
+	if a.p.Authenticated() && a.p.Kind != authz.KindOpen {
+		out.LinkBase = s.publicURL(r)
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, 200, out)
@@ -328,8 +334,29 @@ func (s *server) resetPassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
+// settingsOut is the instance settings plus how the admin's own request
+// reached Slidekick, so a reverse proxy or tunnel can be checked from the
+// public-access section.
+type settingsOut struct {
+	accounts.Settings
+	Arrival arrivalOut `json:"arrival"`
+}
+
+type arrivalOut struct {
+	arrival
+	Host   string `json:"host"`
+	HTTPS  bool   `json:"https"`
+	Client string `json:"client"`
+	// EnvProxies come from SLIDEKICK_TRUSTED_PROXIES (read-only here).
+	EnvProxies []string `json:"envProxies"`
+}
+
+func (s *server) settingsOut(r *http.Request) settingsOut {
+	return settingsOut{s.acc.Settings(r.Context()), arrivalOut{arrivalOf(r), r.Host, isHTTPS(r), clientIP(r), accounts.ProxyStrings(s.opt.TrustedProxies)}}
+}
+
 func (s *server) getSettings(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, s.acc.Settings(r.Context()))
+	writeJSON(w, 200, s.settingsOut(r))
 }
 
 func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
@@ -341,7 +368,7 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 		writeAccErr(w, err)
 		return
 	}
-	writeJSON(w, 200, s.acc.Settings(r.Context()))
+	writeJSON(w, 200, s.settingsOut(r))
 }
 
 // ---- decks: create from the UI, change owner ----
@@ -389,8 +416,21 @@ func (s *server) setDeckOwner(w http.ResponseWriter, r *http.Request) {
 
 // ---- single sign-on ----
 
-func (s *server) ssoRedirectURL(id string) string {
-	return strings.TrimRight(s.opt.BaseURL, "/") + "/auth/sso/" + url.PathEscape(id) + "/callback"
+// ssoRedirectURL is where the provider sends people back: on the address
+// they started from (the public URL or the base URL), so the sign-in
+// cookie set when they left is there when they return.
+func (s *server) ssoRedirectURL(r *http.Request, id string) string {
+	return s.siteBase(r) + "/auth/sso/" + url.PathEscape(id) + "/callback"
+}
+
+// ssoBases are the redirect URL bases to register at a provider: the public
+// URL first when one is set, then the base URL when it differs.
+func (s *server) ssoBases(r *http.Request) []string {
+	base := strings.TrimRight(s.opt.BaseURL, "/")
+	if pub := s.publicURL(r); pub != "" && pub != base {
+		return []string{pub + "/auth/sso/", base + "/auth/sso/"}
+	}
+	return []string{base + "/auth/sso/"}
 }
 
 type ssoOut struct {
@@ -406,9 +446,10 @@ func (s *server) listSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []ssoOut{}
 	for _, p := range ps {
-		out = append(out, ssoOut{p, s.ssoRedirectURL(p.ID)})
+		out = append(out, ssoOut{p, s.ssoBases(r)[0] + url.PathEscape(p.ID) + "/callback"})
 	}
-	writeJSON(w, 200, map[string]any{"providers": out, "redirectBase": strings.TrimRight(s.opt.BaseURL, "/") + "/auth/sso/"})
+	bases := s.ssoBases(r)
+	writeJSON(w, 200, map[string]any{"providers": out, "redirectBase": bases[0], "redirectBases": bases})
 }
 
 func (s *server) putSSO(w http.ResponseWriter, r *http.Request) {
@@ -422,7 +463,7 @@ func (s *server) putSSO(w http.ResponseWriter, r *http.Request) {
 		writeAccErr(w, err)
 		return
 	}
-	writeJSON(w, 200, ssoOut{p, s.ssoRedirectURL(p.ID)})
+	writeJSON(w, 200, ssoOut{p, s.ssoBases(r)[0] + url.PathEscape(p.ID) + "/callback"})
 }
 
 func (s *server) deleteSSO(w http.ResponseWriter, r *http.Request) {
@@ -455,7 +496,7 @@ func (s *server) publicProviders(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) ssoLogin(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("pid")
-	authURL, state, err := s.acc.BeginSSO(r.Context(), id, s.ssoRedirectURL(id), safeNext(r.URL.Query().Get("next")))
+	authURL, state, err := s.acc.BeginSSO(r.Context(), id, s.ssoRedirectURL(r, id), safeNext(r.URL.Query().Get("next")))
 	if err != nil {
 		if s.opt.Log != nil {
 			s.opt.Log.Warn("sso: can't start sign-in", "provider", id, "err", err)
@@ -482,7 +523,7 @@ func (s *server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(ssoCookie); err == nil {
 		cookieState = c.Value
 	}
-	u, next, err := s.acc.FinishSSO(r.Context(), id, s.ssoRedirectURL(id), cookieState, r.URL.Query())
+	u, next, err := s.acc.FinishSSO(r.Context(), id, s.ssoRedirectURL(r, id), cookieState, r.URL.Query())
 	if err != nil {
 		s.fails.fail(ip)
 		if s.opt.Log != nil {

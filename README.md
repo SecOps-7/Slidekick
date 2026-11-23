@@ -238,8 +238,8 @@ Most things are configured in the web UI (**Settings**): users and roles, single
 |---|---|---|
 | `SLIDEKICK_TOKEN` | empty | The server token: an all-powerful emergency key, kept in an owner-only env file. Also accepted as the setup code. At least 24 characters. |
 | `SLIDEKICK_ADMIN_USERNAME`, `SLIDEKICK_ADMIN_PASSWORD` | empty | Create the first admin on first run (or use `/setup`). |
-| `SLIDEKICK_BASE_URL` | `http://localhost:7410` | The URL people use, in share links and SSO redirects. Must be reachable from a cast TV, so use the LAN address rather than `localhost`. |
-| `SLIDEKICK_TRUSTED_PROXIES` | empty | Addresses of your TLS reverse proxy. Only these may set the client address and https headers. |
+| `SLIDEKICK_BASE_URL` | `http://localhost:7410` | The URL people use, in share links and SSO redirects. Must be reachable from a cast TV, so use the LAN address rather than `localhost`. To serve it on its own domain too, set a public URL under Settings > General ([Public access](docs/self-hosting.md#public-access-your-own-domain)). |
+| `SLIDEKICK_TRUSTED_PROXIES` | empty | Addresses of your TLS reverse proxy. Only these may set the client address and https headers. Admins can add more (a reverse proxy or a Cloudflare Tunnel) under Settings > General. |
 | `SLIDEKICK_SECRET_KEY` | key file in `/data` | 32 bytes that encrypt stored SSO, AI and voice secrets. Back it up with the data. |
 | `SLIDEKICK_CAST_SUBNETS` | derived | Private subnets to search for Chromecasts, such as a separate IoT VLAN (`192.168.20.0/24`). Default: the server's own LAN. |
 | `SLIDEKICK_CAST_DISCOVERY` | on | `off` stops the automatic background search for cast devices. |
@@ -282,7 +282,7 @@ Slidekick is built for your **local network**. It serves plain HTTP; terminate T
 - **Casting stays on the LAN.** The server talks to the TV directly; no port forward, tunnel or public URL is used.
 - **Framing is refused** on every page. An admin can let listed sites embed viewer links (Settings > General); the editor, presenter view, presenter links and sign-in are never frameable.
 - **Local HTTPS without a proxy** (optional, off by default): Slidekick can serve HTTPS itself with your certificate or one from its own certificate authority, which is limited to private addresses and local names. Nothing is requested from the internet.
-- **Never expose it directly to the internet.** For remote access use a VPN or an authenticating proxy.
+- **Don't publish port 7410 to the internet.** To let people watch from anywhere, serve Slidekick on its own domain through an HTTPS reverse proxy or a tunnel such as Cloudflare Tunnel, and set **Public access** (Settings > General): links then use that domain, and forwarding headers are believed only from the proxies you list. See [Public access](docs/self-hosting.md#public-access-your-own-domain). A VPN keeps it private altogether.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 

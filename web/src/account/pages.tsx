@@ -532,13 +532,15 @@ const presets: Record<string, Partial<Provider>> = {
 function SSO() {
   const [list, setList] = useState<Provider[]>([]);
   const [base, setBase] = useState("");
+  const [bases, setBases] = useState<string[]>([]);
   const [edit, setEdit] = useState<Provider | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [secret, setSecret] = useState<string | undefined>(undefined);
   const [err, setErr] = useState("");
   const [check, setCheck] = useState("");
   const load = () =>
-    api<{ providers: Provider[]; redirectBase: string }>("GET", "/api/admin/sso").then((d) => {
+    api<{ providers: Provider[]; redirectBase: string; redirectBases?: string[] }>("GET", "/api/admin/sso").then((d) => {
+      setBases(d.redirectBases ?? [d.redirectBase]);
       setList(d.providers);
       setBase(d.redirectBase);
     });
@@ -582,6 +584,12 @@ function SSO() {
           </label>
           <p class="acc-muted">
             Redirect URL to register at the provider: <code>{base + (edit.id || "<id>") + "/callback"}</code>
+            {bases.length > 1 && (
+              <>
+                {" "}
+                (the public address). People who sign in on the local address need <code>{bases[1] + (edit.id || "<id>") + "/callback"}</code> registered too.
+              </>
+            )}
           </p>
           <label>
             Button label
@@ -715,6 +723,20 @@ interface InstanceSettings {
   liveSlides: boolean;
   embedViewer: boolean;
   embedOrigins: string[];
+  publicUrl: string;
+  trustedProxies: string[];
+  arrival: Arrival;
+}
+
+/** How the admin's own request reached Slidekick (for checking a proxy or tunnel). */
+interface Arrival {
+  peer: string;
+  forwarded: boolean;
+  trusted: boolean;
+  host: string;
+  https: boolean;
+  client: string;
+  envProxies: string[];
 }
 
 function General() {
@@ -744,9 +766,97 @@ function General() {
           refused and live slides keep their last values. Slidekick never fetches data itself.
         </p>
       </section>
+      <PublicAccess s={s} onSaved={setS} />
       <EmbedSettings s={s} onSaved={setS} />
       <LocalHTTPS />
     </>
+  );
+}
+
+// ---- public access: a domain, through a reverse proxy or a tunnel ----
+
+function PublicAccess({ s, onSaved }: { s: InstanceSettings; onSaved: (v: InstanceSettings) => void }) {
+  const [url, setUrl] = useState(s.publicUrl);
+  const [proxies, setProxies] = useState(s.trustedProxies.join("\n"));
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
+  const a = s.arrival;
+  const save = async (list = proxies) => {
+    setErr("");
+    setOk("");
+    try {
+      await api<InstanceSettings>("PUT", "/api/admin/settings", { ...s, publicUrl: url, trustedProxies: list.split(/[\s,]+/).filter(Boolean) });
+      // Read back: the check below judges this page's request against the saved proxies.
+      const v = await api<InstanceSettings>("GET", "/api/admin/settings");
+      onSaved(v);
+      setUrl(v.publicUrl);
+      setProxies(v.trustedProxies.join("\n"));
+      setOk(v.publicUrl ? `Saved. Links Slidekick hands out now start with ${v.publicUrl}.` : "Saved. Links use this server's own address.");
+    } catch (x) {
+      setErr((x as Error).message);
+    }
+  };
+  const ignored = a.forwarded && !a.trusted;
+  return (
+    <section>
+      <h2>Public access</h2>
+      <p class="acc-muted">
+        To let people watch from anywhere, put Slidekick behind a reverse proxy or a tunnel (like Cloudflare Tunnel) on its own domain, and enter that address here. Viewer,
+        presenter and share links, and the links agents get, then use it. Cast TVs keep using the local address. Use https: passwords and links with keys travel over it.
+      </p>
+      <form
+        class="acc-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <label>
+          Public URL
+          <input type="url" value={url} placeholder="https://slides.example.com" onInput={(e) => setUrl(e.currentTarget.value)} spellcheck={false} />
+          <small>The address people open, scheme and host only (no path). Leave empty while Slidekick is only on your network.</small>
+        </label>
+        {url.trim().startsWith("http://") && <p class="acc-err">This address is plain http: on the internet, sign-in passwords and private links would travel unencrypted.</p>}
+        <label>
+          Trusted proxies (one per line)
+          <textarea rows={2} value={proxies} placeholder="192.168.1.10" onInput={(e) => setProxies(e.currentTarget.value)} spellcheck={false} />
+          <small>
+            The address your reverse proxy or tunnel connects to Slidekick from, or its network (like <code>172.18.0.0/16</code> for a Docker network). Only these may say a request
+            came over https and name the visitor's address (<code>X-Forwarded-Proto</code>, <code>X-Forwarded-For</code>, <code>X-Real-IP</code>), which secure cookies and the
+            sign-in lockout rely on.
+            {a.envProxies.length > 0 && (
+              <>
+                {" "}
+                Also trusted from <code>SLIDEKICK_TRUSTED_PROXIES</code>: <code>{a.envProxies.join(", ")}</code>.
+              </>
+            )}
+          </small>
+        </label>
+        <p class={ignored ? "acc-err" : "acc-muted"}>
+          This page reached Slidekick at <code>{a.host}</code> over {a.https ? "https" : "plain http"}
+          {a.trusted ? (
+            <>
+              {" "}
+              through the trusted proxy <code>{a.peer}</code>, for <code>{a.client}</code>.
+            </>
+          ) : ignored ? (
+            <>
+              {" "}
+              from <code>{a.peer}</code>, which sent forwarding headers that are ignored because it isn't trusted. If that is your proxy or tunnel,{" "}
+              <button type="button" class="acc-link" onClick={() => void save([proxies, a.peer].filter(Boolean).join("\n"))}>
+                trust {a.peer}
+              </button>
+              .
+            </>
+          ) : (
+            <> directly from <code>{a.peer}</code>.</>
+          )}
+        </p>
+        <Err msg={err} />
+        {ok && <p class="acc-ok">{ok}</p>}
+        <button class="acc-primary">Save</button>
+      </form>
+    </section>
   );
 }
 

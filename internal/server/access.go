@@ -148,10 +148,32 @@ func (s *server) sameOrigin(r *http.Request) bool {
 	if strings.EqualFold(u.Host, r.Host) {
 		return true
 	}
-	if b, err := url.Parse(s.opt.BaseURL); err == nil && b.Host != "" && strings.EqualFold(u.Host, b.Host) {
-		return true
+	for _, base := range []string{s.opt.BaseURL, s.publicURL(r)} {
+		if b, err := url.Parse(base); err == nil && b.Host != "" && strings.EqualFold(u.Host, b.Host) {
+			return true
+		}
 	}
 	return false
+}
+
+// publicURL is the public address an admin set (Settings > General), or "".
+func (s *server) publicURL(r *http.Request) string {
+	if s.acc == nil {
+		return ""
+	}
+	return s.acc.Public(r.Context()).URL
+}
+
+// siteBase is the address this request used to reach Slidekick, as far as
+// links back to it go (single sign-on redirects): the public URL when the
+// request came in on its host, else the base URL.
+func (s *server) siteBase(r *http.Request) string {
+	if pub := s.publicURL(r); pub != "" {
+		if u, err := url.Parse(pub); err == nil && strings.EqualFold(u.Host, r.Host) {
+			return pub
+		}
+	}
+	return strings.TrimRight(s.opt.BaseURL, "/")
 }
 
 // authn identifies the caller, enforces the lockout and, for cookie-signed-in

@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/argon2"
@@ -56,6 +57,8 @@ type Service struct {
 
 	hashSem chan struct{}
 	dummy   string
+
+	pub atomic.Pointer[Public] // public access, see public.go
 
 	mu        sync.Mutex
 	setupCode string // one-time code for /setup while no user exists
@@ -488,6 +491,13 @@ type Settings struct {
 	// LiveSlides lets agents update live slides (update_live). Off by default;
 	// while off, live slides show their last values.
 	LiveSlides bool `json:"liveSlides"`
+	// PublicURL is the address people use from outside (a reverse proxy or a
+	// tunnel); links Slidekick hands out use it. "" when unset. Omitted on a
+	// save: left as it is.
+	PublicURL *string `json:"publicUrl,omitempty"`
+	// TrustedProxies may set the client address and https headers, in
+	// addition to SLIDEKICK_TRUSTED_PROXIES. Omitted on a save: left as it is.
+	TrustedProxies *[]string `json:"trustedProxies,omitempty"`
 }
 
 func (s *Service) Settings(ctx context.Context) Settings {
@@ -496,6 +506,9 @@ func (s *Service) Settings(ctx context.Context) Settings {
 	if raw := s.Store.Setting(ctx, settingOrigins); raw != "" {
 		json.Unmarshal([]byte(raw), &v.EmbedOrigins)
 	}
+	p := s.Public(ctx)
+	proxies := ProxyStrings(p.Proxies)
+	v.PublicURL, v.TrustedProxies = &p.URL, &proxies
 	return v
 }
 
@@ -534,6 +547,9 @@ func (s *Service) SaveSettings(ctx context.Context, v Settings) error {
 	}
 	if v.EmbedViewer && len(origins) == 0 {
 		return fmt.Errorf("%w: list at least one site (like https://dashboard.example:8443) that may embed viewer links", ErrValidation)
+	}
+	if err := s.savePublic(ctx, v.PublicURL, v.TrustedProxies); err != nil {
+		return err
 	}
 	flag := func(b bool) string {
 		if b {

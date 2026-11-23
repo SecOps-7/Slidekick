@@ -7,7 +7,7 @@ import { confirmModal, promptModal } from "./ui/modal";
 import { shareLinksModal } from "./share-links";
 import { applyTheme, renderSlide, STAGE } from "../runtime/render";
 import type { Catalog, Slide, Theme } from "../runtime/types";
-import { authHeaders, goSignIn, me, signOut, type Me } from "./auth";
+import { authHeaders, currentMe, goSignIn, me, signOut, type Me } from "./auth";
 import { wordmarkSVG } from "./brand/brand";
 import "./home.css";
 
@@ -213,7 +213,7 @@ function card(d: Summary, say: (m: string) => void, onDeleted: () => void): HTML
           "Copy link",
           async () => {
             const note = d.private ? " (people need to sign in to open it)" : "";
-            if ((await copyText(location.origin + view, `Link to "${d.title}"`)) === "copied") say(`Copied the link to "${d.title}"${note}`);
+            if ((await copyText((currentMe()?.linkBase || location.origin) + view, `Link to "${d.title}"`)) === "copied") say(`Copied the link to "${d.title}"${note}`);
           },
         ],
       ];

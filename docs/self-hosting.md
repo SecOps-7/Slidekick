@@ -29,11 +29,11 @@ Create the token with `openssl rand -hex 24`. Slidekick refuses to start with a 
 | Variable | Default | |
 | --- | --- | --- |
 | `SLIDEKICK_TOKEN` | empty | The server token: an all-powerful emergency key (see [The server token](#the-server-token-emergency-key)). Also accepted as the setup code for the first admin. At least 24 characters. |
-| `SLIDEKICK_TRUSTED_PROXIES` | empty | Addresses (or CIDR ranges) of your TLS reverse proxy, comma-separated. Only these peers may set the client address and `X-Forwarded-Proto`. See [TLS on the LAN](#tls-on-the-lan). |
+| `SLIDEKICK_TRUSTED_PROXIES` | empty | Addresses (or CIDR ranges) of your TLS reverse proxy, comma-separated. Only these peers may set the client address and `X-Forwarded-Proto`. Admins can add more under Settings > General without a restart. See [TLS on the LAN](#tls-on-the-lan) and [Public access](#public-access-your-own-domain). |
 | `SLIDEKICK_ADMIN_USERNAME` | empty | With `SLIDEKICK_ADMIN_PASSWORD`, creates this admin on first run when no account exists yet. Ignored afterwards. |
 | `SLIDEKICK_ADMIN_PASSWORD` | empty | Password for that first admin (at least 10 characters). A secret: keep it in the `env_file`. |
 | `SLIDEKICK_SECRET_KEY` | key file | 32 bytes (`openssl rand -hex 32`) that encrypt stored secrets: SSO client secrets and AI provider keys. Without it Slidekick creates `SLIDEKICK_DATA/secret.key` (mode 600) on first run; back it up with the data, because the stored secrets can't be decrypted without it. |
-| `SLIDEKICK_BASE_URL` | `http://localhost:<port>` | The URL people use, in share and download links and SSO redirect URLs: `https://<internal hostname>` once TLS is set up. |
+| `SLIDEKICK_BASE_URL` | `http://localhost:<port>` | The URL people use on your network, in share and download links and SSO redirect URLs: `https://<internal hostname>` once TLS is set up. Cast TVs are sent it. A public URL set under Settings > General replaces it in the links Slidekick hands out (see [Public access](#public-access-your-own-domain)). |
 | `SLIDEKICK_ADDR` | `:7410` | Listen address for plain HTTP, which is always served. |
 | `SLIDEKICK_HTTPS_ADDR` | `:7443` | Listen address for [local HTTPS](#local-https), once an admin turns it on (off by default). Publish the port in Compose to reach it. |
 | `SLIDEKICK_DATA` | `/data` | SQLite database and uploaded files. Back this folder up. |
@@ -172,7 +172,7 @@ An AI can present a deck out loud: it moves through the slides and their build s
 
 ## TLS on the LAN
 
-Slidekick speaks plain HTTP (it can also serve HTTPS itself: see [Local HTTPS](#local-https)). Serve it over https through a TLS-terminating reverse proxy on your home network (decided 2026-11-20 for the reference deployment: the existing Nginx Proxy Manager, an internal hostname, **nothing exposed to the internet**: no public DNS record, no tunnel, no port forward).
+Slidekick speaks plain HTTP (it can also serve HTTPS itself: see [Local HTTPS](#local-https)). Serve it over https through a TLS-terminating reverse proxy on your home network (decided 2026-11-20 for the reference deployment: the existing Nginx Proxy Manager, an internal hostname, **nothing exposed to the internet**: no public DNS record, no tunnel, no port forward). To reach it from outside instead, see [Public access](#public-access-your-own-domain).
 
 1. **LAN DNS:** an internal record for the hostname (e.g. `slides.<your domain>`) pointing at the proxy's LAN address, in your LAN's DNS server only. A wildcard certificate the proxy already has covers it without any new public record.
 2. **Proxy host:** forward `https://<hostname>` to `http://<slidekick host>:7410` with WebSockets enabled, force https, and attach an access list that allows only private address ranges and denies everything else, so the name answers on the LAN only even if the proxy also serves the internet.
@@ -198,9 +198,56 @@ Slidekick can serve HTTPS itself on your network, without a reverse proxy. It's 
   - **Use your own.** Paste a certificate (its chain may follow it) and its private key in PEM. Slidekick checks that they match and are valid now; renewing is up to you.
 - **Storage:** the certificates live in the database; private keys are encrypted with `SLIDEKICK_SECRET_KEY` (or the key file) like the other stored secrets. No new volume.
 - **HTTP stays available; it doesn't redirect.** A reverse proxy in front forwards to plain HTTP as before, cast TVs need it (below), and devices that don't trust the certificate yet can still get in. Requests over HTTPS get `Secure` cookies as through a proxy; trusted-proxy handling is unchanged, so a proxy in front keeps working whether the setting is on or off.
-- **Links:** share links, SSO redirects and the base URL come from `SLIDEKICK_BASE_URL`, which this setting doesn't change. Set it to the HTTPS address (`https://192.168.1.10:7443`) to hand out HTTPS links; single sign-on over HTTPS needs that too, because the sign-in cookies are `Secure`.
+- **Links:** share links, SSO redirects and the base URL come from `SLIDEKICK_BASE_URL` (or the [public URL](#public-access-your-own-domain), when set), which this setting doesn't change. Set it to the HTTPS address (`https://192.168.1.10:7443`) to hand out HTTPS links; single sign-on over HTTPS needs that too, because the sign-in cookies are `Secure`.
 - **Casting stays on HTTP.** A Chromecast has no way to add a private certificate authority, so it can't open a page whose certificate it doesn't already trust. When the base URL points at the local HTTPS port, the TV is sent the same host over plain HTTP on `SLIDEKICK_ADDR` instead. (A base URL on a reverse proxy with a publicly trusted certificate is used as is.)
 - **LAN only:** no ACME or other certificate service, no public DNS, no tunnel, no port forward.
+
+## Public access (your own domain)
+
+To let people watch from anywhere, give Slidekick its own domain through a reverse proxy or a tunnel, then tell Slidekick about it under **Settings > General > Public access**. Nothing is public until you set this up: Slidekick never opens ports, registers names or contacts a tunnel service itself.
+
+- **Public URL:** the address people open, like `https://slides.example.com` (scheme and host only; Slidekick is served from the root, not a path). Once set, every link Slidekick hands out starts with it: viewer and presenter links, the editor's share links, **Copy link** in the library, and the links agents get (`get_share_url`, exports, uploads). It can't be set before the first admin exists, so an instance in open mode can't be put online by accident.
+- **Trusted proxies:** the address your proxy or tunnel connects to Slidekick from, or its network (one per line; `172.18.0.0/16` covers a Docker network). Only these may say a request came over https and name the visitor's address (`X-Forwarded-Proto`, `X-Forwarded-For`, `X-Real-IP`): that makes sign-in cookies `Secure` and makes the sign-in lockout follow each visitor instead of the proxy. Ranges that would trust everyone (`0.0.0.0/0`) are refused. They add to `SLIDEKICK_TRUSTED_PROXIES`, take effect at once and need no restart.
+- **Check it from outside:** open Settings through the public address. The section says how that request arrived: over https through a trusted proxy for your address, or from a peer whose forwarding headers are ignored, with a button to trust it.
+- **What stays local:** `SLIDEKICK_BASE_URL` stays the LAN address. Cast TVs are sent that address, never the public one.
+- **Single sign-on:** a sign-in started on the public address returns to it, and one started on the LAN address returns there. Register both callback URLs at the provider (the provider form shows them).
+
+**Reverse proxy** (Nginx, Caddy, Traefik, Nginx Proxy Manager): forward `https://slides.example.com` to `http://<slidekick host>:7410` with WebSockets enabled (live updates and presenting use `/ws/`), and send the usual forwarding headers. For Nginx:
+
+```nginx
+location / {
+    proxy_pass http://192.168.1.10:7410;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 25m;   # uploads go up to 15 MB, sent base64 over MCP
+}
+```
+
+Then add the proxy's address (as Slidekick sees it) to **Trusted proxies**.
+
+**Cloudflare Tunnel:** run `cloudflared` next to Slidekick, point the tunnel's public hostname at `http://slidekick:7410` (the service name on a shared Docker network) or `http://<slidekick host>:7410`, and add the address `cloudflared` connects from to **Trusted proxies**: its container's network (like `172.18.0.0/16`), or `127.0.0.1` when it runs on the same host with host networking. Cloudflare sends `X-Forwarded-Proto: https` and the visitor's address in `X-Forwarded-For`, and passes WebSockets through.
+
+```yaml
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}   # from the Cloudflare dashboard; keep it in .env
+    restart: unless-stopped
+```
+
+**Before you open it up:**
+
+- Use https. On plain http, passwords and links with keys cross the internet readable.
+- Everything is reachable, not only the decks: the sign-in page, the API and the MCP endpoint (`/mcp`). They need an account or a token, and repeated failed sign-ins lock the address out, but use strong passwords, and give agents personal tokens or deck tokens rather than the server token. If agents only work on your network, block `/mcp` at the proxy.
+- New decks are private: people outside need a viewer link (or a presenter link to run it). Expiring links (**Share > Viewer link**, 30 minutes to 24 hours) suit one-off talks, and **Make new links** revokes every link at once.
+- Presenter links can start the AI voice and use your AI and voice provider credits; hand them out like passwords.
 
 ## Live slides
 

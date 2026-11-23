@@ -20,6 +20,8 @@ export interface Me {
   setupNeeded: boolean;
   openMode: boolean;
   can: Record<string, boolean>;
+  /** The public URL an admin set, for links people copy (signed-in callers only). */
+  linkBase?: string;
 }
 
 try {

@@ -4,6 +4,9 @@ Each release lists its changes by type: New, Changed, Fixed and Internal (also S
 
 ## 1.2.0 (unreleased)
 
+### New
+- Public access: give Slidekick its own domain through a reverse proxy or a tunnel (such as Cloudflare Tunnel) so people can watch from anywhere. Under Settings > General, an admin sets the public URL, which every link Slidekick hands out then uses (viewer, presenter and share links, Copy link, and agents' links to exports and uploads), and the proxies to trust, without a restart. The section shows how your own request arrived, to check the proxy, and offers to trust a proxy whose headers are being ignored. Cast TVs keep using the local address, single sign-on returns people to the address they started on, and a public URL can't be set before the first admin exists.
+
 ### Fixed
 - Docker: the documented stdio command with a new named volume (`-v slidekick-data:/data`) stopped with "unable to open database file", because the image's `/data` belonged to root while the server runs as another user. `/data` now belongs to the server's user; bind mounts are unaffected.
 

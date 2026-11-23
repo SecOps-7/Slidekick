@@ -2,6 +2,18 @@
 
 Settled questions about how Slidekick works, newest first. Each records what was decided, when, and what it changed. The open questions they answer have been removed from the rest of the docs.
 
+## 2026-11-23: Public access on its own domain
+
+**Decision.** Slidekick can be reached from the internet on its own domain, through a reverse proxy or a tunnel (such as Cloudflare Tunnel) that the person running it sets up, so people can watch decks remotely. This supersedes the "nothing exposed" part of the 2026-11-20 decision below for deployments that choose it; the LAN-only setup stays the default.
+
+**What changed.**
+
+- **Settings > General > Public access** holds the public URL and the trusted proxies, stored in the database and applied without a restart. Proxies listed there add to `SLIDEKICK_TRUSTED_PROXIES`; ranges that trust every address are refused.
+- Links Slidekick hands out (viewer, presenter and share links, Copy link, agent links to exports and uploads) use the public URL when set. Cast TVs keep using `SLIDEKICK_BASE_URL` on the LAN.
+- Single sign-on returns people to the address they started on, so the public and LAN callback URLs both work once registered.
+- A public URL can't be set while no admin exists (open mode), and the settings page shows how the admin's own request arrived, to check the proxy.
+- The setup is in [self-hosting: Public access](self-hosting.md#public-access-your-own-domain).
+
 ## 2026-11-20: TLS on the home LAN only
 
 **Decision.** Slidekick is served over https on the home LAN through the existing reverse proxy (Nginx Proxy Manager) with an internal hostname. Nothing is exposed to the internet: no public DNS record, no tunnel, no port forward, no public link.
