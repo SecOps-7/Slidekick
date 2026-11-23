@@ -25,8 +25,8 @@ jobs:
         run: |
           npm --prefix web ci --no-fund --no-audit
           npm --prefix web run build
-      - name: Generated files are committed and current
-        run: git diff --exit-code -- web/runtime/schema.gen.ts web/runtime/icons.gen.ts web/src/editor/validate.gen.js web/src/editor/validate.gen.d.ts
+      - name: Generated types are committed and current
+        run: git diff --exit-code -- web/runtime/schema.gen.ts
       - name: Web unit tests (animation presets, schema check)
         run: npm --prefix web test
       - name: Go vet and format

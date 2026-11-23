@@ -5,11 +5,15 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "gen": "node scripts/gen-icons.mjs && node scripts/gen-types.mjs && node scripts/gen-validator.mjs",
+    "predev": "npm run gen",
     "dev": "vite",
     "build": "node scripts/gen-icons.mjs && node scripts/gen-about-deps.mjs && node scripts/gen-types.mjs && node scripts/gen-validator.mjs && tsc --noEmit && vite build && vite build -c vite.standalone.config.ts && SK_LITE=1 vite build -c vite.standalone.config.ts && node -e \"require('fs').writeFileSync('dist/.gitkeep','')\"",
+    "pretypecheck": "npm run gen",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/gen-icons.mjs",
     "fonts": "node scripts/gen-fonts.mjs",
+    "pretest": "npm run gen",
     "test": "vitest run",
     "types": "node scripts/gen-types.mjs && node scripts/gen-validator.mjs"
   },

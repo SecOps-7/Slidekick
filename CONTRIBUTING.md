@@ -14,7 +14,7 @@ npm --prefix web run dev                             # live-reloading web app pr
 npm --prefix web test                                # animation presets and the editor's schema check
 ```
 
-Generated files are committed and CI checks they're current: `npm --prefix web run types` regenerates the TypeScript types (`web/runtime/schema.gen.ts`) and the editor's Ajv validator (`web/src/editor/validate.gen.js`) from `schema/deck.schema.json`; `npm run build` does it too.
+The TypeScript types (`web/runtime/schema.gen.ts`) are generated from `schema/deck.schema.json` and committed, and CI checks they're current. The editor's Ajv validator (`web/src/editor/validate.gen.js`) and the icon table (`web/runtime/icons.gen.ts`) are build output and not committed. `npm --prefix web run gen` writes all three; `npm run build`, `npm test`, `npm run typecheck` and `npm run dev` run it first.
 
 ### Golden screenshots
 
