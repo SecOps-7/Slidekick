@@ -2,6 +2,11 @@
 
 Each release lists its changes by type: New, Changed, Fixed and Internal (also Security, Removed and Deprecated when a release has them). The about page badges every note with its type.
 
+## 1.2.0 (unreleased)
+
+### Fixed
+- Docker: the documented stdio command with a new named volume (`-v slidekick-data:/data`) stopped with "unable to open database file", because the image's `/data` belonged to root while the server runs as another user. `/data` now belongs to the server's user; bind mounts are unaffected.
+
 ## 1.1.0 (2026-11-22)
 
 ### New

@@ -37,6 +37,9 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends chromium fonts-noto-core fonts-noto-color-emoji fonts-liberation ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/slidekick /usr/local/bin/slidekick
+# /data belongs to the user the server runs as, so a new named volume (which
+# copies this directory's owner) is writable. Bind mounts keep their own owner.
+RUN mkdir -p /data && chown 65532:65532 /data
 ENV SLIDEKICK_ADDR=:7410 SLIDEKICK_DATA=/data SLIDEKICK_CHROME=/usr/bin/chromium HOME=/tmp
 USER 65532:65532
 VOLUME /data
