@@ -2,7 +2,7 @@
 
 Each release lists its changes by type: New, Changed, Fixed and Internal (also Security, Removed and Deprecated when a release has them). The about page badges every note with its type.
 
-## 1.2.1 (unreleased)
+## 1.2.1 (2026-11-23)
 
 ### Changed
 - MCP tools state all four hints (read-only, destructive, idempotent, open-world), so agent apps can tell a read from an edit and warn before a destructive call such as `delete_slide` or `set_deck_access` with `rotate`. Before, most tools sent none, which clients read as destructive and open-world. The descriptions of `focus_slide`, `set_deck_access` and `update_live` no longer say they return a new deck version, which they don't.
