@@ -162,3 +162,57 @@ func TestPresentingToolsListed(t *testing.T) {
 	}
 	m.Stop(out["deckId"].(string))
 }
+
+// Every tool states all four hints, matching what it does, so clients can warn
+// before a destructive call and don't fall back to the protocol's defaults.
+func TestToolHints(t *testing.T) {
+	env := testenv.New(t)
+	srv := mcpserver.New(env.Svc, slidekick.Schema, "test", mcpserver.Options{Presenter: &presenting.Manager{Deps: presenting.SvcDeps{Svc: env.Svc}}})
+	ct, st := mcp.NewInMemoryTransports()
+	ctx := context.Background()
+	if _, err := srv.Connect(ctx, st, nil); err != nil {
+		t.Fatal(err)
+	}
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	tools, err := cs.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// read-only, destructive, idempotent, open-world
+	want := map[string]string{
+		"create_deck": "----", "get_deck": "R-I-", "list_decks": "R-I-", "add_slide": "----",
+		"update_slide": "-DI-", "delete_slide": "-DI-", "move_slide": "--I-", "patch_deck": "-D--",
+		"set_theme": "--I-", "list_themes": "R-I-", "lint_deck": "R-I-", "upload_asset": "--I-",
+		"export_deck": "R-I-", "render_slide": "R-I-", "list_comments": "R-I-", "resolve_comment": "--I-",
+		"get_history": "R-I-", "restore_version": "-D--", "set_deck_access": "-D--", "get_share_url": "R-I-",
+		"focus_slide": "--I-", "update_live": "-D--", "list_cast_devices": "R-I-", "cast_deck": "---O",
+		"stop_cast": "--IO", "present_slide": "---O", "start_presentation": "---O", "stop_presentation": "--I-",
+		"presentation_status": "R-I-",
+	}
+	if len(tools.Tools) != len(want) {
+		t.Fatalf("want %d tools, got %d", len(want), len(tools.Tools))
+	}
+	flag := func(on bool, c string) string {
+		if on {
+			return c
+		}
+		return "-"
+	}
+	for _, tl := range tools.Tools {
+		a := tl.Annotations
+		if a == nil || a.DestructiveHint == nil || a.OpenWorldHint == nil {
+			t.Errorf("%s: not all four hints are set: %+v", tl.Name, a)
+			continue
+		}
+		got := flag(a.ReadOnlyHint, "R") + flag(*a.DestructiveHint, "D") + flag(a.IdempotentHint, "I") + flag(*a.OpenWorldHint, "O")
+		if w, ok := want[tl.Name]; !ok {
+			t.Errorf("%s: new tool, add its hints to this test", tl.Name)
+		} else if got != w {
+			t.Errorf("%s: hints %s, want %s", tl.Name, got, w)
+		}
+	}
+}

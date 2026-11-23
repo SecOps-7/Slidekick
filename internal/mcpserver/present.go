@@ -59,10 +59,8 @@ type CastOut struct {
 	Casting *cast.Session `json:"casting" jsonschema:"where the deck is showing; null when nowhere"`
 }
 
-func action(name, desc string) *mcp.Tool { return &mcp.Tool{Name: name, Description: desc} }
-
 func (h *handlers) castTools(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{Name: "list_cast_devices", Description: "List the TVs (Chromecasts) an admin has set up, to show a deck on with cast_deck.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}},
+	mcp.AddTool(s, &mcp.Tool{Name: "list_cast_devices", Description: "List the TVs (Chromecasts) an admin has set up, to show a deck on with cast_deck.", Annotations: readOnly},
 		func(ctx context.Context, req *mcp.CallToolRequest, _ NoInput) (*mcp.CallToolResult, *CastDevicesOut, error) {
 			ds, err := h.svc.CastDevices(ctx)
 			if err != nil {
@@ -75,7 +73,7 @@ func (h *handlers) castTools(s *mcp.Server) {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(s, action("cast_deck", "Show a deck on a TV (Chromecast) in presenting mode. The TV follows the presentation and plays its narration. A deck shows on one TV at a time."),
+	mcp.AddTool(s, &mcp.Tool{Name: "cast_deck", Description: "Show a deck on a TV (Chromecast) in presenting mode. The TV follows the presentation and plays its narration. A deck shows on one TV at a time.", Annotations: reachesOut},
 		func(ctx context.Context, req *mcp.CallToolRequest, in CastDeckIn) (*mcp.CallToolResult, *CastOut, error) {
 			if err := h.svc.StartCast(ctx, in.DeckID, in.Device, actorOf(req)); err != nil {
 				return nil, nil, notFound(err, in.DeckID)
@@ -83,7 +81,7 @@ func (h *handlers) castTools(s *mcp.Server) {
 			return nil, &CastOut{Casting: h.svc.CastStatus(in.DeckID)}, nil
 		})
 
-	mcp.AddTool(s, action("stop_cast", "Take a deck off the TV it is showing on."),
+	mcp.AddTool(s, &mcp.Tool{Name: "stop_cast", Description: "Take a deck off the TV it is showing on.", Annotations: stopsOutside},
 		func(ctx context.Context, req *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *StoppedOut, error) {
 			err := h.svc.StopCastBy(ctx, in.DeckID, actorOf(req))
 			if errors.Is(err, service.ErrNotCasting) {
@@ -97,11 +95,11 @@ func (h *handlers) castTools(s *mcp.Server) {
 }
 
 func (h *handlers) presentTools(s *mcp.Server) {
-	mcp.AddTool(s, action("present_slide", "Present one step out loud: show a slide (at a build step) on every screen watching the deck and speak a line in the narration voice. "+
-		"The presenter view and a cast TV play the audio; other viewers follow silently. It returns after the narration has been spoken, so call it again for the next line or build step. "+
-		"Speak as the presenter to a live audience: explain what the content and data on the slide mean and why they matter, using the speaker notes as talking points rather than reading them out. "+
-		"Never narrate the presentation itself (\"here is the next slide\", \"this point builds in\", \"let's move on\", \"as you can see on screen\", clicks, transitions): the audience sees the slides change, and such sentences are removed before speaking. "+
-		"Use it to present step by step with your own words; start_presentation presents the whole deck on its own instead."),
+	mcp.AddTool(s, &mcp.Tool{Name: "present_slide", Description: "Present one step out loud: show a slide (at a build step) on every screen watching the deck and speak a line in the narration voice. " +
+		"The presenter view and a cast TV play the audio; other viewers follow silently. It returns after the narration has been spoken, so call it again for the next line or build step. " +
+		"Speak as the presenter to a live audience: explain what the content and data on the slide mean and why they matter, using the speaker notes as talking points rather than reading them out. " +
+		"Never narrate the presentation itself (\"here is the next slide\", \"this point builds in\", \"let's move on\", \"as you can see on screen\", clicks, transitions): the audience sees the slides change, and such sentences are removed before speaking. " +
+		"Use it to present step by step with your own words; start_presentation presents the whole deck on its own instead.", Annotations: reachesOut},
 		func(ctx context.Context, req *mcp.CallToolRequest, in PresentSlideIn) (*mcp.CallToolResult, *presenting.StepResult, error) {
 			res, err := h.presenter.Go(ctx, in.DeckID, presenting.Step{Slide: in.Slide, SlideID: in.SlideID, Build: in.Build, Say: in.Say, Voice: in.Voice}, actorOf(req))
 			if err != nil {
@@ -110,10 +108,10 @@ func (h *handlers) presentTools(s *mcp.Server) {
 			return nil, res, nil
 		})
 
-	mcp.AddTool(s, action("start_presentation", "Present the deck by itself in the background, as the slide presenter: it shows each slide and its build steps and speaks about the content, "+
-		"what the text, numbers, charts and diagrams mean, using each slide's speaker notes as talking points (not read out word for word). Slides don't need notes. "+
-		"The narration is written by the instance's AI model just before each slide (without one, the notes are read, or the content summarised). "+
-		"Pass script to supply your own words for some slides. Returns at once; follow it with presentation_status and end it with stop_presentation."),
+	mcp.AddTool(s, &mcp.Tool{Name: "start_presentation", Description: "Present the deck by itself in the background, as the slide presenter: it shows each slide and its build steps and speaks about the content, " +
+		"what the text, numbers, charts and diagrams mean, using each slide's speaker notes as talking points (not read out word for word). Slides don't need notes. " +
+		"The narration is written by the instance's AI model just before each slide (without one, the notes are read, or the content summarised). " +
+		"Pass script to supply your own words for some slides. Returns at once; follow it with presentation_status and end it with stop_presentation.", Annotations: reachesOut},
 		func(ctx context.Context, req *mcp.CallToolRequest, in StartPresentationIn) (*mcp.CallToolResult, *StartPresentationOut, error) {
 			o := presenting.RunOptions{From: in.FromSlide, To: in.ToSlide, Voice: in.Voice, Script: in.Script, AIProvider: in.AIProvider, Model: in.AIModel,
 				NoAI: !h.allowed(ctx, principal(req), authz.UseAI, "")}
@@ -124,12 +122,12 @@ func (h *handlers) presentTools(s *mcp.Server) {
 			return nil, &StartPresentationOut{Status: st, Note: "Presenting in the background. People need the presenter view or a cast TV open to hear it."}, nil
 		})
 
-	mcp.AddTool(s, action("stop_presentation", "Stop the deck's automatic presentation."),
+	mcp.AddTool(s, &mcp.Tool{Name: "stop_presentation", Description: "Stop the deck's automatic presentation.", Annotations: sets},
 		func(ctx context.Context, req *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *StoppedOut, error) {
 			return nil, &StoppedOut{Stopped: h.presenter.Stop(in.DeckID)}, nil
 		})
 
-	mcp.AddTool(s, &mcp.Tool{Name: "presentation_status", Description: "Where the deck's presentation is: running or not, current slide and build step, and why the last run stopped early.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}},
+	mcp.AddTool(s, &mcp.Tool{Name: "presentation_status", Description: "Where the deck's presentation is: running or not, current slide and build step, and why the last run stopped early.", Annotations: readOnly},
 		func(ctx context.Context, req *mcp.CallToolRequest, in DeckRef) (*mcp.CallToolResult, *presenting.Status, error) {
 			if _, _, _, err := h.svc.Get(ctx, in.DeckID); err != nil {
 				return nil, nil, notFound(err, in.DeckID)
