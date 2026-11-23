@@ -1,4 +1,4 @@
-package testenv
+package server_test
 
 import (
 	"context"
@@ -13,13 +13,13 @@ import (
 	"github.com/SecOps-7/slidekick/internal/blob"
 )
 
-// S3Config returns the S3 integration-test settings, skipping the test unless
-// SLIDEKICK_TEST_S3_ENDPOINT is set. It also needs SLIDEKICK_TEST_S3_ACCESS_KEY
-// and SLIDEKICK_TEST_S3_SECRET_KEY; SLIDEKICK_TEST_S3_BUCKET (default
-// "slidekick-test") is created if missing, SLIDEKICK_TEST_S3_REGION is
-// optional and SLIDEKICK_TEST_S3_INSECURE=1 uses plain HTTP (local MinIO).
-// Each call gets a fresh random key prefix so runs don't see each other.
-func S3Config(t testing.TB) blob.S3Config {
+// s3TestConfig returns the S3 integration-test settings, skipping the test
+// unless SLIDEKICK_TEST_S3_ENDPOINT is set (see CONTRIBUTING.md). The
+// SLIDEKICK_TEST_S3_* variables are read only here, in tests, never by the
+// server. The bucket is created if missing, and each call gets a fresh random
+// key prefix so runs don't see each other. internal/blob and internal/server
+// keep identical copies, since test files can't be shared between packages.
+func s3TestConfig(t testing.TB) blob.S3Config {
 	t.Helper()
 	cfg := blob.S3Config{
 		Endpoint:  os.Getenv("SLIDEKICK_TEST_S3_ENDPOINT"),

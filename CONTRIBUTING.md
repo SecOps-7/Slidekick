@@ -30,6 +30,20 @@ When a visual change is intended, add `SLIDEKICK_GOLDEN_UPDATE=1` to rewrite the
 
 Or build the container: `docker build --target render -t slidekick:dev .`
 
+### S3 integration tests
+
+`internal/blob` and `internal/server` also run their file-storage tests against a real S3-compatible bucket when `SLIDEKICK_TEST_S3_ENDPOINT` is set; otherwise those tests are skipped. These variables are read only by the tests, never by the server, which takes its own `SLIDEKICK_S3_*` settings.
+
+| Variable | |
+| --- | --- |
+| `SLIDEKICK_TEST_S3_ENDPOINT` | Host and port, such as `127.0.0.1:9000` |
+| `SLIDEKICK_TEST_S3_ACCESS_KEY`, `SLIDEKICK_TEST_S3_SECRET_KEY` | Credentials for a throwaway test bucket |
+| `SLIDEKICK_TEST_S3_BUCKET` | Default `slidekick-test`; created if missing |
+| `SLIDEKICK_TEST_S3_REGION` | Optional |
+| `SLIDEKICK_TEST_S3_INSECURE` | `1` for plain HTTP, such as a local MinIO |
+
+Each run writes under a fresh random prefix, so runs don't see each other.
+
 ## Where things live
 
 | Path | |

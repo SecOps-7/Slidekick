@@ -9,13 +9,12 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"github.com/SecOps-7/slidekick/internal/blob"
-	"github.com/SecOps-7/slidekick/internal/testenv"
 )
 
 // TestS3 runs the Store contract against a real S3-compatible server; it is
-// skipped unless SLIDEKICK_TEST_S3_* is set (see testenv.S3Config).
+// skipped unless SLIDEKICK_TEST_S3_* is set (see s3TestConfig).
 func TestS3(t *testing.T) {
-	cfg := testenv.S3Config(t)
+	cfg := s3TestConfig(t)
 	ctx := context.Background()
 	c, err := minio.New(cfg.Endpoint, &minio.Options{Creds: credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""), Secure: !cfg.Insecure, Region: cfg.Region})
 	if err != nil {

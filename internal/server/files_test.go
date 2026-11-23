@@ -30,9 +30,9 @@ func TestServeFileHeaders(t *testing.T) {
 }
 
 // TestServeFileS3 is the same check with files in a bucket; it is skipped
-// unless SLIDEKICK_TEST_S3_* is set (see testenv.S3Config).
+// unless SLIDEKICK_TEST_S3_* is set (see s3TestConfig).
 func TestServeFileS3(t *testing.T) {
-	cfg := testenv.S3Config(t)
+	cfg := s3TestConfig(t)
 	env := testenv.New(t)
 	bs, err := blob.NewS3(context.Background(), cfg)
 	if err != nil {
