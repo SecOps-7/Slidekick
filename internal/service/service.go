@@ -38,7 +38,7 @@ type Service struct {
 	// outside (Settings > General), or "" (nil: none). Links handed out use
 	// it; cast TVs keep using BaseURL on the local network.
 	PublicURL func(context.Context) string
-	live        liveLimiter
+	live      liveLimiter
 	// FilesDir holds uploaded assets on disk; empty disables uploads unless
 	// Blobs is set.
 	FilesDir string
