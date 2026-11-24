@@ -15,8 +15,15 @@ interface Provider {
   hasKey: boolean;
   defaultVoice: string;
   defaultModel: string;
+  voices: SavedVoice[];
   builtIn: boolean;
   isDefault: boolean;
+}
+
+/** A voice added to a provider: its id at the provider and the name people pick it by. */
+interface SavedVoice {
+  id: string;
+  name: string;
 }
 
 interface Voice {
@@ -41,10 +48,18 @@ const kinds: Record<string, { label: string; base: string; model: string; hint: 
 
 const kindLabel = (k: string) => (k === "browser" ? "Built into the presenter's browser" : (kinds[k]?.label ?? k));
 
-const blank: Provider = { id: "", name: "", kind: "openai", baseUrl: kinds.openai.base, hasKey: false, defaultVoice: "", defaultModel: "", builtIn: false, isDefault: false };
+const blank: Provider = { id: "", name: "", kind: "openai", baseUrl: kinds.openai.base, hasKey: false, defaultVoice: "", defaultModel: "", voices: [], builtIn: false, isDefault: false };
 
 const browserVoices = (): Voice[] =>
   typeof speechSynthesis === "undefined" ? [] : speechSynthesis.getVoices().map((v) => ({ id: v.name, name: v.name, lang: v.lang }));
+
+/** "3 voices, default Aria" for the provider list. */
+function voiceSummary(p: Provider): string {
+  const n = p.voices?.length ?? 0;
+  if (n === 0) return "the provider's default voice";
+  const def = p.voices.find((v) => v.id === p.defaultVoice)?.name;
+  return `${n === 1 ? "1 voice" : `${n} voices`}${def ? `, default ${def}` : ""}`;
+}
 
 const SAMPLE = "Hello! This is how this voice sounds when Slidekick reads your speaker notes.";
 
@@ -86,7 +101,7 @@ async function loadVoices(provider: string): Promise<Voice[]> {
 
 function VoicePicker({ provider, value, onChange, voices }: { provider: string; value: string; onChange: (v: string) => void; voices: Voice[] }) {
   const known = voices.some((v) => v.id === value);
-  if (voices.length === 0)
+  if (voices.length === 0 && provider === "browser")
     return <input value={value} placeholder={provider === "browser" ? "The browser's default voice" : "Voice ID"} onInput={(e) => onChange(e.currentTarget.value)} />;
   return (
     <select value={value} onChange={(e) => onChange(e.currentTarget.value)}>
@@ -113,18 +128,20 @@ function NarrationDefault({ list, def, onSaved }: { list: Provider[]; def: Defau
     setVoice(def.voice);
   }, [def.provider, def.voice]);
   useEffect(() => {
-    setVoices([]);
     setErr("");
-    loadVoices(provider)
-      .then(setVoices)
-      .catch((x) => setErr((x as Error).message));
-    if (provider === "browser" && typeof speechSynthesis !== "undefined") {
+    if (provider !== "browser") {
+      // The voices added to the provider, by their names.
+      setVoices(list.find((p) => p.id === provider)?.voices ?? []);
+      return;
+    }
+    setVoices(browserVoices());
+    if (typeof speechSynthesis !== "undefined") {
       // Browsers fill the list asynchronously.
       const again = () => setVoices(browserVoices());
       speechSynthesis.addEventListener("voiceschanged", again);
       return () => speechSynthesis.removeEventListener("voiceschanged", again);
     }
-  }, [provider]);
+  }, [provider, list]);
   const save = async () => {
     setErr("");
     try {
@@ -166,6 +183,116 @@ function NarrationDefault({ list, def, onSaved }: { list: Provider[]; def: Defau
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * A provider's voices: each with the name people pick it by, one of them the
+ * default. Voices are added by id; once the provider's own list is loaded,
+ * typing offers its voices and fills in the provider's name for the voice.
+ */
+function VoicesEditor({ edit, setEdit, catalog, onLoad, onSample }: {
+  edit: Provider;
+  setEdit: (p: Provider) => void;
+  catalog: Voice[];
+  onLoad: () => void;
+  onSample: (voice: string) => void;
+}) {
+  const [id, setId] = useState("");
+  const [name, setName] = useState("");
+  const [msg, setMsg] = useState("");
+  const listId = `tts-catalog-${edit.id || "new"}`;
+  const nameOf = (v: Voice) => (v.lang ? `${v.name} (${v.lang})` : v.name);
+  const pickId = (v: string) => {
+    setId(v);
+    setMsg("");
+    const hit = catalog.find((c) => c.id === v.trim());
+    if (hit) setName(nameOf(hit)); // the provider's own name for the voice
+  };
+  const add = () => {
+    const vid = id.trim();
+    if (!vid) return setMsg("Enter the voice's ID, or load the provider's voices and pick one.");
+    if (edit.voices.some((v) => v.id === vid)) return setMsg("That voice is already added.");
+    const hit = catalog.find((c) => c.id === vid);
+    const vname = name.trim() || (hit ? nameOf(hit) : vid);
+    setEdit({ ...edit, voices: [...edit.voices, { id: vid, name: vname }], defaultVoice: edit.defaultVoice || vid });
+    setId("");
+    setName("");
+    setMsg("");
+  };
+  const rename = (vid: string, n: string) => setEdit({ ...edit, voices: edit.voices.map((v) => (v.id === vid ? { ...v, name: n } : v)) });
+  const remove = (vid: string) => {
+    const voices = edit.voices.filter((v) => v.id !== vid);
+    setEdit({ ...edit, voices, defaultVoice: edit.defaultVoice === vid ? (voices[0]?.id ?? "") : edit.defaultVoice });
+  };
+  return (
+    <fieldset class="tts-voices">
+      <legend>Voices</legend>
+      <small>
+        The voices people can pick when they present, by the names you give them. The default is used when nobody picks one.
+        {edit.kind === "deepgram" && " For Deepgram the voice ID is the Aura model, like aura-2-thalia-en."}
+      </small>
+      {edit.voices.length > 0 ? (
+        <table class="acc-table tts-voice-table">
+          <tbody>
+            {edit.voices.map((v) => (
+              <tr key={v.id}>
+                <td>
+                  <label class="acc-check">
+                    <input type="radio" name="tts-default-voice" checked={edit.defaultVoice === v.id} onChange={() => setEdit({ ...edit, defaultVoice: v.id })} /> Default
+                  </label>
+                </td>
+                <td>
+                  <input value={v.name} aria-label={`Name for voice ${v.id}`} maxLength={80} onInput={(e) => rename(v.id, e.currentTarget.value)} />
+                </td>
+                <td class="acc-muted">
+                  <code>{v.id}</code>
+                </td>
+                <td class="acc-actions">
+                  <button type="button" class="acc-link" onClick={() => onSample(v.id)}>
+                    Play
+                  </button>
+                  <button type="button" class="acc-link danger" onClick={() => remove(v.id)}>
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p class="acc-muted">No voices added yet: narration uses the provider's own default voice.</p>
+      )}
+      <div class="acc-inline tts-voice-add">
+        <input
+          value={id}
+          list={catalog.length ? listId : undefined}
+          placeholder={catalog.length ? "Type to find a voice" : "Voice ID"}
+          aria-label="Voice ID to add"
+          onInput={(e) => pickId(e.currentTarget.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), add())}
+        />
+        <input value={name} placeholder="Name (optional)" aria-label="Name for the voice" maxLength={80} onInput={(e) => setName(e.currentTarget.value)} />
+        <button type="button" onClick={add}>
+          Add voice
+        </button>
+        <button type="button" onClick={onLoad}>
+          {catalog.length ? "Reload the provider's voices" : "Load the provider's voices"}
+        </button>
+      </div>
+      {catalog.length > 0 && (
+        <datalist id={listId}>
+          {catalog
+            .filter((c) => !edit.voices.some((v) => v.id === c.id))
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {nameOf(c)}
+              </option>
+            ))}
+        </datalist>
+      )}
+      {msg && <p class="acc-err">{msg}</p>}
+    </fieldset>
   );
 }
 
@@ -215,17 +342,17 @@ function Voices() {
     try {
       const vs = await loadVoices(edit!.id);
       setVoices(vs);
-      setNote(vs.length ? `${vs.length} voices found. Pick the default voice, then Save.` : "The provider listed no voices. Type a voice ID instead.");
+      setNote(vs.length ? `${vs.length} voices found. Type in the voice box to find one, add it, then Save.` : "The provider listed no voices. Add a voice by its ID instead.");
     } catch (x) {
       setNote("");
       setErr((x as Error).message);
     }
   };
-  const sample = async () => {
+  const sample = async (voice: string) => {
     if (!(await save())) return;
     setNote("Playing a sample…");
     try {
-      await playSample(edit!.id, edit!.defaultVoice);
+      await playSample(edit!.id, voice);
       setNote("");
     } catch (x) {
       setNote("");
@@ -281,18 +408,9 @@ function Voices() {
               {k.models && <small>{k.models}</small>}
             </label>
           )}
-          <label>
-            Default voice {edit.kind === "deepgram" && <small>(the voice is the Aura model, e.g. aura-2-thalia-en)</small>}
-            <VoicePicker provider={edit.id} value={edit.defaultVoice} onChange={(v) => setEdit({ ...edit, defaultVoice: v })} voices={voices} />
-          </label>
+          <VoicesEditor edit={edit} setEdit={setEdit} catalog={voices} onLoad={fetchVoices} onSample={sample} />
           <div class="acc-inline">
             <button class="acc-primary">Save</button>
-            <button type="button" onClick={fetchVoices}>
-              Save and load voices
-            </button>
-            <button type="button" onClick={sample}>
-              Play sample
-            </button>
             <button type="button" onClick={() => setEdit(null)}>
               Done
             </button>
@@ -319,7 +437,7 @@ function Voices() {
                     {p.builtIn ? "" : ` · ${p.baseUrl}`}
                   </div>
                 </td>
-                <td class="acc-muted">{p.builtIn ? "no key needed" : `${p.defaultVoice ? `voice ${p.defaultVoice}` : "default voice"} · ${p.hasKey ? "key stored" : "no key"}`}</td>
+                <td class="acc-muted">{p.builtIn ? "no key needed" : `${voiceSummary(p)} · ${p.hasKey ? "key stored" : "no key"}`}</td>
                 <td class="acc-actions">
                   {!p.isDefault && (
                     <button class="acc-link" onClick={() => makeDefault(p).catch((x) => setErr((x as Error).message))}>

@@ -235,15 +235,39 @@ button { font: inherit; }
 .pr-builds i.on { background: #5eead4; }
 .pr-timer { font: 600 40px/1 "JetBrains Mono", ui-monospace, monospace; color: #e8ebf5; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font-variant-numeric: tabular-nums; }
 .pr-clock { justify-self: end; color: #8f98b3; font-variant-numeric: tabular-nums; }
+/* Present with AI voice: purple, so it stands out from the plain controls. */
+.pr-btn.pr-ai-btn { flex: 1 1 100%; gap: 8px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(99, 102, 241, 0.18)); border-color: rgba(167, 139, 250, 0.6); color: #ede9fe; font-weight: 600; }
+.pr-btn.pr-ai-btn:hover:not(:disabled) { background: linear-gradient(135deg, rgba(139, 92, 246, 0.45), rgba(99, 102, 241, 0.28)); border-color: #a78bfa; }
+.pr-btn.pr-ai-btn.on { background: rgba(139, 92, 246, 0.45); border-color: #c4b5fd; color: #fff; }
+.pr-sparkle { width: 16px; height: 16px; flex: none; color: #c4b5fd; }
+.pr-ai-btn.on .pr-sparkle { color: #fff; }
+.pr-viewers { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: #8f98b3; font-size: 13px; font-variant-numeric: tabular-nums; }
+.pr-viewers::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #4b5470; }
+.pr-viewers.on { color: #e8ebf5; }
+.pr-viewers.on::before { background: #5eead4; box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.18); }
 .pr-notes { overflow-y: auto; padding: 14px 16px; border-radius: 10px; background: #111522; font-size: 20px; line-height: 1.5; min-height: 0; }
 .pr-notes p { margin: 0 0 12px; }
 .pr-notes .pr-none { color: #8f98b3; font-size: 15px; }
 .pr-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.pr-btn { padding: 8px 12px; border-radius: 8px; border: 1px solid #262d40; background: #141927; color: inherit; font: inherit; cursor: pointer; }
+/* Every presenter button is the same height, its label centred, with or without an icon. */
+.pr-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 14px; border-radius: 8px; border: 1px solid #262d40; background: #141927; color: inherit; font: inherit; font-size: 14px; line-height: 1.2; white-space: nowrap; cursor: pointer; }
+.pr-btn:hover:not(:disabled) { border-color: #3a4360; background: #1a2032; }
+.pr-btn[hidden] { display: none; }
+.pr-btn:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
+.pr-btn:disabled { opacity: 0.6; cursor: default; }
 .pr-btn.primary { background: #5eead4; color: #062b26; border-color: transparent; font-weight: 600; }
+.pr-btn.primary:hover:not(:disabled) { background: #7ef0dc; }
 .pr-btn.on { border-color: #f43f5e; color: #fda4af; }
-.pr-status { color: #8f98b3; font-size: 13px; }
-@media (max-width: 900px) { .pr { grid-template-columns: 1fr; grid-template-rows: 55vh auto; overflow-y: auto; } }
+/* Exit: red and at the far end of the row, so it isn't hit by mistake. */
+.pr-btn.pr-exit { margin-left: auto; border-color: rgba(244, 63, 94, 0.45); background: rgba(244, 63, 94, 0.08); color: #fda4af; }
+.pr-btn.pr-exit:hover { border-color: #f43f5e; background: rgba(244, 63, 94, 0.18); color: #ffe4e6; }
+/* The last line: the connection on the left, Exit on the right. */
+.pr-break { flex-basis: 100%; height: 0; }
+.pr-status { flex: 1 1 auto; color: #8f98b3; font-size: 13px; }
+@media (max-width: 900px) {
+  .pr { grid-template-columns: 1fr; grid-template-rows: 55vh auto; overflow-y: auto; }
+  .pr-next-stage { max-width: 420px; } /* stacked: a preview, not a second stage */
+}
 
 /* ---- audience window ---- */
 .sk-audience, .sk-audience .sk-viewport { cursor: none; }
@@ -272,14 +296,16 @@ button { font: inherit; }
 /* Scale the page chrome on large and 4K monitors so text keeps a comfortable
    size relative to the screen. The editor, viewer and presenter size their
    own stage, so they're left alone. */
-/* Roughly proportional to width beyond ~1600px (a 4K screen gets about 2.3x). */
-@media (min-width: 1700px) { body.home-page, body.acc-page { zoom: 1.08; } }
-@media (min-width: 1900px) { body.home-page, body.acc-page { zoom: 1.2; } }
-@media (min-width: 2200px) { body.home-page, body.acc-page { zoom: 1.38; } }
-@media (min-width: 2500px) { body.home-page, body.acc-page { zoom: 1.56; } }
-@media (min-width: 2900px) { body.home-page, body.acc-page { zoom: 1.8; } }
-@media (min-width: 3300px) { body.home-page, body.acc-page { zoom: 2.05; } }
-@media (min-width: 3700px) { body.home-page, body.acc-page { zoom: 2.3; } }
+/* Roughly proportional to width beyond ~1600px (a 4K screen gets about 2.3x).
+   --page-zoom repeats the factor: under zoom, 100vh is the window's height
+   times the zoom, so full-height layouts divide by it (see .auth and .dk). */
+@media (min-width: 1700px) { body.home-page, body.acc-page { zoom: 1.08; --page-zoom: 1.08; } }
+@media (min-width: 1900px) { body.home-page, body.acc-page { zoom: 1.2; --page-zoom: 1.2; } }
+@media (min-width: 2200px) { body.home-page, body.acc-page { zoom: 1.38; --page-zoom: 1.38; } }
+@media (min-width: 2500px) { body.home-page, body.acc-page { zoom: 1.56; --page-zoom: 1.56; } }
+@media (min-width: 2900px) { body.home-page, body.acc-page { zoom: 1.8; --page-zoom: 1.8; } }
+@media (min-width: 3300px) { body.home-page, body.acc-page { zoom: 2.05; --page-zoom: 2.05; } }
+@media (min-width: 3700px) { body.home-page, body.acc-page { zoom: 2.3; --page-zoom: 2.3; } }
 /* The Copy button sits above the command, so scrolled text never hides under it. */
 .cmd { display: grid; gap: 6px; }
 .cmd .copy { position: static; justify-self: end; order: -1; }

@@ -2,6 +2,23 @@
 
 Each release lists its changes by type: New, Changed, Fixed and Internal (also Security, Removed and Deprecated when a release has them). The about page badges every note with its type.
 
+## 1.2.2 (unreleased)
+
+### New
+- Named voices: each voice provider keeps several voices under Settings → Voices, each with a name people pick it by (filled in from the provider's own name for it) and one marked as the provider's default. Providers set up earlier keep their voice, named by its ID.
+- Present with AI voice asks which voice to use first, from any provider or the presenting browser's own voices, opening on the voice used last on that device. The button has an AI sparkle.
+- The presenter view shows how many viewers are watching: each device with the viewer link open counts once, and a cast TV counts as one. Only people who can present see the count.
+
+- The presenter view has **Exit presenter view**: back to the page it was opened from, or the tab closes when the editor opened it in a new one. An AI voice run, a cast TV and viewers carry on.
+
+### Fixed
+- Signed-in people get the full deck page again (arrow keys, clicks and swipes, Edit, Present, lint, follow mode, narration sound and captions, back to the library). Only viewer links are view-only.
+- The presenter view shows **Captions** and the sound button only while the AI voice speaks.
+- The presenter view's buttons line up at one height. Present with AI voice is a purple bar that stands out, and Exit presenter view is red, on its own at the bottom right.
+- The presenter view's next-slide preview fills its box at any window size and in the deck's own aspect (it kept its first size after a resize, and was always 16:9).
+- The sign-in page fits the window again on wide screens: it no longer needs scrolling at 1920 pixels wide and above. The home page had the same extra height.
+- The account menu and deck menus on the home page open next to their button again on wide screens, instead of off the edge of the window.
+
 ## 1.2.1 (2026-11-23)
 
 ### Changed

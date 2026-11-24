@@ -33,6 +33,9 @@ export class Live {
     private onMsg: (m: LiveMsg) => void,
     private onState: (s: "live" | "offline") => void = () => {},
     private token?: string,
+    // What this page counts as in the presenter's viewer count: a viewer page
+    // (once per device) or the cast TV. The editor and presenter view leave it out.
+    private as?: "viewer" | "cast",
   ) {
     try {
       this.bc = new BroadcastChannel(`slidekick-present-${deckId}`);
@@ -46,7 +49,10 @@ export class Live {
   private connect() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
     // A private deck opened without its key is unlocked by the auth message.
-    const ws = new WebSocket(`${proto}://${location.host}${withKey(`/ws/decks/${encodeURIComponent(this.deckId)}`)}`);
+    let path = `/ws/decks/${encodeURIComponent(this.deckId)}`;
+    if (this.as === "viewer") path += `?as=viewer&dev=${deviceId()}`;
+    else if (this.as === "cast") path += "?as=cast";
+    const ws = new WebSocket(`${proto}://${location.host}${withKey(path)}`);
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 500;
@@ -91,4 +97,28 @@ export class Live {
     this.ws?.close();
     this.bc?.close();
   }
+}
+
+// A random id for this browser, kept in local storage, so the viewer count
+// counts a device once however many of its tabs watch. Without storage
+// (private windows, blocked site data) it lasts as long as the page.
+let device = "";
+function deviceId(): string {
+  if (device) return device;
+  try {
+    device = localStorage.getItem("slidekick-device") ?? "";
+  } catch {
+    /* storage blocked */
+  }
+  if (!/^[A-Za-z0-9_-]{8,40}$/.test(device)) {
+    const b = new Uint8Array(12);
+    crypto.getRandomValues(b);
+    device = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    try {
+      localStorage.setItem("slidekick-device", device);
+    } catch {
+      /* storage blocked: this page keeps it */
+    }
+  }
+  return device;
 }

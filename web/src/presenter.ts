@@ -13,6 +13,7 @@ import { Laser } from "./laser";
 import { Live, type LiveMsg } from "./sync";
 import { followTo, Narrator, slideIndex, type NarrationStep } from "./narrate";
 import { alertModal } from "./ui/modal";
+import { pickVoice, sparkleIcon } from "./voice-picker";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
   const n = document.createElement(tag);
@@ -58,7 +59,16 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   timer.type = "button";
   timer.title = "Click to pause; double-click to reset (T resets)";
   const clock = el("div", "pr-clock");
-  meta.append(pos, builds, timer, clock);
+  // Devices watching the viewer link, plus the cast TV: updated live.
+  const viewers = el("div", "pr-viewers");
+  viewers.setAttribute("role", "status");
+  viewers.title = "Devices with the viewer link open; a cast TV counts as one";
+  const setViewers = (n: number | null) => {
+    viewers.textContent = n === null ? "Viewers: unknown while offline" : n === 1 ? "1 viewer" : `${n} viewers`;
+    viewers.classList.toggle("on", Boolean(n));
+  };
+  setViewers(0);
+  meta.append(pos, builds, timer, clock, viewers);
   const notes = el("div", "pr-notes");
   notes.setAttribute("aria-label", "Speaker notes");
   const controls = el("div", "pr-controls");
@@ -70,10 +80,31 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   // unless the presenter turns its sound on (onCasting is wired up below).
   let onCasting = (_device: string | null) => {};
   const cast = castMenu(deckId, { buttonClass: "pr-btn", up: true, onCasting: (d) => onCasting(d) });
-  controls.append(openAud, laserBtn, cast.el, status);
+  // Exit: back to where the presenter view was opened from. A tab of its own
+  // (the editor opens one) closes; otherwise the editor, the library or, on a
+  // presenter link, the deck's viewer page. An AI voice run, a cast TV and
+  // viewers carry on: they don't depend on this window.
+  const exitBtn = el("button", "pr-btn pr-exit", "Exit presenter view");
+  exitBtn.type = "button";
+  exitBtn.onclick = () => {
+    let cameFromHere = false; // the page before this one in the tab was Slidekick's (see main.ts)
+    try {
+      cameFromHere = Boolean(sessionStorage.getItem("sk-came-from"));
+    } catch {
+      /* storage blocked */
+    }
+    if (history.length > 1 && cameFromHere) return history.back();
+    if (history.length <= 1) window.close();
+    const can = currentMe()?.can ?? {};
+    const fallback = viaLink ? withKey(`/d/${encodeURIComponent(deckId)}`) : can["deck:edit"] ? `/d/${encodeURIComponent(deckId)}/edit` : "/";
+    setTimeout(() => location.assign(fallback), 150); // still here: the browser kept the tab open
+  };
+  controls.append(openAud, laserBtn, cast.el, el("span", "pr-break"), status, exitBtn);
   // AI voice: start/stop a narrated run and see where it is.
   const ai = el("div", "pr-ai");
-  const aiBtn = el("button", "pr-btn", "Present with AI voice");
+  const aiBtn = el("button", "pr-btn pr-ai-btn");
+  const aiLabel = el("span", undefined, "Present with AI voice");
+  aiBtn.append(sparkleIcon(), aiLabel);
   const capBtn = el("button", "pr-btn", "Captions");
   const soundBtn = el("button", "pr-btn", "Unmute voice");
   const aiStatus = el("span", "pr-ai-status");
@@ -144,12 +175,16 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
       narrator.replay();
     }
   };
+  // Captions and this screen's sound only matter while the AI voice speaks
+  // (a run from here, or an agent presenting step by step).
   const showRun = (running: boolean, text: string, err = false) => {
-    aiBtn.textContent = running ? "Stop AI voice" : "Present with AI voice";
+    aiLabel.textContent = running ? "Stop AI voice" : "Present with AI voice";
     aiBtn.classList.toggle("on", running);
+    capBtn.hidden = soundBtn.hidden = !running;
     aiStatus.textContent = text;
     aiStatus.classList.toggle("err", err);
   };
+  capBtn.hidden = soundBtn.hidden = true;
   const onNarration = (m: LiveMsg) => {
     if (m.state === "started") showRun(true, "Starting the AI voice…");
     else if (m.state === "step") {
@@ -169,11 +204,16 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
     const running = aiBtn.classList.contains("on");
     aiBtn.disabled = true;
     try {
+      // Which voice: asked each time, opening on the one used last.
+      const voice = running ? null : await pickVoice(deckId);
+      if (!running && !voice) return;
       const r = await fetch(presentURL, {
         method: running ? "DELETE" : "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         // From the slide on screen; from the start when that's the last one (a run just ended there).
-        body: running ? undefined : JSON.stringify({ from: player.position.index >= deck.slides.length - 1 ? 1 : player.position.index + 1 }),
+        body: running
+          ? undefined
+          : JSON.stringify({ from: player.position.index >= deck.slides.length - 1 ? 1 : player.position.index + 1, provider: voice!.provider, voice: voice!.voice }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -194,6 +234,8 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
         return;
       }
       if (m.type === "audience") return setAudience(String(m.state));
+      if (m.type === "viewers") return setViewers(Number(m.count) || 0);
+      if (m.type === "hello" && typeof m.viewers === "number") setViewers(m.viewers);
       if (narrator.handle(m)) return onNarration(m);
       cast.onEvent(m);
       // A TV that just started casting opens on slide 1: tell it where we are once it has loaded.
@@ -216,7 +258,10 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
       player.setDeck(deck, { keepSlideId: player.slideId, live });
       await player.refresh();
     },
-    (s) => (status.textContent = s === "live" ? "live · viewers follow you" : "offline: audience windows on this machine still follow"),
+    (s) => {
+      status.textContent = s === "live" ? "live · viewers follow you" : "offline: audience windows on this machine still follow";
+      if (s !== "live") setViewers(null);
+    },
   );
 
   const send = (p: Position) => live.broadcast({ type: "present", index: p.index, step: p.step });
@@ -224,25 +269,35 @@ export async function mountPresenter(host: HTMLElement, deckId: string) {
   live.local({ type: "audience-ping" }); // an audience window left open from before answers
 
   // ---- next slide preview ----
+  // The slide is drawn at full stage size and scaled to fill its box, again
+  // whenever the box changes size (window resized, layout stacked on a narrow
+  // screen, device rotated). The box takes the deck's aspect.
   let nextKey = "";
+  const fitNext = () => {
+    const box = nextStage.querySelector<HTMLElement>(".pr-next-inner");
+    if (!box) return;
+    const [w, h] = STAGE[deck.aspect] ?? STAGE["16:9"];
+    const k = Math.min(nextStage.clientWidth / w, nextStage.clientHeight / h);
+    box.style.transform = `translate(${(nextStage.clientWidth - w * k) / 2}px, ${(nextStage.clientHeight - h * k) / 2}px) scale(${k})`;
+  };
+  new ResizeObserver(fitNext).observe(nextStage);
   const showNext = (p: Position) => {
     const s = deck.slides[p.index + 1];
-    const key = s ? JSON.stringify(s) + deck.theme : "end";
+    const key = s ? JSON.stringify(s) + deck.theme + deck.aspect : "end";
     if (key === nextKey) return;
     nextKey = key;
+    const [w, h] = STAGE[deck.aspect] ?? STAGE["16:9"];
+    nextStage.style.aspectRatio = `${w} / ${h}`;
     if (!s) {
       nextStage.replaceChildren(el("div", "pr-end", "End of deck"));
       return;
     }
-    const [w, h] = STAGE[deck.aspect] ?? STAGE["16:9"];
     const box = el("div", "pr-next-inner");
     box.style.width = `${w}px`;
     box.style.height = `${h}px`;
     box.append(renderSlide(deck, s, catalog.layouts[s.layout]?.regions ?? []).el);
     nextStage.replaceChildren(box);
-    const fit = () => (box.style.transform = `scale(${nextStage.clientWidth / w})`);
-    fit();
-    requestAnimationFrame(fit);
+    fitNext();
   };
 
   player.onChange = (p) => {

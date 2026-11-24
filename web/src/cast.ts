@@ -148,7 +148,7 @@ export async function mountCast(host: HTMLElement, deckId: string) {
   let live: Live | null = null;
   const connect = () => {
     live?.close();
-    live = new Live(deckId, (msg) => void onMsg(msg));
+    live = new Live(deckId, (msg) => void onMsg(msg), undefined, undefined, "cast");
   };
   connect();
   // Ask for the deck again when the TV wakes from standby.

@@ -143,14 +143,19 @@ function menu(label: string, html: string, items: Item[]): HTMLElement {
     pop.append(b);
   }
   // Place the popover under its button, right-aligned, kept inside the window.
+  // Positions are worked out in window pixels, then divided by the page zoom
+  // (wide screens zoom the page, see app.css), since left/top set inside the
+  // zoomed page are scaled by it again.
   pop.addEventListener("toggle", (e) => {
     if ((e as ToggleEvent).newState !== "open") return;
+    const z = parseFloat(getComputedStyle(document.body).zoom) || 1;
     const b = btn.getBoundingClientRect();
-    const w = pop.offsetWidth;
-    const h = pop.offsetHeight;
+    const { width: w, height: h } = pop.getBoundingClientRect();
+    const left = Math.max(8, Math.min(b.right - w, innerWidth - w - 8));
+    const top = b.bottom + 6 + h > innerHeight - 8 ? Math.max(8, b.top - h - 6) : b.bottom + 6;
     pop.style.inset = "auto";
-    pop.style.left = `${Math.max(8, Math.min(b.right - w, innerWidth - w - 8))}px`;
-    pop.style.top = `${b.bottom + 6 + h > innerHeight - 8 ? Math.max(8, b.top - h - 6) : b.bottom + 6}px`;
+    pop.style.left = `${left / z}px`;
+    pop.style.top = `${top / z}px`;
   });
   wrap.append(btn, pop);
   return wrap;

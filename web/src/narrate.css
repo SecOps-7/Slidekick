@@ -15,7 +15,9 @@ body > .nr-caption, body > .nr-enable { position: fixed; }
 
 /* presenter view: run control and status */
 .pr-ai { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.pr-ai-status { color: #8f98b3; font-size: 13px; }
+.pr-ai > .pr-btn:not(.pr-ai-btn) { flex: 1 1 0; } /* Captions and sound share the line under the AI button */
+.pr-ai-status { flex-basis: 100%; color: #8f98b3; font-size: 13px; }
+.pr-ai-status:empty { display: none; }
 .pr-ai-status.err { color: #fda4af; }
 .pr-ai .pr-btn[aria-pressed="true"] { border-color: #5eead4; color: #5eead4; }
 

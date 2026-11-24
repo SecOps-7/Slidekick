@@ -70,7 +70,7 @@
 /* ---- sign-in and setup: brand stage + form ---- */
 /* The stage is always dark, like the screen a deck plays on; the form side
    follows the light/dark theme. One motion: the slides kick into place on load. */
-.auth { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+.auth { min-height: calc(100vh / var(--page-zoom, 1)); min-height: calc(100dvh / var(--page-zoom, 1)); display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
 .auth-stage {
   position: relative; overflow: hidden; isolation: isolate; color: #e8ebf5;
   background: radial-gradient(120% 90% at 85% 10%, #1c1546 0%, transparent 55%), radial-gradient(90% 80% at 0% 100%, #0d2a2c 0%, transparent 60%), #0b1020;
@@ -78,7 +78,7 @@
 }
 .auth-deck { position: absolute; inset: 0; z-index: -1; }
 .auth-slide {
-  --w: clamp(220px, 30vw, 430px); position: absolute; left: 30%; top: 22%; width: var(--w); aspect-ratio: 16 / 10;
+  --w: clamp(200px, min(30vw, calc(42dvh / var(--page-zoom, 1))), 430px); position: absolute; /* short, wide windows: smaller, clear of the logo */ left: 30%; top: 22%; width: var(--w); aspect-ratio: 16 / 10;
   border-radius: clamp(14px, 1.6vw, 22px); box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8);
   display: grid; align-content: center; gap: calc(var(--w) * 0.045); padding: 0 calc(var(--w) * 0.09);
   animation: auth-kick 0.9s cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
@@ -115,3 +115,11 @@
 }
 @media (prefers-reduced-motion: reduce) { .auth-slide { animation: none; } }
 .acc-wide section > .acc-fresh { max-width: 820px; }
+
+/* ---- Settings > Voices: a provider's named voices ---- */
+.tts-voices { border: 1px solid var(--app-line); border-radius: 10px; padding: 12px 14px 14px; margin: 0; display: grid; gap: 10px; min-width: 0; }
+.tts-voices legend { padding: 0 6px; font-weight: 600; }
+.tts-voice-table { margin: 0; }
+.tts-voice-table input:not([type]) { width: 100%; min-width: 10ch; }
+.tts-voice-table code { font-size: 12px; word-break: break-all; }
+.tts-voice-add input { flex: 1 1 12ch; min-width: 0; }
