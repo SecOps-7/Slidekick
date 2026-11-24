@@ -33,6 +33,8 @@ func (s *server) ttsRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/admin/tts/{pid}/test", s.require(authz.ManageSettings, false, s.testTTS))
 	mux.Handle("GET /api/tts/providers", s.require(authz.Narrate, false, s.ttsProviders))
 	mux.Handle("GET /api/tts/voices", s.require(authz.Narrate, false, s.ttsVoices))
+	// The presenter view's voice picker, also for presenter links.
+	mux.Handle("GET /api/decks/{id}/voices", s.require(authz.Narrate, true, s.ttsProviders))
 	mux.HandleFunc("GET /api/tts/audio/{file}", s.ttsAudio)
 }
 
@@ -117,7 +119,8 @@ func (s *server) testTTS(w http.ResponseWriter, r *http.Request) {
 	w.Write(a.Data)
 }
 
-// ttsProviders is what editors see: no URL, no key.
+// ttsProviders is what editors and presenters see: names and voices, no
+// URL, no key.
 func (s *server) ttsProviders(w http.ResponseWriter, r *http.Request) {
 	ps, d, err := s.opt.TTS.Providers(r.Context())
 	if err != nil {
@@ -125,15 +128,20 @@ func (s *server) ttsProviders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type public struct {
-		ID           string `json:"id"`
-		Name         string `json:"name"`
-		Kind         string `json:"kind"`
-		DefaultVoice string `json:"defaultVoice"`
-		IsDefault    bool   `json:"isDefault"`
+		ID           string           `json:"id"`
+		Name         string           `json:"name"`
+		Kind         string           `json:"kind"`
+		DefaultVoice string           `json:"defaultVoice"`
+		Voices       []store.TTSVoice `json:"voices"`
+		IsDefault    bool             `json:"isDefault"`
 	}
 	out := make([]public, 0, len(ps))
 	for _, p := range ps {
-		out = append(out, public{p.ID, p.Name, p.Kind, p.DefaultVoice, p.IsDefault})
+		vs := p.Voices
+		if vs == nil {
+			vs = []store.TTSVoice{} // the browser's voices are listed by the browser
+		}
+		out = append(out, public{p.ID, p.Name, p.Kind, p.DefaultVoice, vs, p.IsDefault})
 	}
 	writeJSON(w, 200, map[string]any{"providers": out, "default": d})
 }

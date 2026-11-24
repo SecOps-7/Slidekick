@@ -61,6 +61,39 @@ type ProviderInput struct {
 	APIKey       *string `json:"apiKey,omitempty"` // nil keeps the stored key; "" removes it
 	DefaultVoice string  `json:"defaultVoice"`
 	DefaultModel string  `json:"defaultModel"`
+	// Voices replaces the provider's named voices; nil keeps them.
+	Voices *[]store.TTSVoice `json:"voices,omitempty"`
+}
+
+// MaxVoices is how many voices one provider can keep.
+const MaxVoices = 100
+
+// cleanVoices trims, names (a voice without a name is called by its id) and
+// de-duplicates a voice list.
+func cleanVoices(in []store.TTSVoice) ([]store.TTSVoice, error) {
+	out := []store.TTSVoice{}
+	seen := map[string]bool{}
+	for _, v := range in {
+		v.ID, v.Name = strings.TrimSpace(v.ID), strings.Join(strings.Fields(v.Name), " ")
+		if v.ID == "" || seen[v.ID] {
+			continue
+		}
+		if len(v.ID) > 200 {
+			return nil, fmt.Errorf("%w: voice id %.40q... is too long", ErrValidation, v.ID)
+		}
+		if v.Name == "" {
+			v.Name = v.ID
+		}
+		if utf8.RuneCountInString(v.Name) > 80 {
+			return nil, fmt.Errorf("%w: voice name %q is longer than 80 characters", ErrValidation, v.Name)
+		}
+		seen[v.ID] = true
+		out = append(out, v)
+	}
+	if len(out) > MaxVoices {
+		return nil, fmt.Errorf("%w: a provider keeps at most %d voices", ErrValidation, MaxVoices)
+	}
+	return out, nil
 }
 
 var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
@@ -113,11 +146,34 @@ func (s *Service) SaveProvider(ctx context.Context, in ProviderInput) (*store.TT
 	}
 	p.Name, p.Kind, p.BaseURL = strings.TrimSpace(in.Name), string(kind), in.BaseURL
 	p.DefaultVoice, p.DefaultModel = clean(in.DefaultVoice), clean(in.DefaultModel)
+	if in.Voices != nil {
+		if p.Voices, err = cleanVoices(*in.Voices); err != nil {
+			return nil, err
+		}
+	}
+	if p.DefaultVoice != "" && !hasVoice(p.Voices, p.DefaultVoice) {
+		if in.Voices != nil {
+			return nil, fmt.Errorf("%w: the default voice must be one of the provider's voices", ErrValidation)
+		}
+		p.Voices = append(p.Voices, store.TTSVoice{ID: p.DefaultVoice, Name: p.DefaultVoice}) // a caller that only sets the default
+	}
+	if p.Voices == nil {
+		p.Voices = []store.TTSVoice{}
+	}
 	if err := s.Store.SaveTTSProvider(ctx, p); err != nil {
 		return nil, err
 	}
 	p.HasKey = p.KeyEnc != ""
 	return p, nil
+}
+
+func hasVoice(vs []store.TTSVoice, id string) bool {
+	for _, v := range vs {
+		if v.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) DeleteProvider(ctx context.Context, id string) error {
@@ -174,7 +230,7 @@ func (s *Service) Providers(ctx context.Context) ([]Provider, Default, error) {
 		return nil, Default{}, err
 	}
 	d := s.Default(ctx)
-	out := []Provider{{TTSProvider: store.TTSProvider{ID: BrowserID, Name: "Browser voices (free)", Kind: string(tts.KindBrowser)}, BuiltIn: true, IsDefault: d.Provider == BrowserID}}
+	out := []Provider{{TTSProvider: store.TTSProvider{ID: BrowserID, Name: "Browser voices (free)", Kind: string(tts.KindBrowser), Voices: []store.TTSVoice{}}, BuiltIn: true, IsDefault: d.Provider == BrowserID}}
 	for _, p := range ps {
 		out = append(out, Provider{TTSProvider: *p, IsDefault: d.Provider == p.ID})
 	}
