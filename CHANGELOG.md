@@ -64,7 +64,7 @@ First public release.
 - Operations: TLS on the LAN through a reverse proxy. `SLIDEKICK_TRUSTED_PROXIES` names the proxy, cookies are `Secure` on https requests, and lockouts use the real client address.
 
 ### Changed
-- New decks are private by default: watching one needs a sign-in or its private link. Existing decks and links are unchanged (decision of 2026-11-20, see docs/decisions.md).
+- New decks are private by default: watching one needs a sign-in or its private link. Existing decks and links are unchanged.
 - Deck ownership stays simple: one owner, everyone signed in views, the owner or an admin edits, no per-deck collaborators (decision of 2026-11-20).
 - The server token is documented as an all-powerful emergency key that stays configured as a backstop (decision of 2026-11-20).
 - The AI presenter talks about each slide's content and data, using the speaker notes as talking points rather than reading them out, and no longer needs notes to start.

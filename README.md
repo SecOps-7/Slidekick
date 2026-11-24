@@ -249,7 +249,7 @@ Most things are configured in the web UI (**Settings**): users and roles, single
 | `SLIDEKICK_CHROME` | auto | Path to Chromium if it isn't on `PATH`. |
 | `SLIDEKICK_S3_*` | empty | Keep uploaded and exported files in an S3-compatible bucket (AWS S3, MinIO...) instead of `/data`. |
 
-The full reference, with the S3 settings, roles, single sign-on and casting across VLANs, is in [docs/self-hosting.md](docs/self-hosting.md). Settled design decisions are in [docs/decisions.md](docs/decisions.md).
+The full reference, with the S3 settings, roles, single sign-on and casting across VLANs, is in [docs/self-hosting.md](docs/self-hosting.md).
 
 <details>
 <summary><strong>Command line</strong></summary>

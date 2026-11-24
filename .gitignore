@@ -11,3 +11,5 @@ data/
 web/runtime/icons.gen.ts
 web/src/editor/validate.gen.js
 web/src/editor/validate.gen.d.ts
+# Design decision notes, kept locally
+docs/decisions.md
