@@ -3,6 +3,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -26,6 +28,7 @@ import (
 	"github.com/SecOps-7/slidekick/internal/authz"
 	"github.com/SecOps-7/slidekick/internal/deck"
 	"github.com/SecOps-7/slidekick/internal/export"
+	"github.com/SecOps-7/slidekick/internal/hub"
 	"github.com/SecOps-7/slidekick/internal/localtls"
 	"github.com/SecOps-7/slidekick/internal/narration"
 	"github.com/SecOps-7/slidekick/internal/presenting"
@@ -324,6 +327,35 @@ func (s *server) catalog(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// viewerKey is what a live connection counts as in the deck's viewer count:
+// a viewer page (as=viewer) counts once per device (dev, the browser's own
+// random id; the connection when it sends none), the cast TV (as=cast) counts
+// once, and anything else (the editor, the presenter view) doesn't count.
+func viewerKey(q url.Values, conn string) string {
+	switch q.Get("as") {
+	case "viewer":
+		if d := q.Get("dev"); validDeviceID(d) {
+			return "dev:" + d
+		}
+		return "conn:" + conn
+	case "cast":
+		return "cast"
+	}
+	return ""
+}
+
+func validDeviceID(d string) bool {
+	if len(d) < 8 || len(d) > 40 {
+		return false
+	}
+	for _, c := range d {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 // ws streams deck change events. The first message is a hello carrying the
 // current version so the client can detect a gap and refetch.
 //
@@ -382,13 +414,17 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 		reply, _ := json.Marshal(map[string]any{"type": "auth", "ok": true})
 		c.Write(r.Context(), websocket.MessageText, reply)
 	}
-	ch, cancel := s.svc.Hub.Subscribe(id)
+	conn := deck.NewID("w")
+	ch, cancel := s.svc.Hub.SubscribeViewer(id, viewerKey(r.URL.Query(), conn))
 	defer cancel()
 	ctx, stop := context.WithCancel(r.Context())
 	defer stop()
-	conn := deck.NewID("w")
 
-	hello, _ := json.Marshal(map[string]any{"type": "hello", "version": ver, "conn": conn})
+	helloMsg := map[string]any{"type": "hello", "version": ver, "conn": conn}
+	if authed { // the viewer count is for whoever may present, not the audience
+		helloMsg["viewers"] = s.svc.Hub.Viewers(id)
+	}
+	hello, _ := json.Marshal(helloMsg)
 	if err := c.Write(ctx, websocket.MessageText, hello); err != nil {
 		return
 	}
@@ -471,6 +507,9 @@ func (s *server) ws(w http.ResponseWriter, r *http.Request) {
 					c.Close(websocket.StatusPolicyViolation, "link replaced") // Make new links
 					return
 				}
+			}
+			if bytes.HasPrefix(msg, hub.ViewersPrefix) && !isAuthed() {
+				continue
 			}
 			wctx, done := context.WithTimeout(ctx, 10*time.Second)
 			err := c.Write(wctx, websocket.MessageText, msg)
