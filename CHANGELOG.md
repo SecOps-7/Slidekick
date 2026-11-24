@@ -2,7 +2,7 @@
 
 Each release lists its changes by type: New, Changed, Fixed and Internal (also Security, Removed and Deprecated when a release has them). The about page badges every note with its type.
 
-## 1.2.2 (unreleased)
+## 1.2.2 (2026-11-24)
 
 ### New
 - Named voices: each voice provider keeps several voices under Settings → Voices, each with a name people pick it by (filled in from the provider's own name for it) and one marked as the provider's default. Providers set up earlier keep their voice, named by its ID.
